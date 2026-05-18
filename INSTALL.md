@@ -35,7 +35,7 @@ http://<loxberry-ip>:8080
 2. Im Bereich `Einrichtung` die offenen Punkte anschauen.
 3. `Zur Konfiguration` waehlen.
 4. Loxone-Miniserver URL, Benutzer und Passwort eintragen.
-5. Raeume, Loxone-UUIDs und Szenenwerte eintragen.
+5. Befehle mit Sprachname, Raum, Funktion, Aktion, Loxone-UUID und changeTo-Wert eintragen.
 6. `Dry-Run aktiv` eingeschaltet lassen.
 7. Konfiguration speichern.
 8. Unter `Bedienen` eine Lichtszene testen.
@@ -149,5 +149,6 @@ docker compose up -d
 
 - Miniserver URL pruefen
 - Benutzer/Passwort pruefen
+- Befehl, Loxone-UUID und changeTo-Wert pruefen
 - Vom LoxBerry aus testen, ob die Miniserver-IP erreichbar ist
 - Dry-Run erst deaktivieren, wenn die erzeugten URLs korrekt aussehen

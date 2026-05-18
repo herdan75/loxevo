@@ -37,6 +37,9 @@ function validateConfig(config) {
       throw new Error('commands muss ein Objekt sein.');
     }
     for (const [commandName, command] of Object.entries(config.commands)) {
+      if (command.enabled === false) {
+        continue;
+      }
       if (!command.loxoneUuid) {
         throw new Error(`Loxone UUID fuer Befehl "${commandName}" fehlt.`);
       }
@@ -79,6 +82,6 @@ async function readConfigOrCreateDefault(path) {
 
 function normalizeConfig(config) {
   config.server ||= {};
-  config.server.port = Number(config.server.port || config.bridge?.port || 8080);
+  config.server.port = Number(process.env.PORT || config.server.port || config.bridge?.port || 8080);
   config.server.name ||= config.bridge?.name || 'LoxEvo';
 }

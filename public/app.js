@@ -67,8 +67,8 @@ async function load() {
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     await loadTtsStatus();
     await loadSetupStatus();
-    renderRooms();
-    renderRoomEditor();
+    renderCommands();
+    renderCommandEditor();
     renderIntegrations();
     syncJsonFromForms();
     await loadEvents();
@@ -78,30 +78,38 @@ async function load() {
   }
 }
 
-function renderRooms() {
+function renderCommands() {
   roomsEl.innerHTML = '';
-  Object.entries(config.rooms || {}).forEach(([roomName, room]) => {
+  Object.entries(getConfiguredCommands()).forEach(([commandKey, command]) => {
     const roomEl = document.createElement('div');
     roomEl.className = 'room';
 
     const title = document.createElement('h3');
-    title.textContent = room.label || roomName;
+    title.textContent = command.label || commandKey;
     roomEl.append(title);
 
     const sceneGrid = document.createElement('div');
     sceneGrid.className = 'scene-grid';
 
-    Object.keys(room.scenes || {}).forEach((sceneName) => {
-      const button = document.createElement('button');
-      button.className = 'secondary';
-      button.textContent = sceneName;
-      button.addEventListener('click', () => sendLight(roomName, sceneName));
-      sceneGrid.append(button);
-    });
+    const button = document.createElement('button');
+    button.className = 'secondary';
+    button.textContent = command.action || command.function || 'Ausfuehren';
+    button.addEventListener('click', () => sendCommand(commandKey));
+    sceneGrid.append(button);
 
     roomEl.append(sceneGrid);
     roomsEl.append(roomEl);
   });
+}
+
+async function sendCommand(commandKey) {
+  try {
+    await postJson('/api/command', { command: commandKey });
+    await loadEvents();
+    setStatus(commandKey, 'ok');
+  } catch (error) {
+    setStatus(error.message, 'error');
+  }
 }
 
 async function sendLight(room, scene) {
@@ -122,8 +130,8 @@ async function saveConfig() {
     populateForms();
     syncJsonFromForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
-    renderRooms();
-    renderRoomEditor();
+    renderCommands();
+    renderCommandEditor();
     await loadTtsStatus();
     await loadSetupStatus();
     renderIntegrations();
@@ -141,8 +149,8 @@ async function saveJsonConfig() {
     populateForms();
     syncJsonFromForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
-    renderRooms();
-    renderRoomEditor();
+    renderCommands();
+    renderCommandEditor();
     await loadTtsStatus();
     await loadSetupStatus();
     renderIntegrations();
@@ -332,23 +340,23 @@ function populateForms() {
   ttsAlarmDevices.value = listToLines(config.tts?.alarmDevices);
 }
 
-function renderRoomEditor() {
+function renderCommandEditor() {
   roomEditor.innerHTML = '';
-  Object.entries(config.rooms || {}).forEach(([roomName, room]) => {
-    roomEditor.append(createRoomCard(roomName, room));
+  Object.entries(getConfiguredCommands()).forEach(([commandKey, command]) => {
+    roomEditor.append(createCommandCard(commandKey, command));
   });
 }
 
-function createRoomCard(roomName, room) {
+function createCommandCard(commandKey, command) {
   const card = document.createElement('div');
   card.className = 'room-card';
-  card.dataset.roomOriginal = roomName;
+  card.dataset.commandOriginal = commandKey;
 
   const head = document.createElement('div');
   head.className = 'room-card-head';
 
   const title = document.createElement('strong');
-  title.textContent = room.label || roomName;
+  title.textContent = command.label || commandKey;
 
   const deleteButton = document.createElement('button');
   deleteButton.type = 'button';
@@ -357,7 +365,7 @@ function createRoomCard(roomName, room) {
   deleteButton.addEventListener('click', () => {
     card.remove();
     syncConfigFromForms();
-    renderRooms();
+    renderCommands();
   });
 
   head.append(title, deleteButton);
@@ -365,61 +373,55 @@ function createRoomCard(roomName, room) {
   const fields = document.createElement('div');
   fields.className = 'form-row three';
   fields.innerHTML = `
-    <label>Schluessel<input class="room-key" type="text"></label>
-    <label>Name<input class="room-label" type="text"></label>
-    <label>Loxone UUID<input class="room-uuid" type="text"></label>
+    <label>Befehl-Schluessel<input class="command-key" type="text"></label>
+    <label>Anzeigename<input class="command-label" type="text"></label>
+    <label>Sprachname<input class="command-voice" type="text"></label>
   `;
-  fields.querySelector('.room-key').value = roomName;
-  fields.querySelector('.room-label').value = room.label || '';
-  fields.querySelector('.room-uuid').value = room.uuid || '';
+  fields.querySelector('.command-key').value = commandKey;
+  fields.querySelector('.command-label').value = command.label || '';
+  fields.querySelector('.command-voice').value = command.voiceName || '';
 
-  const scenes = document.createElement('div');
-  scenes.className = 'scene-editor';
+  const details = document.createElement('div');
+  details.className = 'form-row three';
+  details.innerHTML = `
+    <label>Raum<input class="command-room" type="text"></label>
+    <label>Funktion<input class="command-function" type="text"></label>
+    <label>Aktion/Szene<input class="command-action" type="text"></label>
+  `;
+  details.querySelector('.command-room').value = command.room || '';
+  details.querySelector('.command-function').value = command.function || '';
+  details.querySelector('.command-action').value = command.action || '';
 
-  Object.entries(room.scenes || {}).forEach(([sceneName, command]) => {
-    scenes.append(createSceneRow(sceneName, command));
-  });
+  const loxone = document.createElement('div');
+  loxone.className = 'form-row three';
+  loxone.innerHTML = `
+    <label>Loxone UUID<input class="command-uuid" type="text"></label>
+    <label>changeTo Wert<input class="command-value" type="text"></label>
+    <label>Aktiv<span class="checkbox-row inline"><input class="command-enabled" type="checkbox"><span>Befehl verwenden</span></span></label>
+  `;
+  loxone.querySelector('.command-uuid').value = command.loxoneUuid || '';
+  loxone.querySelector('.command-value').value = command.loxoneCommand || '';
+  loxone.querySelector('.command-enabled').checked = command.enabled !== false;
 
-  const addSceneButton = document.createElement('button');
-  addSceneButton.type = 'button';
-  addSceneButton.className = 'secondary small';
-  addSceneButton.textContent = 'Szene hinzufuegen';
-  addSceneButton.addEventListener('click', () => {
-    scenes.append(createSceneRow('neu', ''));
-  });
-
-  card.append(head, fields, scenes, addSceneButton);
+  card.append(head, fields, details, loxone);
   return card;
 }
 
-function createSceneRow(sceneName, command) {
-  const row = document.createElement('div');
-  row.className = 'scene-row';
-  row.innerHTML = `
-    <label>Szene<input class="scene-name" type="text"></label>
-    <label>changeTo Wert<input class="scene-command" type="text"></label>
-    <button type="button" class="secondary small danger-text">Entfernen</button>
-  `;
-  row.querySelector('.scene-name').value = sceneName;
-  row.querySelector('.scene-command').value = command;
-  row.querySelector('button').addEventListener('click', () => row.remove());
-  return row;
-}
-
 function addRoom() {
-  const nextName = uniqueRoomName('neuer_raum');
-  config.rooms ||= {};
-  config.rooms[nextName] = {
-    label: 'Neuer Raum',
-    uuid: '',
-    scenes: {
-      ambient: '1',
-      hell: '777',
-      aus: '778'
-    }
+  const nextName = uniqueCommandName('neuer_befehl');
+  config.commands ||= {};
+  config.commands[nextName] = {
+    label: 'Neuer Befehl',
+    voiceName: 'Neuer Befehl',
+    room: '',
+    function: 'licht',
+    action: '',
+    loxoneUuid: '',
+    loxoneCommand: '',
+    enabled: true
   };
-  renderRoomEditor();
-  renderRooms();
+  renderCommandEditor();
+  renderCommands();
   renderIntegrations();
   syncJsonFromForms();
 }
@@ -429,22 +431,20 @@ function renderIntegrations() {
 
   const baseUrl = window.location.origin;
   lightEndpoints.innerHTML = '';
-  Object.entries(config.rooms || {}).forEach(([roomName, room]) => {
-    Object.keys(room.scenes || {}).forEach((sceneName) => {
-      lightEndpoints.append(createEndpointCard({
-        title: `${room.label || roomName} - ${sceneName}`,
+  Object.entries(getConfiguredCommands()).forEach(([commandKey, command]) => {
+    lightEndpoints.append(createEndpointCard({
+      title: command.label || commandKey,
+      method: 'POST',
+      url: `${baseUrl}/command/${encodeURIComponent(commandKey)}`,
+      body: '',
+      note: `Sprachname: ${command.voiceName || command.label || commandKey}`,
+      testLabel: 'Befehl testen',
+      testAction: () => testEndpoint({
         method: 'POST',
-        url: `${baseUrl}/light/${encodeURIComponent(roomName)}/${encodeURIComponent(sceneName)}`,
-        body: '',
-        note: `Direkter Szenenaufruf: ${roomName}/${sceneName}`,
-        testLabel: 'Szene testen',
-        testAction: () => testEndpoint({
-          method: 'POST',
-          url: `${baseUrl}/light/${encodeURIComponent(roomName)}/${encodeURIComponent(sceneName)}`,
-          successText: `${room.label || roomName} ${sceneName}`
-        })
-      }));
-    });
+        url: `${baseUrl}/command/${encodeURIComponent(commandKey)}`,
+        successText: command.label || commandKey
+      })
+    }));
   });
 
   ttsEndpoints.innerHTML = '';
@@ -598,7 +598,8 @@ function collectConfigFromForms() {
   nextConfig.loxone.password = loxonePassword.value;
   nextConfig.loxone.dryRun = dryRunToggle.checked;
 
-  nextConfig.rooms = collectRooms();
+  nextConfig.commands = collectCommands();
+  delete nextConfig.rooms;
 
   nextConfig.tts ||= {};
   nextConfig.tts.enabled = ttsEnabled.checked;
@@ -614,28 +615,24 @@ function collectConfigFromForms() {
   return nextConfig;
 }
 
-function collectRooms() {
-  const rooms = {};
+function collectCommands() {
+  const commands = {};
   roomEditor.querySelectorAll('.room-card').forEach((card) => {
-    const roomKey = normalizeInputKey(card.querySelector('.room-key').value);
-    if (!roomKey) return;
+    const commandKey = normalizeInputKey(card.querySelector('.command-key').value);
+    if (!commandKey) return;
 
-    const scenes = {};
-    card.querySelectorAll('.scene-row').forEach((row) => {
-      const sceneName = normalizeInputKey(row.querySelector('.scene-name').value);
-      const command = row.querySelector('.scene-command').value.trim();
-      if (sceneName && command) {
-        scenes[sceneName] = command;
-      }
-    });
-
-    rooms[roomKey] = {
-      label: card.querySelector('.room-label').value.trim() || roomKey,
-      uuid: card.querySelector('.room-uuid').value.trim(),
-      scenes
+    commands[commandKey] = {
+      label: card.querySelector('.command-label').value.trim() || commandKey,
+      voiceName: card.querySelector('.command-voice').value.trim() || commandKey,
+      room: normalizeInputKey(card.querySelector('.command-room').value),
+      function: normalizeInputKey(card.querySelector('.command-function').value),
+      action: normalizeInputKey(card.querySelector('.command-action').value),
+      loxoneUuid: card.querySelector('.command-uuid').value.trim(),
+      loxoneCommand: card.querySelector('.command-value').value.trim(),
+      enabled: card.querySelector('.command-enabled').checked
     };
   });
-  return rooms;
+  return commands;
 }
 
 function syncConfigFromForms() {
@@ -651,14 +648,38 @@ function syncJsonFromForms() {
   }
 }
 
-function uniqueRoomName(baseName) {
+function uniqueCommandName(baseName) {
   let name = baseName;
   let index = 2;
-  while (config.rooms?.[name]) {
+  while (getConfiguredCommands()[name]) {
     name = `${baseName}_${index}`;
     index += 1;
   }
   return name;
+}
+
+function getConfiguredCommands() {
+  if (config.commands && Object.keys(config.commands).length) {
+    return config.commands;
+  }
+
+  const commands = {};
+  Object.entries(config.rooms || {}).forEach(([roomName, room]) => {
+    Object.entries(room.scenes || {}).forEach(([sceneName, value]) => {
+      const key = normalizeInputKey(`${roomName}_${sceneName}`);
+      commands[key] = {
+        label: `${room.label || roomName} ${sceneName}`,
+        voiceName: `${room.label || roomName} ${sceneName}`,
+        room: roomName,
+        function: 'licht',
+        action: sceneName,
+        loxoneUuid: room.uuid || '',
+        loxoneCommand: value,
+        enabled: true
+      };
+    });
+  });
+  return commands;
 }
 
 function listToLines(value) {

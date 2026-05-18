@@ -41,6 +41,15 @@ http://<loxberry>:8080
 In `config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie unter "Letzte Befehle", sendet aber noch nichts an Loxone.
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
+Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt werden:
+
+- Loxone-Miniserver URL, Benutzer und Passwort
+- Dry-Run/Live-Modus
+- Raeume mit Name, Schluessel, UUID und Szenenwerten
+- TTS-Aktivierung, Cookie-Datei, Lautstaerken und Alexa-Geraetelisten
+
+Die JSON-Ansicht bleibt als Expertenmodus erhalten.
+
 Echte Loxone-Requests aktivieren:
 
 ```json

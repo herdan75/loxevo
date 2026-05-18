@@ -3,7 +3,30 @@ export class LoxoneClient {
     this.baseUrl = config.loxone.baseUrl.replace(/\/$/, '');
     this.username = config.loxone.username || '';
     this.password = config.loxone.password || '';
-    this.rooms = config.rooms;
+    this.dryRun = config.loxone.dryRun !== false;
+    this.commands = config.commands || {};
+    this.rooms = config.rooms || {};
+  }
+
+  async runCommand(commandKey) {
+    const command = this.commands[commandKey];
+    if (!command) {
+      throw new Error(`Unbekannter Befehl: ${commandKey}`);
+    }
+    if (command.enabled === false) {
+      throw new Error(`Befehl ist deaktiviert: ${commandKey}`);
+    }
+
+    return await this.sendLoxoneCommand({
+      key: commandKey,
+      label: command.label || commandKey,
+      voiceName: command.voiceName || command.label || commandKey,
+      room: command.room || '',
+      functionName: command.function || '',
+      action: command.action || '',
+      uuid: command.loxoneUuid,
+      command: command.loxoneCommand
+    });
   }
 
   async changeScene(roomName, sceneName) {
@@ -17,9 +40,32 @@ export class LoxoneClient {
       throw new Error(`Unbekannte Szene "${sceneName}" fuer Raum "${roomName}".`);
     }
 
-    const path = `/jdev/sps/io/${encodeURIComponent(room.uuid)}/changeTo/${encodeURIComponent(command)}`;
+    return await this.sendLoxoneCommand({
+      key: `${roomName}_${sceneName}`,
+      label: `${room.label || roomName} ${sceneName}`,
+      room: roomName,
+      functionName: 'licht',
+      action: sceneName,
+      uuid: room.uuid,
+      command
+    });
+  }
+
+  async sendLoxoneCommand(entry) {
+    if (!entry.uuid) {
+      throw new Error(`Loxone UUID fehlt fuer "${entry.label}".`);
+    }
+    if (!entry.command) {
+      throw new Error(`Loxone Befehl fehlt fuer "${entry.label}".`);
+    }
+
+    const path = `/jdev/sps/io/${encodeURIComponent(entry.uuid)}/changeTo/${encodeURIComponent(entry.command)}`;
     const url = `${this.baseUrl}${path}`;
     const headers = {};
+
+    if (this.dryRun) {
+      return { dryRun: true, ...entry, url, response: 'dry-run' };
+    }
 
     if (this.username || this.password) {
       const token = Buffer.from(`${this.username}:${this.password}`).toString('base64');
@@ -33,6 +79,6 @@ export class LoxoneClient {
       throw new Error(`Loxone HTTP ${response.status}: ${text}`);
     }
 
-    return { room: roomName, scene: sceneName, url, response: text };
+    return { ...entry, url, response: text };
   }
 }

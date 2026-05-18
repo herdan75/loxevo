@@ -23,6 +23,7 @@ Loxone
 ```
 
 Der aktuelle Stand ist ein Docker-faehiger Prototyp mit HTTP-API, Web-UI, Loxone-`changeTo` und integriertem TTS-Modul.
+Loxone-Befehle laufen standardmaessig im Dry-Run-Modus, damit lokal gefahrlos getestet werden kann.
 
 ## Setup
 
@@ -37,6 +38,16 @@ Web-UI:
 http://<loxberry>:8080
 ```
 
+In `config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie unter "Letzte Befehle", sendet aber noch nichts an Loxone.
+
+Echte Loxone-Requests aktivieren:
+
+```json
+"loxone": {
+  "dryRun": false
+}
+```
+
 ## Licht-API
 
 ```text
@@ -44,6 +55,12 @@ POST http://<loxberry>:8080/api/light
 Content-Type: application/json
 
 {"room":"kueche","scene":"ambient"}
+```
+
+Letzte Aktionen:
+
+```text
+GET http://<loxberry>:8080/api/events
 ```
 
 Kurzform:

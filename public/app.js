@@ -329,7 +329,13 @@ function renderIntegrations() {
         method: 'POST',
         url: `${baseUrl}/light/${encodeURIComponent(roomName)}/${encodeURIComponent(sceneName)}`,
         body: '',
-        note: `Direkter Szenenaufruf: ${roomName}/${sceneName}`
+        note: `Direkter Szenenaufruf: ${roomName}/${sceneName}`,
+        testLabel: 'Szene testen',
+        testAction: () => testEndpoint({
+          method: 'POST',
+          url: `${baseUrl}/light/${encodeURIComponent(roomName)}/${encodeURIComponent(sceneName)}`,
+          successText: `${room.label || roomName} ${sceneName}`
+        })
       }));
     });
   });
@@ -340,25 +346,47 @@ function renderIntegrations() {
     method: 'POST',
     url: `${baseUrl}/tts/speak`,
     body: 'Geschirrspueler ist fertig.',
-    note: 'Einfacher Text im Request-Body.'
+    note: 'Einfacher Text im Request-Body.',
+    testLabel: 'TTS testen',
+    testAction: () => testEndpoint({
+      method: 'POST',
+      url: `${baseUrl}/tts/speak`,
+      body: 'Geschirrspueler ist fertig.',
+      contentType: 'text/plain',
+      successText: 'TTS normal'
+    })
   }));
   ttsEndpoints.append(createEndpointCard({
     title: 'Alarm',
     method: 'POST',
     url: `${baseUrl}/tts/alarm`,
     body: 'Achtung, Alarm wurde ausgeloest.',
-    note: 'Nutzt die Alarm-Geraeteliste und Alarm-Lautstaerke.'
+    note: 'Nutzt die Alarm-Geraeteliste und Alarm-Lautstaerke.',
+    testLabel: 'Alarm testen',
+    testAction: () => testEndpoint({
+      method: 'POST',
+      url: `${baseUrl}/tts/alarm`,
+      body: 'Achtung, Alarm wurde ausgeloest.',
+      contentType: 'text/plain',
+      successText: 'Alarm'
+    })
   }));
   ttsEndpoints.append(createEndpointCard({
     title: 'Alexa2Lox-kompatibel',
     method: 'GET',
     url: `${baseUrl}/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50`,
     body: '',
-    note: 'Kompatibler Einstieg fuer bestehende Loxone-Aufrufe.'
+    note: 'Kompatibler Einstieg fuer bestehende Loxone-Aufrufe.',
+    testLabel: 'Compat testen',
+    testAction: () => testEndpoint({
+      method: 'GET',
+      url: `${baseUrl}/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50`,
+      successText: 'Alexa2Lox TTS'
+    })
   }));
 }
 
-function createEndpointCard({ title, method, url, body, note }) {
+function createEndpointCard({ title, method, url, body, note, testLabel, testAction }) {
   const card = document.createElement('div');
   card.className = 'endpoint-card';
 
@@ -380,6 +408,9 @@ function createEndpointCard({ title, method, url, body, note }) {
 
   const actions = document.createElement('div');
   actions.className = 'endpoint-actions';
+  if (testAction) {
+    actions.append(createTestButton(testLabel || 'Testen', testAction));
+  }
   actions.append(createCopyButton('URL kopieren', url));
   actions.append(createCopyButton('PowerShell kopieren', buildPowerShellExample(method, url, body)));
 
@@ -396,6 +427,31 @@ function createEndpointCard({ title, method, url, body, note }) {
   }
 
   return card;
+}
+
+function createTestButton(label, action) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'small';
+  button.textContent = label;
+  button.addEventListener('click', action);
+  return button;
+}
+
+async function testEndpoint({ method, url, body, contentType, successText }) {
+  try {
+    const options = { method };
+    if (body) {
+      options.body = body;
+      options.headers = { 'content-type': contentType || 'text/plain' };
+    }
+    const response = await fetch(url, options);
+    await ensureOk(response);
+    await loadEvents();
+    setStatus(`${successText} getestet`, 'ok');
+  } catch (error) {
+    setStatus(error.message, 'error');
+  }
 }
 
 function createCopyButton(label, value) {

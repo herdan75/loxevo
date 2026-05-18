@@ -71,6 +71,10 @@ async function handleApi(req, res, pathParts, body) {
     return sendJson(res, events);
   }
 
+  if (req.method === 'GET' && pathParts[1] === 'setup-status') {
+    return sendJson(res, getSetupStatus());
+  }
+
   if (req.method === 'GET' && pathParts[1] === 'tts' && pathParts[2] === 'status') {
     return sendJson(res, tts.getStatus());
   }
@@ -155,6 +159,73 @@ async function initTts() {
     return;
   }
   addEvent({ type: 'tts-status', status: 'not-ready', text: status.error || 'TTS ist nicht bereit.' });
+}
+
+function getSetupStatus() {
+  const checks = [
+    {
+      id: 'loxone-url',
+      label: 'Loxone-Miniserver URL eintragen',
+      ok: isConfiguredUrl(config.loxone?.baseUrl),
+      detail: 'Die Beispiel-IP muss durch die echte Miniserver-Adresse ersetzt werden.'
+    },
+    {
+      id: 'loxone-login',
+      label: 'Loxone-Zugangsdaten eintragen',
+      ok: isConfiguredSecret(config.loxone?.username) && isConfiguredSecret(config.loxone?.password),
+      detail: 'Benutzer und Passwort werden fuer Live-Befehle an Loxone benoetigt.'
+    },
+    {
+      id: 'rooms',
+      label: 'Raeume und Loxone-UUIDs konfigurieren',
+      ok: roomsConfigured(config.rooms),
+      detail: 'Jeder Raum braucht eine echte Loxone-UUID und mindestens eine Szene.'
+    },
+    {
+      id: 'dry-run',
+      label: 'Dry-Run fuer erste Tests aktiv lassen',
+      ok: config.loxone?.dryRun !== false,
+      detail: 'Live-Modus erst aktivieren, wenn die Tests passen.'
+    },
+    {
+      id: 'tts',
+      label: 'Optional: Alexa TTS konfigurieren',
+      ok: !config.tts?.enabled || tts.getStatus().ready,
+      optional: true,
+      detail: config.tts?.enabled
+        ? tts.getStatus().error || 'Alexa TTS ist bereit.'
+        : 'TTS ist deaktiviert und kann spaeter eingerichtet werden.'
+    }
+  ];
+
+  const required = checks.filter((check) => !check.optional);
+  const openRequired = required.filter((check) => !check.ok);
+
+  return {
+    complete: openRequired.length === 0,
+    dryRun: config.loxone?.dryRun !== false,
+    openRequired: openRequired.length,
+    checks
+  };
+}
+
+function isConfiguredUrl(value) {
+  const raw = String(value || '').trim();
+  return raw && raw !== 'http://192.168.1.100' && !raw.includes('replace-with');
+}
+
+function isConfiguredSecret(value) {
+  const raw = String(value || '').trim();
+  return raw && !['loxone-user', 'loxone-pass', 'xxx', 'replace-with'].some((placeholder) => raw.includes(placeholder));
+}
+
+function roomsConfigured(rooms) {
+  const entries = Object.values(rooms || {});
+  if (!entries.length) return false;
+  return entries.every((room) => {
+    const uuid = String(room.uuid || '');
+    return uuid && !uuid.includes('replace-with') && room.scenes && Object.keys(room.scenes).length > 0;
+  });
 }
 
 async function handleAlexa2LoxCompat(req, res, url) {

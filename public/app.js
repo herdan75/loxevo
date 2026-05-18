@@ -34,9 +34,14 @@ const lightEndpoints = document.querySelector('#lightEndpoints');
 const ttsEndpoints = document.querySelector('#ttsEndpoints');
 const ttsStatusCard = document.querySelector('#ttsStatusCard');
 const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
+const setupPanel = document.querySelector('#setupPanel');
+const setupSummary = document.querySelector('#setupSummary');
+const setupChecks = document.querySelector('#setupChecks');
+const setupConfigBtn = document.querySelector('#setupConfigBtn');
 
 let config = null;
 let ttsStatus = null;
+let setupStatus = null;
 
 load();
 
@@ -49,6 +54,7 @@ refreshEventsBtn.addEventListener('click', loadEvents);
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 addRoomBtn.addEventListener('click', addRoom);
 refreshIntegrationsBtn.addEventListener('click', renderIntegrations);
+setupConfigBtn.addEventListener('click', () => showView('configView'));
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => showView(button.dataset.tabTarget));
 });
@@ -60,6 +66,7 @@ async function load() {
     populateForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     await loadTtsStatus();
+    await loadSetupStatus();
     renderRooms();
     renderRoomEditor();
     renderIntegrations();
@@ -118,6 +125,7 @@ async function saveConfig() {
     renderRooms();
     renderRoomEditor();
     await loadTtsStatus();
+    await loadSetupStatus();
     renderIntegrations();
     setStatus('Gespeichert', 'ok');
   } catch (error) {
@@ -136,6 +144,7 @@ async function saveJsonConfig() {
     renderRooms();
     renderRoomEditor();
     await loadTtsStatus();
+    await loadSetupStatus();
     renderIntegrations();
     setStatus('JSON gespeichert', 'ok');
   } catch (error) {
@@ -247,12 +256,64 @@ async function setDryRun(enabled) {
     config.loxone.dryRun = result.dryRun;
     syncJsonFromForms();
     updateDryRunUi(result.dryRun);
+    await loadSetupStatus();
     await loadEvents();
     setStatus(result.dryRun ? 'Dry-Run aktiv' : 'Live aktiv', result.dryRun ? 'ok' : 'error');
   } catch (error) {
     dryRunToggle.checked = Boolean(config.loxone?.dryRun);
     setStatus(error.message, 'error');
   }
+}
+
+async function loadSetupStatus() {
+  try {
+    const response = await fetch('/api/setup-status');
+    await ensureOk(response);
+    setupStatus = await response.json();
+    renderSetupStatus();
+  } catch (error) {
+    setupStatus = null;
+    renderSetupStatus(error.message);
+  }
+}
+
+function renderSetupStatus(errorText) {
+  if (!setupPanel || !setupSummary || !setupChecks) return;
+
+  if (errorText) {
+    setupPanel.classList.add('setup-warning');
+    setupSummary.textContent = `Setup-Status konnte nicht geladen werden: ${errorText}`;
+    setupChecks.innerHTML = '';
+    return;
+  }
+
+  if (!setupStatus) return;
+
+  setupPanel.classList.toggle('setup-complete', setupStatus.complete);
+  setupPanel.classList.toggle('setup-warning', !setupStatus.complete);
+  setupSummary.textContent = setupStatus.complete
+    ? 'Die Basiskonfiguration ist vollstaendig. Live-Modus erst nach erfolgreichem Test aktivieren.'
+    : `${setupStatus.openRequired} notwendige Einrichtungsschritte sind noch offen.`;
+
+  setupChecks.innerHTML = '';
+  setupStatus.checks.forEach((check) => {
+    const row = document.createElement('div');
+    row.className = `setup-check ${check.ok ? 'ok' : 'open'} ${check.optional ? 'optional' : ''}`.trim();
+
+    const marker = document.createElement('span');
+    marker.className = 'setup-marker';
+    marker.textContent = check.ok ? 'OK' : check.optional ? 'Optional' : 'Offen';
+
+    const content = document.createElement('div');
+    const title = document.createElement('strong');
+    title.textContent = check.label;
+    const detail = document.createElement('p');
+    detail.textContent = check.detail;
+    content.append(title, detail);
+
+    row.append(marker, content);
+    setupChecks.append(row);
+  });
 }
 
 function populateForms() {

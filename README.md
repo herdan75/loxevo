@@ -24,6 +24,7 @@ Loxone
 
 Der aktuelle Stand ist ein Docker-faehiger Prototyp mit HTTP-API, Web-UI, Loxone-`changeTo` und integriertem TTS-Modul.
 Loxone-Befehle laufen standardmaessig im Dry-Run-Modus, damit lokal gefahrlos getestet werden kann.
+Wenn TTS aktiviert wird, aber `alexa-remote2` oder die Cookie-Datei noch fehlt, startet LoxEvo trotzdem weiter und zeigt den TTS-Status in der Web-UI an.
 
 ## Setup
 
@@ -41,12 +42,15 @@ http://<loxberry>:8080
 In `config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie unter "Letzte Befehle", sendet aber noch nichts an Loxone.
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
+TTS braucht zusaetzlich das optionale Paket `alexa-remote2` und eine gueltige Alexa-Cookie-Datei. Im Docker/LoxBerry-Betrieb wird das Paket ueber die Projektabhaengigkeiten installiert. Lokal ohne installierte Node-Abhaengigkeiten bleibt TTS sichtbar, aber als "nicht bereit" markiert.
+
 Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt werden:
 
 - Loxone-Miniserver URL, Benutzer und Passwort
 - Dry-Run/Live-Modus
 - Raeume mit Name, Schluessel, UUID und Szenenwerten
 - TTS-Aktivierung, Cookie-Datei, Lautstaerken und Alexa-Geraetelisten
+- TTS-Status mit klarer Fehlermeldung, falls Alexa noch nicht bereit ist
 
 Die Oberflaeche ist in drei Bereiche gegliedert:
 

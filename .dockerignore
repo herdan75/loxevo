@@ -1,0 +1,10 @@
+node_modules
+data
+config.json
+Node.txt
+.git
+.gitignore
+*.log
+*.pid
+.env
+README.local.md

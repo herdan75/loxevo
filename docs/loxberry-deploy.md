@@ -39,8 +39,9 @@ Vor dem ersten Start:
 
 ```bash
 mkdir -p data
-cp config.example.json data/config.json
 ```
+
+Falls `data/config.json` noch nicht existiert, wird sie beim ersten Start automatisch aus `config.example.json` angelegt.
 
 ## Wichtige Pfade
 

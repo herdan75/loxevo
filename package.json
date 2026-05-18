@@ -1,0 +1,17 @@
+{
+  "name": "loxevo",
+  "version": "0.1.0",
+  "description": "Eigene LoxBerry-Zentrale fuer Alexa, Echo-TTS und Loxone.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "check": "node --check src/index.js && node --check src/config.js && node --check src/loxone.js && node --check src/tts.js"
+  },
+  "optionalDependencies": {
+    "alexa-remote2": "^7.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

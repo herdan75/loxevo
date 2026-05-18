@@ -14,9 +14,10 @@ cd /mnt/docker
 git clone https://github.com/herdan75/loxevo.git
 cd loxevo
 mkdir -p data
-cp config.example.json data/config.json
 docker compose up -d --build
 ```
+
+Beim ersten Start legt LoxEvo automatisch `data/config.json` aus der Beispielkonfiguration an, falls sie noch nicht existiert.
 
 Web-UI:
 
@@ -34,6 +35,7 @@ data/Node.txt
 ```
 
 Diese Dateien werden nicht ins Git-Repository uebernommen.
+`data/config.json` wird beim ersten Start automatisch erzeugt und danach ueber die Web-UI angepasst.
 
 ## TTS aktivieren
 

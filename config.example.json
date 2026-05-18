@@ -4,15 +4,15 @@
     "port": 8080
   },
   "loxone": {
-    "baseUrl": "http://192.168.178.3",
-    "username": "xxx",
-    "password": "xxx",
+    "baseUrl": "http://192.168.1.100",
+    "username": "loxone-user",
+    "password": "loxone-pass",
     "dryRun": true
   },
   "rooms": {
-    "kueche": {
-      "label": "Kueche",
-      "uuid": "2030c0ad-02a5-5919-ffffba27bfcae6ca",
+    "wohnzimmer": {
+      "label": "Wohnzimmer",
+      "uuid": "replace-with-loxone-lightcontroller-uuid",
       "scenes": {
         "ambient": "1",
         "hell": "777",
@@ -20,19 +20,9 @@
         "aus": "778"
       }
     },
-    "essbereich": {
-      "label": "Essbereich",
-      "uuid": "16aad660-00e6-591a-ffffba27bfcae6ca",
-      "scenes": {
-        "ambient": "2",
-        "hell": "777",
-        "nacht": "1",
-        "aus": "778"
-      }
-    },
-    "tv": {
-      "label": "TV",
-      "uuid": "181845d2-010c-c343-ffff4505cd4d795e",
+    "kueche": {
+      "label": "Kueche",
+      "uuid": "replace-with-loxone-lightcontroller-uuid",
       "scenes": {
         "ambient": "1",
         "hell": "777",
@@ -50,17 +40,13 @@
     "alarmVolume": 100,
     "ignoreZeroText": true,
     "defaultDevices": [
-      "G091AA1014320APF"
+      "replace-with-echo-device-serial"
     ],
     "allDevices": [
-      "G091AA1014320APF",
-      "G091AA1215230KEK",
-      "G091AA1215230JSW"
+      "replace-with-echo-device-serial"
     ],
     "alarmDevices": [
-      "G091AA1014320APF",
-      "G091AA1215230KEK",
-      "G091AA1215230JSW"
+      "replace-with-echo-device-serial"
     ]
   }
 }

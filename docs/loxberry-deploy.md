@@ -84,6 +84,8 @@ Web-UI:
 http://<loxberry-ip>:8080
 ```
 
+Beim ersten Start ist `Dry-Run` aktiv. LoxEvo sendet dann noch keine echten Loxone-Befehle, sondern zeigt die erzeugten URLs im Protokoll.
+
 ## Erster Test
 
 1. In der Web-UI `Dry-Run aktiv` eingeschaltet lassen.

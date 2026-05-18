@@ -289,6 +289,76 @@ textarea:focus {
   font-size: 14px;
 }
 
+.endpoint-block + .endpoint-block {
+  margin-top: 22px;
+}
+
+.endpoint-block h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.endpoint-block > p {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.endpoint-list {
+  display: grid;
+  gap: 10px;
+}
+
+.endpoint-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.endpoint-card-head,
+.endpoint-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.endpoint-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.method-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #e8f2f3;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.endpoint-url {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 10px;
+  border-radius: 6px;
+  background: #101820;
+  color: #eef6f8;
+  font: 13px/1.4 Consolas, Monaco, monospace;
+}
+
+.endpoint-card p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.endpoint-body {
+  margin: 0;
+}
+
 .panel {
   padding: 18px;
   border: 1px solid var(--line);

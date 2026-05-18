@@ -42,6 +42,11 @@ const server = http.createServer(async (req, res) => {
       return await handleApi(req, res, pathParts, body);
     }
 
+    // Frei definierbarer Befehl: /command/kueche_licht_hell
+    if (req.method === 'POST' && pathParts[0] === 'command' && pathParts[1]) {
+      return await runConfiguredCommand(res, pathParts[1]);
+    }
+
     // Kurze Legacy-URL fuer Node-RED oder Loxone: /light/kueche/ambient
     if (req.method === 'POST' && pathParts[0] === 'light' && pathParts.length >= 3) {
       return await runLightCommand(res, pathParts[1], pathParts[2]);
@@ -102,11 +107,35 @@ async function handleApi(req, res, pathParts, body) {
     return await runLightCommand(res, payload.room, payload.scene);
   }
 
+  if (req.method === 'POST' && pathParts[1] === 'command') {
+    const payload = parseJson(body);
+    return await runConfiguredCommand(res, payload.command || payload.key);
+  }
+
   if (pathParts[1] === 'tts') {
     return await handleTts(req, res, pathParts.slice(1), body);
   }
 
   return sendJson(res, { error: 'not found' }, 404);
+}
+
+async function runConfiguredCommand(res, commandKey) {
+  if (!commandKey) {
+    return sendJson(res, { error: 'command ist erforderlich' }, 400);
+  }
+
+  const result = await loxone.runCommand(normalizeKey(commandKey));
+  addEvent({
+    type: 'command',
+    status: result.dryRun ? 'dry-run' : 'sent',
+    key: result.key,
+    label: result.label,
+    room: result.room,
+    function: result.functionName,
+    action: result.action,
+    url: result.url
+  });
+  return sendJson(res, { ok: true, result });
 }
 
 async function runLightCommand(res, room, scene) {
@@ -119,7 +148,7 @@ async function runLightCommand(res, room, scene) {
     type: 'light',
     status: result.dryRun ? 'dry-run' : 'sent',
     room: result.room,
-    scene: result.scene,
+    scene: result.action || scene,
     url: result.url
   });
   return sendJson(res, { ok: true, result });
@@ -176,10 +205,10 @@ function getSetupStatus() {
       detail: 'Benutzer und Passwort werden fuer Live-Befehle an Loxone benoetigt.'
     },
     {
-      id: 'rooms',
-      label: 'Raeume und Loxone-UUIDs konfigurieren',
-      ok: roomsConfigured(config.rooms),
-      detail: 'Jeder Raum braucht eine echte Loxone-UUID und mindestens eine Szene.'
+      id: 'commands',
+      label: 'Befehle konfigurieren',
+      ok: commandsConfigured(config.commands) || roomsConfigured(config.rooms),
+      detail: 'Jeder Befehl braucht Namen, Loxone-UUID und changeTo-Wert.'
     },
     {
       id: 'dry-run',
@@ -217,6 +246,16 @@ function isConfiguredUrl(value) {
 function isConfiguredSecret(value) {
   const raw = String(value || '').trim();
   return raw && !['loxone-user', 'loxone-pass', 'xxx', 'replace-with'].some((placeholder) => raw.includes(placeholder));
+}
+
+function commandsConfigured(commands) {
+  const entries = Object.values(commands || {});
+  if (!entries.length) return false;
+  return entries.every((command) => {
+    const uuid = String(command.loxoneUuid || '');
+    const loxoneCommand = String(command.loxoneCommand || '');
+    return command.enabled !== false && uuid && !uuid.includes('replace-with') && loxoneCommand;
+  });
 }
 
 function roomsConfigured(rooms) {

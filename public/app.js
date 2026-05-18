@@ -27,6 +27,8 @@ const roomEditor = document.querySelector('#roomEditor');
 const addRoomBtn = document.querySelector('#addRoomBtn');
 const reloadJsonBtn = document.querySelector('#reloadJsonBtn');
 const saveJsonBtn = document.querySelector('#saveJsonBtn');
+const tabButtons = document.querySelectorAll('.tab-button');
+const views = document.querySelectorAll('.view');
 
 let config = null;
 
@@ -40,6 +42,9 @@ alarmBtn.addEventListener('click', () => postText('/tts/alarm', ttsText.value));
 refreshEventsBtn.addEventListener('click', loadEvents);
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 addRoomBtn.addEventListener('click', addRoom);
+tabButtons.forEach((button) => {
+  button.addEventListener('click', () => showView(button.dataset.tabTarget));
+});
 
 async function load() {
   try {
@@ -169,6 +174,15 @@ async function ensureOk(response) {
 function setStatus(text, type) {
   statusEl.textContent = text;
   statusEl.className = `status ${type || ''}`.trim();
+}
+
+function showView(viewId) {
+  tabButtons.forEach((button) => {
+    button.classList.toggle('active', button.dataset.tabTarget === viewId);
+  });
+  views.forEach((view) => {
+    view.classList.toggle('active', view.id === viewId);
+  });
 }
 
 async function setDryRun(enabled) {

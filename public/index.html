@@ -49,8 +49,8 @@
       <section class="panel">
         <div class="section-head">
           <div>
-            <h2>Licht testen</h2>
-            <p>Sendet direkt einen Loxone changeTo-Befehl.</p>
+            <h2>Befehle testen</h2>
+            <p>Sendet frei konfigurierte Loxone changeTo-Befehle.</p>
           </div>
         </div>
         <div id="rooms" class="rooms"></div>
@@ -101,7 +101,7 @@
         <div class="section-head">
           <div>
             <h2>Konfiguration</h2>
-            <p>Loxone-Zugang, Raeume, Szenen und TTS-Geraete bequem pflegen.</p>
+            <p>Loxone-Zugang, Befehle, Sprachnamen und TTS-Geraete bequem pflegen.</p>
           </div>
           <button id="saveBtn">Konfiguration speichern</button>
         </div>
@@ -160,9 +160,9 @@
         </div>
 
         <fieldset class="wide-fieldset">
-          <legend>Raeume und Szenen</legend>
+          <legend>Befehle</legend>
           <div id="roomEditor" class="room-editor"></div>
-          <button id="addRoomBtn" type="button" class="secondary">Raum hinzufuegen</button>
+          <button id="addRoomBtn" type="button" class="secondary">Befehl hinzufuegen</button>
         </fieldset>
 
         <fieldset class="wide-fieldset">
@@ -195,11 +195,11 @@
       </section>
 
       <section class="panel wide">
-        <h2>Node-RED Aufruf</h2>
-        <pre><code>POST http://&lt;loxberry&gt;:&lt;port&gt;/api/light
+        <h2>HTTP Aufruf</h2>
+        <pre><code>POST http://&lt;loxberry&gt;:&lt;port&gt;/api/command
 Content-Type: application/json
 
-{"room":"kueche","scene":"ambient"}</code></pre>
+{"command":"kueche_licht_hell"}</code></pre>
       </section>
       </section>
 

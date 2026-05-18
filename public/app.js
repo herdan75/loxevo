@@ -32,8 +32,11 @@ const views = document.querySelectorAll('.view');
 const refreshIntegrationsBtn = document.querySelector('#refreshIntegrationsBtn');
 const lightEndpoints = document.querySelector('#lightEndpoints');
 const ttsEndpoints = document.querySelector('#ttsEndpoints');
+const ttsStatusCard = document.querySelector('#ttsStatusCard');
+const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
 
 let config = null;
+let ttsStatus = null;
 
 load();
 
@@ -56,6 +59,7 @@ async function load() {
     config = await response.json();
     populateForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
+    await loadTtsStatus();
     renderRooms();
     renderRoomEditor();
     renderIntegrations();
@@ -113,6 +117,7 @@ async function saveConfig() {
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderRooms();
     renderRoomEditor();
+    await loadTtsStatus();
     renderIntegrations();
     setStatus('Gespeichert', 'ok');
   } catch (error) {
@@ -130,6 +135,7 @@ async function saveJsonConfig() {
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderRooms();
     renderRoomEditor();
+    await loadTtsStatus();
     renderIntegrations();
     setStatus('JSON gespeichert', 'ok');
   } catch (error) {
@@ -145,6 +151,7 @@ async function postText(url, text) {
       body: text
     });
     await ensureOk(response);
+    await loadTtsStatus();
     await loadEvents();
     setStatus('TTS gesendet', 'ok');
   } catch (error) {
@@ -181,6 +188,45 @@ async function ensureOk(response) {
 function setStatus(text, type) {
   statusEl.textContent = text;
   statusEl.className = `status ${type || ''}`.trim();
+}
+
+async function loadTtsStatus() {
+  try {
+    const response = await fetch('/api/tts/status');
+    await ensureOk(response);
+    ttsStatus = await response.json();
+    renderTtsStatus();
+  } catch (error) {
+    ttsStatus = { enabled: false, ready: false, error: error.message };
+    renderTtsStatus();
+  }
+}
+
+function renderTtsStatus() {
+  const targets = [ttsStatusCard, ttsConfigStatus].filter(Boolean);
+  if (!targets.length) return;
+
+  const status = ttsStatus || { enabled: false, ready: false };
+  let text = 'TTS ist deaktiviert.';
+  let className = 'service-status disabled';
+
+  if (status.enabled && status.ready) {
+    text = `TTS ist bereit. Standard: ${deviceCount(status.defaultDevices)}, Alarm: ${deviceCount(status.alarmDevices)}.`;
+    className = 'service-status ready';
+  } else if (status.enabled) {
+    text = `TTS ist aktiviert, aber noch nicht bereit: ${status.error || 'Status unbekannt'}`;
+    className = 'service-status error';
+  }
+
+  targets.forEach((target) => {
+    target.textContent = text;
+    target.className = className;
+  });
+}
+
+function deviceCount(devices) {
+  const count = Array.isArray(devices) ? devices.length : 0;
+  return `${count} ${count === 1 ? 'Geraet' : 'Geraete'}`;
 }
 
 function showView(viewId) {
@@ -447,6 +493,7 @@ async function testEndpoint({ method, url, body, contentType, successText }) {
     }
     const response = await fetch(url, options);
     await ensureOk(response);
+    await loadTtsStatus();
     await loadEvents();
     setStatus(`${successText} getestet`, 'ok');
   } catch (error) {

@@ -9,26 +9,36 @@
     "password": "loxone-pass",
     "dryRun": true
   },
-  "rooms": {
-    "wohnzimmer": {
-      "label": "Wohnzimmer",
-      "uuid": "replace-with-loxone-lightcontroller-uuid",
-      "scenes": {
-        "ambient": "1",
-        "hell": "777",
-        "nacht": "2",
-        "aus": "778"
-      }
+  "commands": {
+    "kueche_licht_hell": {
+      "label": "Kueche Licht Hell",
+      "voiceName": "Kueche Licht Hell",
+      "room": "kueche",
+      "function": "licht",
+      "action": "hell",
+      "loxoneUuid": "replace-with-loxone-lightcontroller-uuid",
+      "loxoneCommand": "777",
+      "enabled": true
     },
-    "kueche": {
-      "label": "Kueche",
-      "uuid": "replace-with-loxone-lightcontroller-uuid",
-      "scenes": {
-        "ambient": "1",
-        "hell": "777",
-        "nacht": "2",
-        "aus": "778"
-      }
+    "kueche_licht_ambient": {
+      "label": "Kueche Licht Ambient",
+      "voiceName": "Kueche Licht Ambient",
+      "room": "kueche",
+      "function": "licht",
+      "action": "ambient",
+      "loxoneUuid": "replace-with-loxone-lightcontroller-uuid",
+      "loxoneCommand": "1",
+      "enabled": true
+    },
+    "wohnzimmer_licht_aus": {
+      "label": "Wohnzimmer Licht Aus",
+      "voiceName": "Wohnzimmer Licht Aus",
+      "room": "wohnzimmer",
+      "function": "licht",
+      "action": "aus",
+      "loxoneUuid": "replace-with-loxone-lightcontroller-uuid",
+      "loxoneCommand": "778",
+      "enabled": true
     }
   },
   "tts": {

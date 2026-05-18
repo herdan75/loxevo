@@ -1,5 +1,7 @@
 # LoxBerry Docker Deployment
 
+> **Hinweis:** Diese Deployment-Anleitung beschreibt den aktuellen Entwicklungsstand. LoxEvo ist noch nicht als stabile Produktivversion freigegeben.
+
 Diese Anleitung ist fuer den ersten Test von LoxEvo auf dem LoxBerry gedacht.
 
 ## Ziel

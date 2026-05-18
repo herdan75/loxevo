@@ -65,7 +65,7 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt w
 
 - Loxone-Miniserver URL, Benutzer und Passwort
 - Dry-Run/Live-Modus
-- Raeume mit Name, Schluessel, UUID und Szenenwerten
+- frei definierbare Befehle mit Sprachname, Raum, Funktion, Aktion, UUID und changeTo-Wert
 - TTS-Aktivierung, Cookie-Datei, Lautstaerken und Alexa-Geraetelisten
 - TTS-Status mit klarer Fehlermeldung, falls Alexa noch nicht bereit ist
 
@@ -73,7 +73,7 @@ Die Oberflaeche ist in drei Bereiche gegliedert:
 
 - `Bedienen`: Licht-Szenen und TTS direkt ausloesen
 - `Alexa / Endpunkte`: fertige HTTP-Aufrufe fuer Licht, TTS und Alexa2Lox-kompatible URLs testen und kopieren
-- `Konfiguration`: Loxone, Raeume, Szenen und TTS pflegen
+- `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
 - `Protokoll`: letzte Befehle und Dry-Run/Live-Aktionen ansehen
 
 Die JSON-Ansicht bleibt als Expertenmodus erhalten.
@@ -89,11 +89,13 @@ Echte Loxone-Requests aktivieren:
 ## Licht-API
 
 ```text
-POST http://<loxberry>:8080/api/light
+POST http://<loxberry>:8080/api/command
 Content-Type: application/json
 
-{"room":"kueche","scene":"ambient"}
+{"command":"kueche_licht_hell"}
 ```
+
+Die Befehle werden in der Web-UI frei angelegt. Beispiel: `kueche_licht_hell` kann als Sprachname `Kueche Licht Hell`, als Raum `kueche`, als Funktion `licht` und als Aktion `hell` bekommen.
 
 Letzte Aktionen:
 
@@ -113,8 +115,10 @@ Content-Type: application/json
 Kurzform:
 
 ```text
-POST http://<loxberry>:8080/light/kueche/ambient
+POST http://<loxberry>:8080/command/kueche_licht_hell
 ```
+
+Die alte Kurzform `/light/<raum>/<szene>` bleibt vorerst als Legacy-Einstieg erhalten, wenn eine alte `rooms`-Konfiguration vorhanden ist.
 
 ## TTS-API
 

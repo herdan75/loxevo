@@ -7,5 +7,4 @@ services:
     environment:
       CONFIG_PATH: /config/config.json
     volumes:
-      - ./config.json:/config/config.json
-      - ./Node.txt:/config/Node.txt:ro
+      - ./data:/config

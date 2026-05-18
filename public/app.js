@@ -7,6 +7,10 @@ const speakBtn = document.querySelector('#speakBtn');
 const alarmBtn = document.querySelector('#alarmBtn');
 const refreshEventsBtn = document.querySelector('#refreshEventsBtn');
 const eventsEl = document.querySelector('#events');
+const dryRunToggle = document.querySelector('#dryRunToggle');
+const modeBanner = document.querySelector('#modeBanner');
+const modeTitle = document.querySelector('#modeTitle');
+const modeText = document.querySelector('#modeText');
 
 let config = null;
 
@@ -16,12 +20,14 @@ saveBtn.addEventListener('click', saveConfig);
 speakBtn.addEventListener('click', () => postText('/tts/speak', ttsText.value));
 alarmBtn.addEventListener('click', () => postText('/tts/alarm', ttsText.value));
 refreshEventsBtn.addEventListener('click', loadEvents);
+dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 
 async function load() {
   try {
     const response = await fetch('/api/config');
     config = await response.json();
     configEditor.value = JSON.stringify(config, null, 2);
+    updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderRooms();
     await loadEvents();
     setStatus('Bereit', 'ok');
@@ -72,6 +78,7 @@ async function saveConfig() {
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
     configEditor.value = JSON.stringify(config, null, 2);
+    updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderRooms();
     setStatus('Gespeichert', 'ok');
   } catch (error) {
@@ -123,6 +130,29 @@ async function ensureOk(response) {
 function setStatus(text, type) {
   statusEl.textContent = text;
   statusEl.className = `status ${type || ''}`.trim();
+}
+
+async function setDryRun(enabled) {
+  try {
+    const result = await putJson('/api/dry-run', { enabled });
+    config.loxone.dryRun = result.dryRun;
+    configEditor.value = JSON.stringify(config, null, 2);
+    updateDryRunUi(result.dryRun);
+    await loadEvents();
+    setStatus(result.dryRun ? 'Dry-Run aktiv' : 'Live aktiv', result.dryRun ? 'ok' : 'error');
+  } catch (error) {
+    dryRunToggle.checked = Boolean(config.loxone?.dryRun);
+    setStatus(error.message, 'error');
+  }
+}
+
+function updateDryRunUi(enabled) {
+  dryRunToggle.checked = enabled;
+  modeBanner.classList.toggle('live', !enabled);
+  modeTitle.textContent = enabled ? 'Testmodus' : 'Live-Modus';
+  modeText.textContent = enabled
+    ? 'Loxone-Befehle werden nur simuliert und im Event-Log angezeigt.'
+    : 'Loxone-Befehle werden wirklich an den Miniserver gesendet.';
 }
 
 async function loadEvents() {

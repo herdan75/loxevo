@@ -92,14 +92,18 @@ export class TtsService {
       throw new Error(`Ungueltige Alexa-Lautstaerke: ${volume}`);
     }
 
-    await Promise.all(devices.map((device) => this.exec(device, 'volume', value)));
+    const targets = this.normalizeDevices(devices);
+    this.assertDevices(targets);
+    await Promise.all(targets.map((device) => this.exec(device, 'volume', value)));
   }
 
   async sendSequence(type, text, devices, volume) {
     if (!text || typeof text !== 'string') {
       throw new Error('TTS braucht einen Text im Request-Body.');
     }
-    await Promise.all(devices.map((device) => this.exec(device, type, text, volume)));
+    const targets = this.normalizeDevices(devices);
+    this.assertDevices(targets);
+    await Promise.all(targets.map((device) => this.exec(device, type, text, volume)));
   }
 
   exec(device, type, value, volume) {
@@ -121,6 +125,20 @@ export class TtsService {
     }
     if (!this.ready) {
       throw new Error(this.lastError || 'TTS ist noch nicht initialisiert.');
+    }
+  }
+
+  normalizeDevices(devices) {
+    if (Array.isArray(devices)) {
+      return devices.map((device) => String(device).trim()).filter(Boolean);
+    }
+    const device = String(devices || '').trim();
+    return device ? [device] : [];
+  }
+
+  assertDevices(devices) {
+    if (!devices.length) {
+      throw new Error('Keine Alexa-Geraete fuer TTS konfiguriert.');
     }
   }
 }

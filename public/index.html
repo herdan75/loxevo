@@ -27,6 +27,13 @@
         </label>
       </section>
 
+      <nav class="tab-nav wide" aria-label="LoxEvo Bereiche">
+        <button class="tab-button active" type="button" data-tab-target="controlView">Bedienen</button>
+        <button class="tab-button" type="button" data-tab-target="configView">Konfiguration</button>
+        <button class="tab-button" type="button" data-tab-target="eventsView">Protokoll</button>
+      </nav>
+
+      <section id="controlView" class="view active wide">
       <section class="panel">
         <div class="section-head">
           <div>
@@ -50,7 +57,9 @@
           <button id="alarmBtn" class="danger">Alarm</button>
         </div>
       </section>
+      </section>
 
+      <section id="configView" class="view wide">
       <section class="panel wide">
         <div class="section-head">
           <div>
@@ -154,7 +163,9 @@ Content-Type: application/json
 
 {"room":"kueche","scene":"ambient"}</code></pre>
       </section>
+      </section>
 
+      <section id="eventsView" class="view wide">
       <section class="panel wide">
         <div class="section-head">
           <div>
@@ -164,6 +175,7 @@ Content-Type: application/json
           <button id="refreshEventsBtn">Aktualisieren</button>
         </div>
         <div id="events" class="events"></div>
+      </section>
       </section>
     </main>
 

@@ -39,6 +39,7 @@ http://<loxberry>:8080
 ```
 
 In `config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie unter "Letzte Befehle", sendet aber noch nichts an Loxone.
+Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
 Echte Loxone-Requests aktivieren:
 
@@ -61,6 +62,15 @@ Letzte Aktionen:
 
 ```text
 GET http://<loxberry>:8080/api/events
+```
+
+Dry-Run per API umschalten:
+
+```text
+PUT http://<loxberry>:8080/api/dry-run
+Content-Type: application/json
+
+{"enabled":true}
 ```
 
 Kurzform:

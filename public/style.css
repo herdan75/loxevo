@@ -195,6 +195,35 @@ pre {
   color: #eef6f8;
 }
 
+.events {
+  display: grid;
+  gap: 8px;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.event-row {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfd;
+}
+
+.event-meta {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.event-detail {
+  overflow-wrap: anywhere;
+  font: 13px/1.4 Consolas, Monaco, monospace;
+}
+
 @media (max-width: 760px) {
   header {
     align-items: flex-start;

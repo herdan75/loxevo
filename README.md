@@ -32,9 +32,10 @@ Ausfuehrliche Installationsschritte stehen in [INSTALL.md](INSTALL.md).
 
 ```bash
 mkdir -p data
-cp config.example.json data/config.json
 docker compose up -d --build
 ```
+
+Falls `data/config.json` noch nicht existiert, legt LoxEvo sie beim ersten Start automatisch aus `config.example.json` an.
 
 Web-UI:
 
@@ -54,6 +55,7 @@ Private Daten gehoeren in `data/`:
 - `data/Node.txt`
 
 Dieser Ordner ist absichtlich von Git ausgenommen, damit keine Loxone-Zugangsdaten, UUIDs oder Alexa-Geraete-IDs veroeffentlicht werden.
+Alle privaten Werte werden nach der Installation ueber die Web-UI oder direkt in `data/config.json` gepflegt.
 
 Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt werden:
 

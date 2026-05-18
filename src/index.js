@@ -11,10 +11,10 @@ const publicDir = join(rootDir, 'public');
 
 let config = await loadConfig();
 let loxone = new LoxoneClient(config);
-const tts = new TtsService(config);
+let tts = new TtsService(config);
 const events = [];
 
-await tts.init();
+await initTts();
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -31,7 +31,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/health') {
-      return sendJson(res, { ok: true, name: config.server.name });
+      return sendJson(res, { ok: true, name: config.server.name, tts: tts.getStatus() });
     }
 
     if (url.pathname === '/admin/plugins/alexa2lox/tts.php') {
@@ -71,6 +71,10 @@ async function handleApi(req, res, pathParts, body) {
     return sendJson(res, events);
   }
 
+  if (req.method === 'GET' && pathParts[1] === 'tts' && pathParts[2] === 'status') {
+    return sendJson(res, tts.getStatus());
+  }
+
   if (req.method === 'PUT' && pathParts[1] === 'dry-run') {
     const payload = parseJson(body);
     config.loxone.dryRun = payload.enabled !== false;
@@ -84,6 +88,8 @@ async function handleApi(req, res, pathParts, body) {
     const nextConfig = parseJson(body);
     config = await saveConfig(nextConfig);
     loxone = new LoxoneClient(config);
+    tts = new TtsService(config);
+    await initTts();
     return sendJson(res, { ok: true, config });
   }
 
@@ -135,6 +141,20 @@ async function handleTts(req, res, pathParts, body) {
   await tts.speak(body);
   addEvent({ type: 'tts-speak', status: 'sent', text: body });
   return sendJson(res, { ok: true, command: 'speak' });
+}
+
+async function initTts() {
+  await tts.init();
+  const status = tts.getStatus();
+  if (!status.enabled) {
+    addEvent({ type: 'tts-status', status: 'disabled', text: 'TTS ist deaktiviert.' });
+    return;
+  }
+  if (status.ready) {
+    addEvent({ type: 'tts-status', status: 'ready', text: 'Alexa TTS ist bereit.' });
+    return;
+  }
+  addEvent({ type: 'tts-status', status: 'not-ready', text: status.error || 'TTS ist nicht bereit.' });
 }
 
 async function handleAlexa2LoxCompat(req, res, url) {

@@ -191,6 +191,8 @@ async function initTts() {
 }
 
 function getSetupStatus() {
+  const ttsStatus = tts.getStatus();
+  const ttsReady = !config.tts?.enabled || (ttsStatus.ready && ttsDevicesConfigured(ttsStatus));
   const checks = [
     {
       id: 'loxone-url',
@@ -219,11 +221,9 @@ function getSetupStatus() {
     {
       id: 'tts',
       label: 'Optional: Alexa TTS konfigurieren',
-      ok: !config.tts?.enabled || tts.getStatus().ready,
+      ok: ttsReady,
       optional: true,
-      detail: config.tts?.enabled
-        ? tts.getStatus().error || 'Alexa TTS ist bereit.'
-        : 'TTS ist deaktiviert und kann spaeter eingerichtet werden.'
+      detail: ttsDetail(ttsStatus)
     }
   ];
 
@@ -249,12 +249,12 @@ function isConfiguredSecret(value) {
 }
 
 function commandsConfigured(commands) {
-  const entries = Object.values(commands || {});
+  const entries = Object.values(commands || {}).filter((command) => command.enabled !== false);
   if (!entries.length) return false;
   return entries.every((command) => {
     const uuid = String(command.loxoneUuid || '');
     const loxoneCommand = String(command.loxoneCommand || '');
-    return command.enabled !== false && uuid && !uuid.includes('replace-with') && loxoneCommand;
+    return uuid && !uuid.includes('replace-with') && loxoneCommand;
   });
 }
 
@@ -265,6 +265,24 @@ function roomsConfigured(rooms) {
     const uuid = String(room.uuid || '');
     return uuid && !uuid.includes('replace-with') && room.scenes && Object.keys(room.scenes).length > 0;
   });
+}
+
+function ttsDevicesConfigured(status) {
+  return [status.defaultDevices, status.allDevices, status.alarmDevices]
+    .some((devices) => Array.isArray(devices) && devices.length > 0);
+}
+
+function ttsDetail(status) {
+  if (!config.tts?.enabled) {
+    return 'TTS ist deaktiviert und kann spaeter eingerichtet werden.';
+  }
+  if (status.error) {
+    return status.error;
+  }
+  if (!ttsDevicesConfigured(status)) {
+    return 'Mindestens ein Alexa-Geraet fuer TTS eintragen.';
+  }
+  return 'Alexa TTS ist bereit.';
 }
 
 async function handleAlexa2LoxCompat(req, res, url) {
@@ -361,9 +379,15 @@ function normalizeTtsText(value) {
 
 function resolveTtsDevices(deviceParam) {
   const raw = String(deviceParam || '').trim();
-  if (!raw) return config.tts?.defaultDevices || [];
-  if (raw.toUpperCase() === 'ALL') return config.tts?.allDevices || config.tts?.alarmDevices || config.tts?.defaultDevices || [];
+  if (!raw) return firstNonEmpty(config.tts?.defaultDevices);
+  if (raw.toUpperCase() === 'ALL') {
+    return firstNonEmpty(config.tts?.allDevices, config.tts?.alarmDevices, config.tts?.defaultDevices);
+  }
   return raw.split(',').map((device) => device.trim()).filter(Boolean);
+}
+
+function firstNonEmpty(...lists) {
+  return lists.find((list) => Array.isArray(list) && list.length > 0) || [];
 }
 
 function addEvent(event) {

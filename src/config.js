@@ -1,10 +1,12 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 const DEFAULT_CONFIG_PATH = './config.json';
+const EXAMPLE_CONFIG_PATH = './config.example.json';
 
 export async function loadConfig() {
   const path = process.env.CONFIG_PATH || DEFAULT_CONFIG_PATH;
-  const raw = await readFile(path, 'utf8');
+  const raw = await readConfigOrCreateDefault(path);
   const config = JSON.parse(raw);
 
   validateConfig(config);
@@ -36,6 +38,22 @@ function validateConfig(config) {
     if (!room.scenes || typeof room.scenes !== 'object') {
       throw new Error(`Szenen fuer Raum "${roomName}" fehlen.`);
     }
+  }
+}
+
+async function readConfigOrCreateDefault(path) {
+  try {
+    return await readFile(path, 'utf8');
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+
+    const example = await readFile(EXAMPLE_CONFIG_PATH, 'utf8');
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, example, 'utf8');
+    console.log(`Keine Konfiguration gefunden. Erstkonfiguration wurde angelegt: ${path}`);
+    return example;
   }
 }
 

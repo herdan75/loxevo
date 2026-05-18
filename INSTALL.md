@@ -29,6 +29,8 @@ Web-UI:
 http://<loxberry-ip>:8080
 ```
 
+Die Web-UI ist fuer das eigene LAN gedacht. Port `8080` sollte nicht direkt ins Internet freigegeben werden, weil darueber Loxone-Zugangsdaten und Steuerbefehle konfiguriert werden.
+
 ## Ersteinrichtung in der Web-UI
 
 1. Web-UI oeffnen.
@@ -38,7 +40,7 @@ http://<loxberry-ip>:8080
 5. Befehle mit Sprachname, Raum, Funktion, Aktion, Loxone-UUID und changeTo-Wert eintragen.
 6. `Dry-Run aktiv` eingeschaltet lassen.
 7. Konfiguration speichern.
-8. Unter `Bedienen` eine Lichtszene testen.
+8. Unter `Bedienen` einen Befehl testen.
 9. Unter `Protokoll` pruefen, welche Loxone-URL erzeugt wurde.
 10. Erst wenn alles passt, Dry-Run deaktivieren.
 

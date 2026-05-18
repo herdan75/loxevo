@@ -78,6 +78,34 @@ h2 {
   color: var(--danger);
 }
 
+.service-status {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.service-status.ready {
+  border-color: #afd7c2;
+  background: #ecf8f1;
+  color: #247143;
+}
+
+.service-status.disabled {
+  border-color: #d7dde4;
+  background: #f3f5f7;
+  color: #5b6570;
+}
+
+.service-status.error {
+  border-color: #e8b8b2;
+  background: #fff0ee;
+  color: var(--danger);
+}
+
 main {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

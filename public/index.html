@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LoxEvo</title>
+    <link rel="stylesheet" href="/assets/style.css">
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">LoxBerry</p>
+        <h1>LoxEvo</h1>
+      </div>
+      <span id="status" class="status">Verbinde...</span>
+    </header>
+
+    <main>
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <h2>Licht testen</h2>
+            <p>Sendet direkt einen Loxone changeTo-Befehl.</p>
+          </div>
+        </div>
+        <div id="rooms" class="rooms"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <h2>TTS testen</h2>
+            <p>Sendet Text an die konfigurierten Alexa-Geraete.</p>
+          </div>
+        </div>
+        <textarea id="ttsText" rows="3">Geschirrspueler ist fertig.</textarea>
+        <div class="actions">
+          <button id="speakBtn">Sprechen</button>
+          <button id="alarmBtn" class="danger">Alarm</button>
+        </div>
+      </section>
+
+      <section class="panel wide">
+        <div class="section-head">
+          <div>
+            <h2>Konfiguration</h2>
+            <p>Raeume, UUIDs, Szenenwerte, Loxone-Zugang und TTS-Geraete.</p>
+          </div>
+          <button id="saveBtn">Speichern</button>
+        </div>
+        <textarea id="configEditor" spellcheck="false"></textarea>
+      </section>
+
+      <section class="panel wide">
+        <h2>Node-RED Aufruf</h2>
+        <pre><code>POST http://&lt;loxberry&gt;:&lt;port&gt;/api/light
+Content-Type: application/json
+
+{"room":"kueche","scene":"ambient"}</code></pre>
+      </section>
+    </main>
+
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

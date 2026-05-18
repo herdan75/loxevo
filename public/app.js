@@ -80,7 +80,14 @@ async function load() {
 
 function renderCommands() {
   roomsEl.innerHTML = '';
-  Object.entries(getConfiguredCommands()).forEach(([commandKey, command]) => {
+  const runnableCommands = Object.entries(getRunnableCommands());
+
+  if (!runnableCommands.length) {
+    roomsEl.innerHTML = '<p class="empty">Noch keine aktiven Befehle konfiguriert.</p>';
+    return;
+  }
+
+  runnableCommands.forEach(([commandKey, command]) => {
     const roomEl = document.createElement('div');
     roomEl.className = 'room';
 
@@ -107,16 +114,6 @@ async function sendCommand(commandKey) {
     await postJson('/api/command', { command: commandKey });
     await loadEvents();
     setStatus(commandKey, 'ok');
-  } catch (error) {
-    setStatus(error.message, 'error');
-  }
-}
-
-async function sendLight(room, scene) {
-  try {
-    await postJson('/api/light', { room, scene });
-    await loadEvents();
-    setStatus(`${room} ${scene}`, 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
   }
@@ -418,7 +415,7 @@ function addRoom() {
     action: '',
     loxoneUuid: '',
     loxoneCommand: '',
-    enabled: true
+    enabled: false
   };
   renderCommandEditor();
   renderCommands();
@@ -431,7 +428,13 @@ function renderIntegrations() {
 
   const baseUrl = window.location.origin;
   lightEndpoints.innerHTML = '';
-  Object.entries(getConfiguredCommands()).forEach(([commandKey, command]) => {
+  const runnableCommands = Object.entries(getRunnableCommands());
+
+  if (!runnableCommands.length) {
+    lightEndpoints.innerHTML = '<p class="empty">Noch keine aktiven Befehle vorhanden.</p>';
+  }
+
+  runnableCommands.forEach(([commandKey, command]) => {
     lightEndpoints.append(createEndpointCard({
       title: command.label || commandKey,
       method: 'POST',
@@ -680,6 +683,12 @@ function getConfiguredCommands() {
     });
   });
   return commands;
+}
+
+function getRunnableCommands() {
+  return Object.fromEntries(
+    Object.entries(getConfiguredCommands()).filter(([, command]) => command.enabled !== false)
+  );
 }
 
 function listToLines(value) {

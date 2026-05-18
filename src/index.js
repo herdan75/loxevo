@@ -12,6 +12,7 @@ const publicDir = join(rootDir, 'public');
 let config = await loadConfig();
 let loxone = new LoxoneClient(config);
 const tts = new TtsService(config);
+const events = [];
 
 await tts.init();
 
@@ -66,6 +67,19 @@ async function handleApi(req, res, pathParts, body) {
     return sendJson(res, config);
   }
 
+  if (req.method === 'GET' && pathParts[1] === 'events') {
+    return sendJson(res, events);
+  }
+
+  if (req.method === 'PUT' && pathParts[1] === 'dry-run') {
+    const payload = parseJson(body);
+    config.loxone.dryRun = payload.enabled !== false;
+    config = await saveConfig(config);
+    loxone = new LoxoneClient(config);
+    addEvent({ type: 'config', status: 'updated', text: `dryRun=${config.loxone.dryRun}` });
+    return sendJson(res, { ok: true, dryRun: config.loxone.dryRun });
+  }
+
   if (req.method === 'PUT' && pathParts[1] === 'config') {
     const nextConfig = parseJson(body);
     config = await saveConfig(nextConfig);
@@ -91,6 +105,13 @@ async function runLightCommand(res, room, scene) {
   }
 
   const result = await loxone.changeScene(normalizeKey(room), normalizeKey(scene));
+  addEvent({
+    type: 'light',
+    status: result.dryRun ? 'dry-run' : 'sent',
+    room: result.room,
+    scene: result.scene,
+    url: result.url
+  });
   return sendJson(res, { ok: true, result });
 }
 
@@ -102,14 +123,17 @@ async function handleTts(req, res, pathParts, body) {
   const cmd = pathParts[1] || 'speak';
   if (cmd === 'lautstaerke' || cmd === 'volume') {
     await tts.setVolume(body);
+    addEvent({ type: 'tts-volume', status: 'sent', volume: body });
     return sendJson(res, { ok: true, command: 'volume' });
   }
   if (cmd === 'alarm') {
     await tts.alarm(body);
+    addEvent({ type: 'tts-alarm', status: 'sent', text: body });
     return sendJson(res, { ok: true, command: 'alarm' });
   }
 
   await tts.speak(body);
+  addEvent({ type: 'tts-speak', status: 'sent', text: body });
   return sendJson(res, { ok: true, command: 'speak' });
 }
 
@@ -133,9 +157,11 @@ async function handleAlexa2LoxCompat(req, res, url) {
 
   if (volume) {
     await tts.setVolume(volume, resolveTtsDevices(devices));
+    addEvent({ type: 'tts-volume', status: 'sent', volume, devices: resolveTtsDevices(devices) });
   }
 
   await tts.speak(normalizeTtsText(text), resolveTtsDevices(devices));
+  addEvent({ type: 'tts-speak', status: 'sent', text, devices: resolveTtsDevices(devices), compat: 'alexa2lox' });
   return sendText(res, `TTS sent: ${text}`);
 }
 
@@ -208,4 +234,12 @@ function resolveTtsDevices(deviceParam) {
   if (!raw) return config.tts?.defaultDevices || [];
   if (raw.toUpperCase() === 'ALL') return config.tts?.allDevices || config.tts?.alarmDevices || config.tts?.defaultDevices || [];
   return raw.split(',').map((device) => device.trim()).filter(Boolean);
+}
+
+function addEvent(event) {
+  events.unshift({
+    at: new Date().toISOString(),
+    ...event
+  });
+  events.splice(50);
 }

@@ -1,0 +1,10 @@
+services:
+  loxevo:
+    build: .
+    container_name: loxevo
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      CONFIG_PATH: /config/config.json
+    volumes:
+      - ./config.json:/config/config.json

@@ -61,6 +61,8 @@ Private Daten gehoeren in `data/`:
 Dieser Ordner ist absichtlich von Git ausgenommen, damit keine Loxone-Zugangsdaten, UUIDs oder Alexa-Geraete-IDs veroeffentlicht werden.
 Alle privaten Werte werden nach der Installation ueber die Web-UI oder direkt in `data/config.json` gepflegt.
 
+Wichtig fuer Live-Tests: Die Web-UI zeigt und speichert Loxone-Zugangsdaten. LoxEvo sollte deshalb nur im eigenen LAN oder per VPN erreichbar sein und nicht direkt ins Internet freigegeben werden.
+
 Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt werden:
 
 - Loxone-Miniserver URL, Benutzer und Passwort
@@ -71,7 +73,7 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt w
 
 Die Oberflaeche ist in drei Bereiche gegliedert:
 
-- `Bedienen`: Licht-Szenen und TTS direkt ausloesen
+- `Bedienen`: frei definierte Befehle und TTS direkt ausloesen
 - `Alexa / Endpunkte`: fertige HTTP-Aufrufe fuer Licht, TTS und Alexa2Lox-kompatible URLs testen und kopieren
 - `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
 - `Protokoll`: letzte Befehle und Dry-Run/Live-Aktionen ansehen

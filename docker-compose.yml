@@ -1,10 +1,12 @@
 services:
   loxevo:
     build: .
+    image: loxevo:local
     container_name: loxevo
     restart: unless-stopped
     network_mode: host
     environment:
       CONFIG_PATH: /config/config.json
+      TZ: Europe/Zurich
     volumes:
       - ./data:/config

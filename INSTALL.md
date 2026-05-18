@@ -1,5 +1,7 @@
 # Installation
 
+> **Hinweis:** LoxEvo ist noch eine Entwicklungsversion. Diese Anleitung ist fuer Tests gedacht, nicht als produktive Freigabe.
+
 ## Voraussetzungen
 
 - LoxBerry oder Linux-System mit Docker

@@ -48,6 +48,12 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt w
 - Raeume mit Name, Schluessel, UUID und Szenenwerten
 - TTS-Aktivierung, Cookie-Datei, Lautstaerken und Alexa-Geraetelisten
 
+Die Oberflaeche ist in drei Bereiche gegliedert:
+
+- `Bedienen`: Licht-Szenen und TTS direkt ausloesen
+- `Konfiguration`: Loxone, Raeume, Szenen und TTS pflegen
+- `Protokoll`: letzte Befehle und Dry-Run/Live-Aktionen ansehen
+
 Die JSON-Ansicht bleibt als Expertenmodus erhalten.
 
 Echte Loxone-Requests aktivieren:

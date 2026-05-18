@@ -28,15 +28,35 @@ function validateConfig(config) {
   if (!config.loxone?.baseUrl) {
     throw new Error('loxone.baseUrl fehlt in der Konfiguration.');
   }
-  if (!config.rooms || typeof config.rooms !== 'object') {
-    throw new Error('rooms fehlt in der Konfiguration.');
+  if (!config.commands && !config.rooms) {
+    throw new Error('commands fehlt in der Konfiguration.');
   }
-  for (const [roomName, room] of Object.entries(config.rooms)) {
-    if (!room.uuid) {
-      throw new Error(`UUID fuer Raum "${roomName}" fehlt.`);
+
+  if (config.commands) {
+    if (typeof config.commands !== 'object') {
+      throw new Error('commands muss ein Objekt sein.');
     }
-    if (!room.scenes || typeof room.scenes !== 'object') {
-      throw new Error(`Szenen fuer Raum "${roomName}" fehlen.`);
+    for (const [commandName, command] of Object.entries(config.commands)) {
+      if (!command.loxoneUuid) {
+        throw new Error(`Loxone UUID fuer Befehl "${commandName}" fehlt.`);
+      }
+      if (!command.loxoneCommand) {
+        throw new Error(`Loxone changeTo-Wert fuer Befehl "${commandName}" fehlt.`);
+      }
+    }
+  }
+
+  if (config.rooms) {
+    if (typeof config.rooms !== 'object') {
+      throw new Error('rooms muss ein Objekt sein.');
+    }
+    for (const [roomName, room] of Object.entries(config.rooms)) {
+      if (!room.uuid) {
+        throw new Error(`UUID fuer Raum "${roomName}" fehlt.`);
+      }
+      if (!room.scenes || typeof room.scenes !== 'object') {
+        throw new Error(`Szenen fuer Raum "${roomName}" fehlen.`);
+      }
     }
   }
 }

@@ -11,24 +11,45 @@ const dryRunToggle = document.querySelector('#dryRunToggle');
 const modeBanner = document.querySelector('#modeBanner');
 const modeTitle = document.querySelector('#modeTitle');
 const modeText = document.querySelector('#modeText');
+const loxoneBaseUrl = document.querySelector('#loxoneBaseUrl');
+const loxoneUsername = document.querySelector('#loxoneUsername');
+const loxonePassword = document.querySelector('#loxonePassword');
+const ttsEnabled = document.querySelector('#ttsEnabled');
+const ttsCookieFile = document.querySelector('#ttsCookieFile');
+const ttsAmazonPage = document.querySelector('#ttsAmazonPage');
+const ttsAlexaHost = document.querySelector('#ttsAlexaHost');
+const ttsDefaultVolume = document.querySelector('#ttsDefaultVolume');
+const ttsAlarmVolume = document.querySelector('#ttsAlarmVolume');
+const ttsDefaultDevices = document.querySelector('#ttsDefaultDevices');
+const ttsAllDevices = document.querySelector('#ttsAllDevices');
+const ttsAlarmDevices = document.querySelector('#ttsAlarmDevices');
+const roomEditor = document.querySelector('#roomEditor');
+const addRoomBtn = document.querySelector('#addRoomBtn');
+const reloadJsonBtn = document.querySelector('#reloadJsonBtn');
+const saveJsonBtn = document.querySelector('#saveJsonBtn');
 
 let config = null;
 
 load();
 
 saveBtn.addEventListener('click', saveConfig);
+saveJsonBtn.addEventListener('click', saveJsonConfig);
+reloadJsonBtn.addEventListener('click', syncJsonFromForms);
 speakBtn.addEventListener('click', () => postText('/tts/speak', ttsText.value));
 alarmBtn.addEventListener('click', () => postText('/tts/alarm', ttsText.value));
 refreshEventsBtn.addEventListener('click', loadEvents);
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
+addRoomBtn.addEventListener('click', addRoom);
 
 async function load() {
   try {
     const response = await fetch('/api/config');
     config = await response.json();
-    configEditor.value = JSON.stringify(config, null, 2);
+    populateForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderRooms();
+    renderRoomEditor();
+    syncJsonFromForms();
     await loadEvents();
     setStatus('Bereit', 'ok');
   } catch (error) {
@@ -74,13 +95,31 @@ async function sendLight(room, scene) {
 
 async function saveConfig() {
   try {
+    const nextConfig = collectConfigFromForms();
+    const result = await putJson('/api/config', nextConfig);
+    config = result.config;
+    populateForms();
+    syncJsonFromForms();
+    updateDryRunUi(Boolean(config.loxone?.dryRun));
+    renderRooms();
+    renderRoomEditor();
+    setStatus('Gespeichert', 'ok');
+  } catch (error) {
+    setStatus(error.message, 'error');
+  }
+}
+
+async function saveJsonConfig() {
+  try {
     const nextConfig = JSON.parse(configEditor.value);
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
-    configEditor.value = JSON.stringify(config, null, 2);
+    populateForms();
+    syncJsonFromForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderRooms();
-    setStatus('Gespeichert', 'ok');
+    renderRoomEditor();
+    setStatus('JSON gespeichert', 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
   }
@@ -136,7 +175,7 @@ async function setDryRun(enabled) {
   try {
     const result = await putJson('/api/dry-run', { enabled });
     config.loxone.dryRun = result.dryRun;
-    configEditor.value = JSON.stringify(config, null, 2);
+    syncJsonFromForms();
     updateDryRunUi(result.dryRun);
     await loadEvents();
     setStatus(result.dryRun ? 'Dry-Run aktiv' : 'Live aktiv', result.dryRun ? 'ok' : 'error');
@@ -144,6 +183,213 @@ async function setDryRun(enabled) {
     dryRunToggle.checked = Boolean(config.loxone?.dryRun);
     setStatus(error.message, 'error');
   }
+}
+
+function populateForms() {
+  loxoneBaseUrl.value = config.loxone?.baseUrl || '';
+  loxoneUsername.value = config.loxone?.username || '';
+  loxonePassword.value = config.loxone?.password || '';
+
+  ttsEnabled.checked = Boolean(config.tts?.enabled);
+  ttsCookieFile.value = config.tts?.cookieFile || '';
+  ttsAmazonPage.value = config.tts?.amazonPage || '';
+  ttsAlexaHost.value = config.tts?.alexaServiceHost || '';
+  ttsDefaultVolume.value = config.tts?.defaultVolume ?? 40;
+  ttsAlarmVolume.value = config.tts?.alarmVolume ?? 100;
+  ttsDefaultDevices.value = listToLines(config.tts?.defaultDevices);
+  ttsAllDevices.value = listToLines(config.tts?.allDevices);
+  ttsAlarmDevices.value = listToLines(config.tts?.alarmDevices);
+}
+
+function renderRoomEditor() {
+  roomEditor.innerHTML = '';
+  Object.entries(config.rooms || {}).forEach(([roomName, room]) => {
+    roomEditor.append(createRoomCard(roomName, room));
+  });
+}
+
+function createRoomCard(roomName, room) {
+  const card = document.createElement('div');
+  card.className = 'room-card';
+  card.dataset.roomOriginal = roomName;
+
+  const head = document.createElement('div');
+  head.className = 'room-card-head';
+
+  const title = document.createElement('strong');
+  title.textContent = room.label || roomName;
+
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'secondary small danger-text';
+  deleteButton.textContent = 'Entfernen';
+  deleteButton.addEventListener('click', () => {
+    card.remove();
+    syncConfigFromForms();
+    renderRooms();
+  });
+
+  head.append(title, deleteButton);
+
+  const fields = document.createElement('div');
+  fields.className = 'form-row three';
+  fields.innerHTML = `
+    <label>Schluessel<input class="room-key" type="text"></label>
+    <label>Name<input class="room-label" type="text"></label>
+    <label>Loxone UUID<input class="room-uuid" type="text"></label>
+  `;
+  fields.querySelector('.room-key').value = roomName;
+  fields.querySelector('.room-label').value = room.label || '';
+  fields.querySelector('.room-uuid').value = room.uuid || '';
+
+  const scenes = document.createElement('div');
+  scenes.className = 'scene-editor';
+
+  Object.entries(room.scenes || {}).forEach(([sceneName, command]) => {
+    scenes.append(createSceneRow(sceneName, command));
+  });
+
+  const addSceneButton = document.createElement('button');
+  addSceneButton.type = 'button';
+  addSceneButton.className = 'secondary small';
+  addSceneButton.textContent = 'Szene hinzufuegen';
+  addSceneButton.addEventListener('click', () => {
+    scenes.append(createSceneRow('neu', ''));
+  });
+
+  card.append(head, fields, scenes, addSceneButton);
+  return card;
+}
+
+function createSceneRow(sceneName, command) {
+  const row = document.createElement('div');
+  row.className = 'scene-row';
+  row.innerHTML = `
+    <label>Szene<input class="scene-name" type="text"></label>
+    <label>changeTo Wert<input class="scene-command" type="text"></label>
+    <button type="button" class="secondary small danger-text">Entfernen</button>
+  `;
+  row.querySelector('.scene-name').value = sceneName;
+  row.querySelector('.scene-command').value = command;
+  row.querySelector('button').addEventListener('click', () => row.remove());
+  return row;
+}
+
+function addRoom() {
+  const nextName = uniqueRoomName('neuer_raum');
+  config.rooms ||= {};
+  config.rooms[nextName] = {
+    label: 'Neuer Raum',
+    uuid: '',
+    scenes: {
+      ambient: '1',
+      hell: '777',
+      aus: '778'
+    }
+  };
+  renderRoomEditor();
+  renderRooms();
+  syncJsonFromForms();
+}
+
+function collectConfigFromForms() {
+  const nextConfig = structuredClone(config);
+  nextConfig.loxone ||= {};
+  nextConfig.loxone.baseUrl = loxoneBaseUrl.value.trim();
+  nextConfig.loxone.username = loxoneUsername.value.trim();
+  nextConfig.loxone.password = loxonePassword.value;
+  nextConfig.loxone.dryRun = dryRunToggle.checked;
+
+  nextConfig.rooms = collectRooms();
+
+  nextConfig.tts ||= {};
+  nextConfig.tts.enabled = ttsEnabled.checked;
+  nextConfig.tts.cookieFile = ttsCookieFile.value.trim();
+  nextConfig.tts.amazonPage = ttsAmazonPage.value.trim() || 'amazon.de';
+  nextConfig.tts.alexaServiceHost = ttsAlexaHost.value.trim() || 'layla.amazon.de';
+  nextConfig.tts.defaultVolume = numberInRange(ttsDefaultVolume.value, 40);
+  nextConfig.tts.alarmVolume = numberInRange(ttsAlarmVolume.value, 100);
+  nextConfig.tts.defaultDevices = linesToList(ttsDefaultDevices.value);
+  nextConfig.tts.allDevices = linesToList(ttsAllDevices.value);
+  nextConfig.tts.alarmDevices = linesToList(ttsAlarmDevices.value);
+
+  return nextConfig;
+}
+
+function collectRooms() {
+  const rooms = {};
+  roomEditor.querySelectorAll('.room-card').forEach((card) => {
+    const roomKey = normalizeInputKey(card.querySelector('.room-key').value);
+    if (!roomKey) return;
+
+    const scenes = {};
+    card.querySelectorAll('.scene-row').forEach((row) => {
+      const sceneName = normalizeInputKey(row.querySelector('.scene-name').value);
+      const command = row.querySelector('.scene-command').value.trim();
+      if (sceneName && command) {
+        scenes[sceneName] = command;
+      }
+    });
+
+    rooms[roomKey] = {
+      label: card.querySelector('.room-label').value.trim() || roomKey,
+      uuid: card.querySelector('.room-uuid').value.trim(),
+      scenes
+    };
+  });
+  return rooms;
+}
+
+function syncConfigFromForms() {
+  config = collectConfigFromForms();
+  syncJsonFromForms();
+}
+
+function syncJsonFromForms() {
+  try {
+    configEditor.value = JSON.stringify(collectConfigFromForms(), null, 2);
+  } catch {
+    configEditor.value = JSON.stringify(config, null, 2);
+  }
+}
+
+function uniqueRoomName(baseName) {
+  let name = baseName;
+  let index = 2;
+  while (config.rooms?.[name]) {
+    name = `${baseName}_${index}`;
+    index += 1;
+  }
+  return name;
+}
+
+function listToLines(value) {
+  return Array.isArray(value) ? value.join('\n') : '';
+}
+
+function linesToList(value) {
+  return String(value || '')
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function numberInRange(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(100, Math.max(0, number));
+}
+
+function normalizeInputKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replaceAll(' ', '_')
+    .replaceAll('\u00fc', 'ue')
+    .replaceAll('\u00f6', 'oe')
+    .replaceAll('\u00e4', 'ae')
+    .replaceAll('\u00df', 'ss')
+    .replace(/[^a-z0-9_-]/g, '');
 }
 
 function updateDryRunUi(enabled) {

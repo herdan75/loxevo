@@ -29,6 +29,9 @@ const reloadJsonBtn = document.querySelector('#reloadJsonBtn');
 const saveJsonBtn = document.querySelector('#saveJsonBtn');
 const tabButtons = document.querySelectorAll('.tab-button');
 const views = document.querySelectorAll('.view');
+const refreshIntegrationsBtn = document.querySelector('#refreshIntegrationsBtn');
+const lightEndpoints = document.querySelector('#lightEndpoints');
+const ttsEndpoints = document.querySelector('#ttsEndpoints');
 
 let config = null;
 
@@ -42,6 +45,7 @@ alarmBtn.addEventListener('click', () => postText('/tts/alarm', ttsText.value));
 refreshEventsBtn.addEventListener('click', loadEvents);
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 addRoomBtn.addEventListener('click', addRoom);
+refreshIntegrationsBtn.addEventListener('click', renderIntegrations);
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => showView(button.dataset.tabTarget));
 });
@@ -54,6 +58,7 @@ async function load() {
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderRooms();
     renderRoomEditor();
+    renderIntegrations();
     syncJsonFromForms();
     await loadEvents();
     setStatus('Bereit', 'ok');
@@ -108,6 +113,7 @@ async function saveConfig() {
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderRooms();
     renderRoomEditor();
+    renderIntegrations();
     setStatus('Gespeichert', 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
@@ -124,6 +130,7 @@ async function saveJsonConfig() {
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderRooms();
     renderRoomEditor();
+    renderIntegrations();
     setStatus('JSON gespeichert', 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
@@ -183,6 +190,9 @@ function showView(viewId) {
   views.forEach((view) => {
     view.classList.toggle('active', view.id === viewId);
   });
+  if (viewId === 'eventsView') {
+    loadEvents();
+  }
 }
 
 async function setDryRun(enabled) {
@@ -303,7 +313,117 @@ function addRoom() {
   };
   renderRoomEditor();
   renderRooms();
+  renderIntegrations();
   syncJsonFromForms();
+}
+
+function renderIntegrations() {
+  if (!lightEndpoints || !ttsEndpoints || !config) return;
+
+  const baseUrl = window.location.origin;
+  lightEndpoints.innerHTML = '';
+  Object.entries(config.rooms || {}).forEach(([roomName, room]) => {
+    Object.keys(room.scenes || {}).forEach((sceneName) => {
+      lightEndpoints.append(createEndpointCard({
+        title: `${room.label || roomName} - ${sceneName}`,
+        method: 'POST',
+        url: `${baseUrl}/light/${encodeURIComponent(roomName)}/${encodeURIComponent(sceneName)}`,
+        body: '',
+        note: `Direkter Szenenaufruf: ${roomName}/${sceneName}`
+      }));
+    });
+  });
+
+  ttsEndpoints.innerHTML = '';
+  ttsEndpoints.append(createEndpointCard({
+    title: 'TTS normal',
+    method: 'POST',
+    url: `${baseUrl}/tts/speak`,
+    body: 'Geschirrspueler ist fertig.',
+    note: 'Einfacher Text im Request-Body.'
+  }));
+  ttsEndpoints.append(createEndpointCard({
+    title: 'Alarm',
+    method: 'POST',
+    url: `${baseUrl}/tts/alarm`,
+    body: 'Achtung, Alarm wurde ausgeloest.',
+    note: 'Nutzt die Alarm-Geraeteliste und Alarm-Lautstaerke.'
+  }));
+  ttsEndpoints.append(createEndpointCard({
+    title: 'Alexa2Lox-kompatibel',
+    method: 'GET',
+    url: `${baseUrl}/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50`,
+    body: '',
+    note: 'Kompatibler Einstieg fuer bestehende Loxone-Aufrufe.'
+  }));
+}
+
+function createEndpointCard({ title, method, url, body, note }) {
+  const card = document.createElement('div');
+  card.className = 'endpoint-card';
+
+  const header = document.createElement('div');
+  header.className = 'endpoint-card-head';
+
+  const label = document.createElement('strong');
+  label.textContent = title;
+
+  const methodBadge = document.createElement('span');
+  methodBadge.className = 'method-badge';
+  methodBadge.textContent = method;
+
+  header.append(label, methodBadge);
+
+  const urlLine = document.createElement('code');
+  urlLine.className = 'endpoint-url';
+  urlLine.textContent = url;
+
+  const actions = document.createElement('div');
+  actions.className = 'endpoint-actions';
+  actions.append(createCopyButton('URL kopieren', url));
+  actions.append(createCopyButton('PowerShell kopieren', buildPowerShellExample(method, url, body)));
+
+  const noteEl = document.createElement('p');
+  noteEl.textContent = note;
+
+  card.append(header, urlLine, actions, noteEl);
+
+  if (body) {
+    const bodyEl = document.createElement('pre');
+    bodyEl.className = 'endpoint-body';
+    bodyEl.textContent = body;
+    card.append(bodyEl);
+  }
+
+  return card;
+}
+
+function createCopyButton(label, value) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'secondary small';
+  button.textContent = label;
+  button.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setStatus('Kopiert', 'ok');
+    } catch {
+      setStatus('Kopieren nicht erlaubt', 'error');
+    }
+  });
+  return button;
+}
+
+function buildPowerShellExample(method, url, body) {
+  if (method === 'GET') {
+    return `Invoke-WebRequest -UseBasicParsing '${url}'`;
+  }
+
+  if (body) {
+    return `Invoke-WebRequest -UseBasicParsing '${url}' -Method ${method} -Body '${body.replaceAll("'", "''")}' -ContentType 'text/plain'`;
+  }
+
+  return `Invoke-WebRequest -UseBasicParsing '${url}' -Method ${method}`;
 }
 
 function collectConfigFromForms() {

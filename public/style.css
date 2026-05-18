@@ -124,6 +124,133 @@ main {
   height: 20px;
 }
 
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+legend {
+  padding: 0 6px;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #ffffff;
+  color: var(--text);
+  font: 14px/1.45 Arial, Helvetica, sans-serif;
+}
+
+input:focus,
+textarea:focus {
+  outline: 2px solid rgba(37, 111, 116, 0.18);
+  border-color: var(--accent);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.form-row.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.wide-fieldset {
+  margin-top: 16px;
+}
+
+.room-editor {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.room-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.room-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.scene-editor {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.scene-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.expert-json {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.expert-json summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.expert-json p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .panel {
   padding: 18px;
   border: 1px solid var(--line);
@@ -205,13 +332,18 @@ button.danger {
   background: var(--danger);
 }
 
+button.small {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+button.danger-text {
+  color: var(--danger);
+}
+
 textarea {
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 12px;
   font: 14px/1.45 Consolas, Monaco, monospace;
-  color: var(--text);
   resize: vertical;
 }
 
@@ -270,6 +402,13 @@ pre {
   }
 
   main {
+    grid-template-columns: 1fr;
+  }
+
+  .config-grid,
+  .form-row,
+  .form-row.three,
+  .scene-row {
     grid-template-columns: 1fr;
   }
 }

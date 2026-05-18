@@ -124,6 +124,44 @@ main {
   height: 20px;
 }
 
+.tab-nav {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.tab-button {
+  flex: 1;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.tab-button:hover {
+  border-color: var(--line);
+  background: #f8fafc;
+  color: var(--text);
+}
+
+.tab-button.active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.view {
+  display: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.view.active {
+  display: grid;
+}
+
 .config-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -408,7 +446,12 @@ pre {
   .config-grid,
   .form-row,
   .form-row.three,
+  .view,
   .scene-row {
     grid-template-columns: 1fr;
+  }
+
+  .tab-nav {
+    flex-direction: column;
   }
 }

@@ -29,6 +29,7 @@
 
       <nav class="tab-nav wide" aria-label="LoxEvo Bereiche">
         <button class="tab-button active" type="button" data-tab-target="controlView">Bedienen</button>
+        <button class="tab-button" type="button" data-tab-target="integrationView">Alexa / Endpunkte</button>
         <button class="tab-button" type="button" data-tab-target="configView">Konfiguration</button>
         <button class="tab-button" type="button" data-tab-target="eventsView">Protokoll</button>
       </nav>
@@ -55,6 +56,30 @@
         <div class="actions">
           <button id="speakBtn">Sprechen</button>
           <button id="alarmBtn" class="danger">Alarm</button>
+        </div>
+      </section>
+      </section>
+
+      <section id="integrationView" class="view wide">
+      <section class="panel wide">
+        <div class="section-head">
+          <div>
+            <h2>Alexa- und HTTP-Endpunkte</h2>
+            <p>Fertige Aufrufe fuer Sprachroutinen, Node-RED, Loxone und Tests.</p>
+          </div>
+          <button id="refreshIntegrationsBtn" type="button" class="secondary">Neu erzeugen</button>
+        </div>
+
+        <div class="endpoint-block">
+          <h3>Licht-Szenen</h3>
+          <p>Jede Szene kann per POST aufgerufen werden. Diese URLs eignen sich als Ziel fuer Node-RED, Loxone oder spaetere Alexa-Bridge-Logik.</p>
+          <div id="lightEndpoints" class="endpoint-list"></div>
+        </div>
+
+        <div class="endpoint-block">
+          <h3>TTS</h3>
+          <p>Diese Aufrufe sind fuer Sprachausgabe aus Loxone gedacht. Der Alexa2Lox-kompatible Pfad bleibt bewusst erhalten.</p>
+          <div id="ttsEndpoints" class="endpoint-list"></div>
         </div>
       </section>
       </section>

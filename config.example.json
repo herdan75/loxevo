@@ -6,7 +6,8 @@
   "loxone": {
     "baseUrl": "http://192.168.178.3",
     "username": "loxone-user",
-    "password": "loxone-pass"
+    "password": "loxone-pass",
+    "dryRun": true
   },
   "rooms": {
     "kueche": {

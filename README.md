@@ -28,8 +28,11 @@ Wenn TTS aktiviert wird, aber `alexa-remote2` oder die Cookie-Datei noch fehlt, 
 
 ## Setup
 
+Ausfuehrliche Installationsschritte stehen in [INSTALL.md](INSTALL.md).
+
 ```bash
-cp config.example.json config.json
+mkdir -p data
+cp config.example.json data/config.json
 docker compose up -d --build
 ```
 
@@ -39,11 +42,18 @@ Web-UI:
 http://<loxberry>:8080
 ```
 
-In `config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie unter "Letzte Befehle", sendet aber noch nichts an Loxone.
+In `data/config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie unter "Letzte Befehle", sendet aber noch nichts an Loxone.
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
 TTS braucht zusaetzlich das optionale Paket `alexa-remote2` und eine gueltige Alexa-Cookie-Datei. Im Docker/LoxBerry-Betrieb wird das Paket ueber die Projektabhaengigkeiten installiert. Lokal ohne installierte Node-Abhaengigkeiten bleibt TTS sichtbar, aber als "nicht bereit" markiert.
 Fuer den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
+
+Private Daten gehoeren in `data/`:
+
+- `data/config.json`
+- `data/Node.txt`
+
+Dieser Ordner ist absichtlich von Git ausgenommen, damit keine Loxone-Zugangsdaten, UUIDs oder Alexa-Geraete-IDs veroeffentlicht werden.
 
 Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt werden:
 
@@ -148,7 +158,7 @@ Hinweis: In diesem Prototyp muessen die Geraete in `config.json` so angegeben we
 EchoLox ist eine wichtige technische Referenz, aber in der geprueften Repository-Ansicht war kein klares `LICENSE`-File sichtbar. Ohne Lizenz gelten standardmaessig restriktive Urheberrechte. Darum wird LoxEvo als eigenstaendige Implementierung aufgebaut:
 
 - kein Kopieren von EchoLox-Code
-- keine Uebernahme von Assets, Logos oder Web-UI
+- keine Uebernahme von Assets, Logos, Texten oder Web-UI
 - eigene Projektstruktur und eigener Name
 - Referenzen nur als technische Orientierung
 

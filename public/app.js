@@ -5,6 +5,8 @@ const ttsText = document.querySelector('#ttsText');
 const saveBtn = document.querySelector('#saveBtn');
 const speakBtn = document.querySelector('#speakBtn');
 const alarmBtn = document.querySelector('#alarmBtn');
+const refreshEventsBtn = document.querySelector('#refreshEventsBtn');
+const eventsEl = document.querySelector('#events');
 
 let config = null;
 
@@ -13,6 +15,7 @@ load();
 saveBtn.addEventListener('click', saveConfig);
 speakBtn.addEventListener('click', () => postText('/tts/speak', ttsText.value));
 alarmBtn.addEventListener('click', () => postText('/tts/alarm', ttsText.value));
+refreshEventsBtn.addEventListener('click', loadEvents);
 
 async function load() {
   try {
@@ -20,6 +23,7 @@ async function load() {
     config = await response.json();
     configEditor.value = JSON.stringify(config, null, 2);
     renderRooms();
+    await loadEvents();
     setStatus('Bereit', 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
@@ -55,6 +59,7 @@ function renderRooms() {
 async function sendLight(room, scene) {
   try {
     await postJson('/api/light', { room, scene });
+    await loadEvents();
     setStatus(`${room} ${scene}`, 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
@@ -82,6 +87,7 @@ async function postText(url, text) {
       body: text
     });
     await ensureOk(response);
+    await loadEvents();
     setStatus('TTS gesendet', 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
@@ -117,4 +123,40 @@ async function ensureOk(response) {
 function setStatus(text, type) {
   statusEl.textContent = text;
   statusEl.className = `status ${type || ''}`.trim();
+}
+
+async function loadEvents() {
+  const response = await fetch('/api/events');
+  const events = await response.json();
+  renderEvents(events);
+}
+
+function renderEvents(events) {
+  if (!eventsEl) return;
+  if (!events.length) {
+    eventsEl.innerHTML = '<p class="empty">Noch keine Befehle.</p>';
+    return;
+  }
+
+  eventsEl.innerHTML = '';
+  events.forEach((event) => {
+    const row = document.createElement('div');
+    row.className = 'event-row';
+    const meta = document.createElement('div');
+    meta.className = 'event-meta';
+    meta.textContent = `${formatTime(event.at)} | ${event.type} | ${event.status}`;
+    const detail = document.createElement('div');
+    detail.className = 'event-detail';
+    detail.textContent = event.url || event.text || JSON.stringify(event);
+    row.append(meta, detail);
+    eventsEl.append(row);
+  });
+}
+
+function formatTime(value) {
+  return new Date(value).toLocaleTimeString('de-CH', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
 }

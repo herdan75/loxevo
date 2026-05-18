@@ -51,6 +51,7 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt w
 Die Oberflaeche ist in drei Bereiche gegliedert:
 
 - `Bedienen`: Licht-Szenen und TTS direkt ausloesen
+- `Alexa / Endpunkte`: fertige HTTP-Aufrufe fuer Licht, TTS und Alexa2Lox-kompatible URLs kopieren
 - `Konfiguration`: Loxone, Raeume, Szenen und TTS pflegen
 - `Protokoll`: letzte Befehle und Dry-Run/Live-Aktionen ansehen
 

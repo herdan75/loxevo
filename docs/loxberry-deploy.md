@@ -25,14 +25,22 @@ In diesem Ordner sollten liegen:
 docker-compose.yml
 Dockerfile
 package.json
-config.json
-Node.txt
+data/config.json
+data/Node.txt
 src/
 public/
 ```
 
-`config.json` enthaelt deine Loxone- und LoxEvo-Konfiguration.
-`Node.txt` ist die Alexa-Cookie-Datei, die bisher in Node-RED fuer `alexa-remote2` genutzt wurde.
+`data/config.json` enthaelt deine Loxone- und LoxEvo-Konfiguration.
+`data/Node.txt` ist die Alexa-Cookie-Datei, die bisher in Node-RED fuer `alexa-remote2` genutzt wurde.
+Der komplette Ordner `data/` ist fuer private lokale Daten gedacht und wird nicht ins GitHub-Repository uebernommen.
+
+Vor dem ersten Start:
+
+```bash
+mkdir -p data
+cp config.example.json data/config.json
+```
 
 ## Wichtige Pfade
 
@@ -45,12 +53,11 @@ In `config.json` muss der TTS-Cookie-Pfad im Container stehen:
 }
 ```
 
-Die Datei wird ueber `docker-compose.yml` so eingebunden:
+Der komplette lokale `data/`-Ordner wird ueber `docker-compose.yml` so eingebunden:
 
 ```yaml
 volumes:
-  - ./config.json:/config/config.json
-  - ./Node.txt:/config/Node.txt:ro
+  - ./data:/config
 ```
 
 ## Start
@@ -96,7 +103,7 @@ docker compose up -d
 
 `Alexa-Cookie konnte nicht gelesen werden`
 
-`Node.txt` liegt nicht im Projektordner oder der Volume-Pfad stimmt nicht.
+`Node.txt` liegt nicht in `data/` oder der Cookie-Pfad in `data/config.json` stimmt nicht.
 
 `Alexa-Verbindung konnte nicht initialisiert werden`
 

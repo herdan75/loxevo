@@ -85,6 +85,45 @@ main {
   padding: 24px clamp(18px, 4vw, 48px) 40px;
 }
 
+.mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid #b9d8c5;
+  border-radius: 8px;
+  background: #edf8f1;
+  color: #194f31;
+}
+
+.mode-banner.live {
+  border-color: #e1b4ae;
+  background: #fff0ee;
+  color: #8d2d25;
+}
+
+.mode-banner h2 {
+  margin-bottom: 4px;
+}
+
+.mode-banner p {
+  font-size: 14px;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 150px;
+  font-weight: 700;
+}
+
+.switch-row input {
+  width: 20px;
+  height: 20px;
+}
+
 .panel {
   padding: 18px;
   border: 1px solid var(--line);

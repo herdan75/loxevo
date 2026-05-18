@@ -2,6 +2,8 @@
 
 > **Hinweis:** LoxEvo ist noch eine Entwicklungsversion. Diese Anleitung ist fuer Tests gedacht, nicht als produktive Freigabe.
 
+Diese Anleitung beschreibt den Docker-Weg. Private Daten werden erst nach der Installation lokal im Ordner `data/` angelegt oder ueber die Web-UI eingetragen.
+
 ## Voraussetzungen
 
 - LoxBerry oder Linux-System mit Docker
@@ -9,7 +11,7 @@
 - Loxone-Miniserver mit erreichbarer HTTP-Schnittstelle
 - Optional fuer TTS: Alexa-Cookie-Datei fuer `alexa-remote2`
 
-## Installation auf LoxBerry
+## Schnellstart auf LoxBerry
 
 ```bash
 cd /mnt/docker
@@ -27,6 +29,19 @@ Web-UI:
 http://<loxberry-ip>:8080
 ```
 
+## Ersteinrichtung in der Web-UI
+
+1. Web-UI oeffnen.
+2. Im Bereich `Einrichtung` die offenen Punkte anschauen.
+3. `Zur Konfiguration` waehlen.
+4. Loxone-Miniserver URL, Benutzer und Passwort eintragen.
+5. Raeume, Loxone-UUIDs und Szenenwerte eintragen.
+6. `Dry-Run aktiv` eingeschaltet lassen.
+7. Konfiguration speichern.
+8. Unter `Bedienen` eine Lichtszene testen.
+9. Unter `Protokoll` pruefen, welche Loxone-URL erzeugt wurde.
+10. Erst wenn alles passt, Dry-Run deaktivieren.
+
 ## Private Konfiguration
 
 Alle privaten Daten gehoeren in den Ordner `data/`.
@@ -39,6 +54,8 @@ data/Node.txt
 Diese Dateien werden nicht ins Git-Repository uebernommen.
 `data/config.json` wird beim ersten Start automatisch erzeugt und danach ueber die Web-UI angepasst.
 
+Wichtig: `config.example.json` bleibt absichtlich allgemein und enthaelt nur Platzhalter. Eigene IPs, Passwoerter, UUIDs und Echo-Geraete-IDs gehoeren nie direkt ins Repository.
+
 ## TTS aktivieren
 
 1. Alexa-Cookie-Datei als `data/Node.txt` ablegen.
@@ -46,6 +63,32 @@ Diese Dateien werden nicht ins Git-Repository uebernommen.
 3. Cookie-Datei auf `/config/Node.txt` setzen.
 4. Echo-Geraete-IDs eintragen.
 5. Speichern und TTS-Status pruefen.
+
+## Betrieb
+
+Status anzeigen:
+
+```bash
+docker compose ps
+```
+
+Logs ansehen:
+
+```bash
+docker compose logs -f loxevo
+```
+
+Container neu starten:
+
+```bash
+docker compose restart loxevo
+```
+
+Stoppen:
+
+```bash
+docker compose down
+```
 
 ## Updates
 
@@ -56,3 +99,55 @@ docker compose up -d --build
 ```
 
 Die Dateien in `data/` bleiben dabei erhalten.
+
+## Neuinstallation oder Ruecksetzen
+
+Container stoppen:
+
+```bash
+docker compose down
+```
+
+Nur die Anwendung neu bauen:
+
+```bash
+docker compose up -d --build
+```
+
+Konfiguration komplett neu erzeugen:
+
+```bash
+mv data/config.json data/config.backup.json
+docker compose up -d
+```
+
+Beim naechsten Start wird wieder eine frische `data/config.json` aus `config.example.json` angelegt.
+
+## Typische Probleme
+
+`http://<loxberry-ip>:8080` ist nicht erreichbar:
+
+```bash
+docker compose ps
+docker compose logs loxevo
+```
+
+`alexa-remote2 ist nicht installiert`:
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
+
+`Alexa-Cookie konnte nicht gelesen werden`:
+
+- `data/Node.txt` pruefen
+- In der Web-UI Cookie-Datei auf `/config/Node.txt` setzen
+- Container neu starten
+
+`Loxone antwortet nicht`:
+
+- Miniserver URL pruefen
+- Benutzer/Passwort pruefen
+- Vom LoxBerry aus testen, ob die Miniserver-IP erreichbar ist
+- Dry-Run erst deaktivieren, wenn die erzeugten URLs korrekt aussehen

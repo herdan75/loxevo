@@ -1,5 +1,9 @@
 # LoxEvo
 
+> **Status: Entwicklungsversion / Work in Progress**
+>
+> LoxEvo ist aktuell noch **nicht produktiv freigegeben**. Das Projekt ist im Aufbau und kann lokal oder auf einem Test-LoxBerry ausprobiert werden. Installation, API, Konfiguration und Alexa/TTS-Integration koennen sich noch aendern. Nutzung bitte nur im Dry-Run oder in einer bewusst getesteten Umgebung.
+
 Eigene LoxBerry-Zentrale fuer Alexa, Echo-TTS und Loxone.
 
 Dieses Projekt ist bewusst **keine Code-Kopie von EchoLox**. EchoLox und Alexa2Lox dienen als fachliche Referenzen fuer das Zielbild:

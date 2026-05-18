@@ -5,6 +5,7 @@ export class TtsService {
     this.config = config.tts || {};
     this.remote = null;
     this.ready = false;
+    this.lastError = null;
   }
 
   async init() {
@@ -13,24 +14,65 @@ export class TtsService {
       return;
     }
 
-    const { default: AlexaRemote } = await import('alexa-remote2');
-    const cookie = await readFile(this.config.cookieFile, 'utf8');
+    let AlexaRemote;
+    try {
+      ({ default: AlexaRemote } = await import('alexa-remote2'));
+    } catch (error) {
+      this.markUnavailable(
+        'alexa-remote2 ist nicht installiert. Bitte Abhaengigkeiten im LoxBerry/Docker-Container installieren.',
+        error
+      );
+      return;
+    }
+
+    let cookie;
+    try {
+      cookie = await readFile(this.config.cookieFile, 'utf8');
+    } catch (error) {
+      this.markUnavailable(`Alexa-Cookie konnte nicht gelesen werden: ${this.config.cookieFile}`, error);
+      return;
+    }
+
     this.remote = new AlexaRemote();
 
-    await new Promise((resolve, reject) => {
-      this.remote.init(
-        {
-          cookie,
-          amazonPage: this.config.amazonPage || 'amazon.de',
-          alexaServiceHost: this.config.alexaServiceHost || 'layla.amazon.de',
-          usePushConnection: true
-        },
-        (error) => (error ? reject(error) : resolve())
-      );
-    });
+    try {
+      await new Promise((resolve, reject) => {
+        this.remote.init(
+          {
+            cookie,
+            amazonPage: this.config.amazonPage || 'amazon.de',
+            alexaServiceHost: this.config.alexaServiceHost || 'layla.amazon.de',
+            usePushConnection: true
+          },
+          (error) => (error ? reject(error) : resolve())
+        );
+      });
+    } catch (error) {
+      this.markUnavailable('Alexa-Verbindung konnte nicht initialisiert werden.', error);
+      return;
+    }
 
     this.ready = true;
+    this.lastError = null;
     console.log('TTS ist mit alexa-remote2 verbunden.');
+  }
+
+  markUnavailable(message, error) {
+    this.ready = false;
+    this.remote = null;
+    this.lastError = error?.message ? `${message} (${error.message})` : message;
+    console.warn(`TTS nicht bereit: ${this.lastError}`);
+  }
+
+  getStatus() {
+    return {
+      enabled: Boolean(this.config.enabled),
+      ready: this.ready,
+      error: this.lastError,
+      defaultDevices: this.config.defaultDevices || [],
+      allDevices: this.config.allDevices || [],
+      alarmDevices: this.config.alarmDevices || []
+    };
   }
 
   async speak(text, devices = this.config.defaultDevices || []) {
@@ -78,7 +120,7 @@ export class TtsService {
       throw new Error('TTS ist in config.json deaktiviert.');
     }
     if (!this.ready) {
-      throw new Error('TTS ist noch nicht initialisiert.');
+      throw new Error(this.lastError || 'TTS ist noch nicht initialisiert.');
     }
   }
 }

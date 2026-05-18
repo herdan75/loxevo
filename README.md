@@ -43,6 +43,7 @@ In `config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt LoxEvo
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
 TTS braucht zusaetzlich das optionale Paket `alexa-remote2` und eine gueltige Alexa-Cookie-Datei. Im Docker/LoxBerry-Betrieb wird das Paket ueber die Projektabhaengigkeiten installiert. Lokal ohne installierte Node-Abhaengigkeiten bleibt TTS sichtbar, aber als "nicht bereit" markiert.
+Fuer den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
 Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt werden:
 
@@ -147,7 +148,7 @@ Hinweis: In diesem Prototyp muessen die Geraete in `config.json` so angegeben we
 EchoLox ist eine wichtige technische Referenz, aber in der geprueften Repository-Ansicht war kein klares `LICENSE`-File sichtbar. Ohne Lizenz gelten standardmaessig restriktive Urheberrechte. Darum wird LoxEvo als eigenstaendige Implementierung aufgebaut:
 
 - kein Kopieren von EchoLox-Code
-- keine Uebernahme von Assets, Logos, Texten oder Web-UI
+- keine Uebernahme von Assets, Logos oder Web-UI
 - eigene Projektstruktur und eigener Name
 - Referenzen nur als technische Orientierung
 

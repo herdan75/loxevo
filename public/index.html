@@ -33,6 +33,7 @@
         <button class="tab-button active" type="button" data-tab-target="controlView">Steuerung</button>
         <button class="tab-button" type="button" data-tab-target="integrationView">Alexa / Endpunkte</button>
         <button class="tab-button" type="button" data-tab-target="configView">Konfiguration</button>
+        <button class="tab-button" type="button" data-tab-target="maintenanceView">Wartung</button>
         <button class="tab-button" type="button" data-tab-target="eventsView">Protokoll</button>
       </nav>
 
@@ -202,6 +203,20 @@
 Content-Type: application/json
 
 {"command":"kueche_licht_hell"}</code></pre>
+      </section>
+      </section>
+
+      <section id="maintenanceView" class="view wide">
+      <section class="panel wide">
+        <div class="section-head">
+          <div>
+            <h2>Wartung</h2>
+            <p>Versionen pruefen und Updates fuer LoxEvo-Komponenten verwalten.</p>
+          </div>
+          <button id="refreshMaintenanceBtn" type="button" class="secondary">Versionen pruefen</button>
+        </div>
+
+        <div id="dependencyStatus" class="maintenance-list"></div>
       </section>
       </section>
 

@@ -102,6 +102,8 @@ docker compose up -d --build
 
 Die Dateien in `data/` bleiben dabei erhalten.
 
+Die installierte `alexa-remote2`-Version und verfuegbare Updates sind in der Web-UI unter "Wartung" sichtbar.
+
 ## Neuinstallation oder Ruecksetzen
 
 Container stoppen:

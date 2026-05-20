@@ -38,10 +38,13 @@ const setupPanel = document.querySelector('#setupPanel');
 const setupSummary = document.querySelector('#setupSummary');
 const setupChecks = document.querySelector('#setupChecks');
 const setupConfigBtn = document.querySelector('#setupConfigBtn');
+const refreshMaintenanceBtn = document.querySelector('#refreshMaintenanceBtn');
+const dependencyStatus = document.querySelector('#dependencyStatus');
 
 let config = null;
 let ttsStatus = null;
 let setupStatus = null;
+let dependencyInfo = null;
 
 load();
 
@@ -58,6 +61,7 @@ refreshIntegrationsBtn.addEventListener('click', () => {
   showToast('Endpunkte aktualisiert', 'ok');
 });
 setupConfigBtn.addEventListener('click', () => showView('configView'));
+refreshMaintenanceBtn.addEventListener('click', () => loadDependencyStatus(refreshMaintenanceBtn));
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => showView(button.dataset.tabTarget));
 });
@@ -70,6 +74,7 @@ async function load() {
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     await loadTtsStatus();
     await loadSetupStatus();
+    loadDependencyStatus();
     renderCommands();
     renderCommandEditor();
     renderIntegrations();
@@ -332,6 +337,118 @@ function showView(viewId) {
   });
   if (viewId === 'eventsView') {
     loadEvents();
+  }
+  if (viewId === 'maintenanceView') {
+    loadDependencyStatus();
+  }
+}
+
+async function loadDependencyStatus(button) {
+  if (!dependencyStatus) return;
+  if (button) setButtonFeedback(button, 'pending', 'Prueft');
+  dependencyStatus.innerHTML = '<p class="empty">Versionen werden geprueft...</p>';
+  try {
+    const response = await fetch('/api/dependencies');
+    await ensureOk(response);
+    dependencyInfo = await response.json();
+    renderDependencyStatus();
+    if (button) {
+      setButtonFeedback(button, 'success', 'Geprueft');
+      showToast('Versionen geprueft', 'ok');
+    }
+  } catch (error) {
+    dependencyStatus.innerHTML = `<div class="service-status error">${escapeHtml(error.message)}</div>`;
+    if (button) {
+      setButtonFeedback(button, 'error', 'Fehler');
+      showToast(error.message, 'error');
+    }
+  }
+}
+
+function renderDependencyStatus() {
+  if (!dependencyStatus) return;
+  const dependencies = dependencyInfo?.dependencies || [];
+  if (!dependencies.length) {
+    dependencyStatus.innerHTML = '<p class="empty">Keine wartbaren Komponenten gefunden.</p>';
+    return;
+  }
+
+  dependencyStatus.innerHTML = '';
+  dependencies.forEach((dependency) => {
+    const card = document.createElement('div');
+    card.className = 'maintenance-card';
+
+    const title = document.createElement('div');
+    title.className = 'maintenance-title';
+    const name = document.createElement('strong');
+    name.textContent = dependency.name;
+    const badge = document.createElement('span');
+    badge.className = dependency.updateAvailable ? 'update-badge update' : 'update-badge ok';
+    badge.textContent = dependency.updateAvailable ? 'Update verfuegbar' : 'Aktuell';
+    title.append(name, badge);
+
+    const grid = document.createElement('div');
+    grid.className = 'maintenance-grid';
+    grid.innerHTML = `
+      <div><span>Installiert</span><strong>${escapeHtml(dependency.installedVersion || 'Nicht installiert')}</strong></div>
+      <div><span>Verfuegbar</span><strong>${escapeHtml(dependency.latestVersion || 'Unbekannt')}</strong></div>
+      <div><span>Geprueft</span><strong>${escapeHtml(formatDateTime(dependency.latestCheckedAt))}</strong></div>
+    `;
+
+    const message = document.createElement('p');
+    message.className = 'maintenance-message';
+    message.textContent = dependency.latestError
+      ? `Update-Pruefung nicht moeglich: ${dependency.latestError}`
+      : dependency.update?.message || (dependency.updateAvailable ? 'Eine neuere Version kann installiert werden.' : 'Die installierte Version ist aktuell.');
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    const updateButton = document.createElement('button');
+    updateButton.type = 'button';
+    updateButton.textContent = dependency.installedVersion ? 'Update installieren' : 'Installieren';
+    updateButton.disabled = dependency.update?.status === 'running' || Boolean(dependency.latestError);
+    updateButton.addEventListener('click', () => updateDependency(dependency.name, updateButton));
+    actions.append(updateButton);
+
+    if (dependency.update?.restartRequired) {
+      const restartButton = document.createElement('button');
+      restartButton.type = 'button';
+      restartButton.className = 'secondary';
+      restartButton.textContent = 'LoxEvo neu starten';
+      restartButton.addEventListener('click', () => restartSystem(restartButton));
+      actions.append(restartButton);
+    }
+
+    card.append(title, grid, message, actions);
+    dependencyStatus.append(card);
+  });
+}
+
+async function updateDependency(name, button) {
+  setButtonFeedback(button, 'pending', 'Installiert');
+  try {
+    const response = await fetch(`/api/dependencies/${encodeURIComponent(name)}/update`, { method: 'POST' });
+    await ensureOk(response);
+    dependencyInfo = await response.json();
+    renderDependencyStatus();
+    setButtonFeedback(button, 'success', 'Installiert');
+    showToast('Update installiert. Neustart erforderlich.', 'ok');
+  } catch (error) {
+    await loadDependencyStatus();
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
+}
+
+async function restartSystem(button) {
+  setButtonFeedback(button, 'pending', 'Startet neu');
+  try {
+    const response = await fetch('/api/system/restart', { method: 'POST' });
+    await ensureOk(response);
+    showToast('LoxEvo startet neu', 'ok');
+  } catch (error) {
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
   }
 }
 
@@ -1095,6 +1212,26 @@ function renderEvents(events) {
     detail.textContent = event.url || event.text || JSON.stringify(event);
     row.append(meta, detail);
     eventsEl.append(row);
+  });
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function formatDateTime(value) {
+  if (!value) return 'Noch nicht';
+  return new Date(value).toLocaleString('de-CH', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
   });
 }
 

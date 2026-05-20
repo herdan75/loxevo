@@ -1,5 +1,7 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, saveConfig } from './config.js';
@@ -8,6 +10,8 @@ import { TtsService } from './tts.js';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const publicDir = join(rootDir, 'public');
+const require = createRequire(import.meta.url);
+let dependencyUpdate = null;
 
 let config = await loadConfig();
 let loxone = new LoxoneClient(config);
@@ -82,6 +86,20 @@ async function handleApi(req, res, pathParts, body) {
 
   if (req.method === 'GET' && pathParts[1] === 'tts' && pathParts[2] === 'status') {
     return sendJson(res, tts.getStatus());
+  }
+
+  if (req.method === 'GET' && pathParts[1] === 'dependencies') {
+    return sendJson(res, { dependencies: [await getDependencyStatus('alexa-remote2')] });
+  }
+
+  if (req.method === 'POST' && pathParts[1] === 'dependencies' && pathParts[2] === 'alexa-remote2' && pathParts[3] === 'update') {
+    return await updateDependency(res, 'alexa-remote2');
+  }
+
+  if (req.method === 'POST' && pathParts[1] === 'system' && pathParts[2] === 'restart') {
+    sendJson(res, { ok: true, message: 'LoxEvo startet neu.' });
+    setTimeout(() => process.exit(0), 500);
+    return;
   }
 
   if (req.method === 'PUT' && pathParts[1] === 'dry-run') {
@@ -238,6 +256,134 @@ function getSetupStatus() {
     openRequired: openRequired.length,
     checks
   };
+}
+
+async function getDependencyStatus(name) {
+  const installedVersion = await getInstalledPackageVersion(name);
+  const latest = await getLatestPackageVersion(name);
+  const updateAvailable = Boolean(installedVersion && latest.version && compareVersions(installedVersion, latest.version) < 0);
+
+  return {
+    name,
+    installedVersion,
+    latestVersion: latest.version,
+    updateAvailable,
+    latestCheckedAt: latest.checkedAt,
+    latestError: latest.error,
+    update: dependencyUpdate?.name === name ? dependencyUpdate : null
+  };
+}
+
+async function getInstalledPackageVersion(name) {
+  try {
+    const packagePath = require.resolve(`${name}/package.json`);
+    const packageJson = JSON.parse(await readFile(packagePath, 'utf8'));
+    return packageJson.version || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getLatestPackageVersion(name) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/latest`, {
+      headers: { accept: 'application/json' },
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      throw new Error(`npm Registry HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    return { version: payload.version || null, checkedAt: new Date().toISOString(), error: null };
+  } catch (error) {
+    return { version: null, checkedAt: new Date().toISOString(), error: error.message };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function updateDependency(res, name) {
+  if (dependencyUpdate?.status === 'running') {
+    return sendJson(res, { ok: false, error: 'Ein Update laeuft bereits.' }, 409);
+  }
+
+  dependencyUpdate = {
+    name,
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    message: 'Update wird installiert...',
+    restartRequired: false
+  };
+
+  try {
+    const output = await runNpmInstall(name);
+    dependencyUpdate = {
+      ...dependencyUpdate,
+      status: 'done',
+      finishedAt: new Date().toISOString(),
+      message: 'Update installiert. Bitte LoxEvo neu starten.',
+      restartRequired: true,
+      output: output.slice(-4000)
+    };
+    addEvent({ type: 'dependency-update', status: 'done', text: `${name} wurde aktualisiert.` });
+    return sendJson(res, { ok: true, dependencies: [await getDependencyStatus(name)] });
+  } catch (error) {
+    dependencyUpdate = {
+      ...dependencyUpdate,
+      status: 'error',
+      finishedAt: new Date().toISOString(),
+      message: error.message,
+      restartRequired: false
+    };
+    addEvent({ type: 'dependency-update', status: 'error', text: `${name}: ${error.message}` });
+    return sendJson(res, { ok: false, error: error.message, dependencies: [await getDependencyStatus(name)] }, 500);
+  }
+}
+
+function runNpmInstall(name) {
+  const npmExecPath = process.env.npm_execpath;
+  const command = npmExecPath ? process.execPath : 'npm';
+  const args = npmExecPath
+    ? [npmExecPath, 'install', `${name}@latest`, '--omit=dev']
+    : ['install', `${name}@latest`, '--omit=dev'];
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: rootDir,
+      windowsHide: true,
+      env: process.env
+    });
+    let output = '';
+
+    child.stdout.on('data', (chunk) => {
+      output += chunk.toString();
+    });
+    child.stderr.on('data', (chunk) => {
+      output += chunk.toString();
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve(output);
+        return;
+      }
+      reject(new Error(output.trim() || `npm install wurde mit Code ${code} beendet.`));
+    });
+  });
+}
+
+function compareVersions(left, right) {
+  const leftParts = String(left || '').split('.').map((part) => Number.parseInt(part, 10) || 0);
+  const rightParts = String(right || '').split('.').map((part) => Number.parseInt(part, 10) || 0);
+  const maxLength = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < maxLength; index += 1) {
+    const diff = (leftParts[index] || 0) - (rightParts[index] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
 }
 
 function isConfiguredUrl(value) {

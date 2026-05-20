@@ -53,6 +53,8 @@ Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 TTS braucht das Paket `alexa-remote2` und eine gueltige Alexa-Cookie-Datei. Im Docker/LoxBerry-Betrieb wird das Paket ueber die Projektabhaengigkeiten installiert. Lokal ohne installierte Node-Abhaengigkeiten bleibt TTS sichtbar, aber als "nicht bereit" markiert.
 Fuer den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
+Die Web-UI zeigt unter "Wartung" die installierte `alexa-remote2`-Version, die aktuelle npm-Version und kann ein Update im laufenden Container anstossen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
+
 Private Daten gehoeren in `data/`:
 
 - `data/config.json`

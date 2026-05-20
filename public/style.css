@@ -522,10 +522,16 @@ button {
   color: #ffffff;
   font-weight: 700;
   cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 button:hover {
   background: var(--accent-strong);
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.92;
 }
 
 button.secondary {
@@ -549,6 +555,73 @@ button.small {
 }
 
 button.danger-text {
+  color: var(--danger);
+}
+
+button.action-pending,
+button.secondary.action-pending {
+  border-color: #d8c58b;
+  background: #fff6d8;
+  color: #775b12;
+  box-shadow: 0 0 0 3px rgba(216, 197, 139, 0.25);
+}
+
+button.action-success,
+button.secondary.action-success {
+  border-color: #8ac39f;
+  background: #e2f6e9;
+  color: #1e6438;
+  box-shadow: 0 0 0 3px rgba(138, 195, 159, 0.3);
+  transform: translateY(-1px);
+}
+
+button.action-error,
+button.secondary.action-error {
+  border-color: #e1a29b;
+  background: #fff0ee;
+  color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(225, 162, 155, 0.28);
+}
+
+.toast-region {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 30;
+  display: grid;
+  gap: 10px;
+  width: min(360px, calc(100vw - 36px));
+  pointer-events: none;
+}
+
+.toast {
+  opacity: 0;
+  transform: translateY(8px);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast.ok {
+  border-color: #afd7c2;
+  background: #ecf8f1;
+  color: #194f31;
+}
+
+.toast.error {
+  border-color: #e8b8b2;
+  background: #fff0ee;
   color: var(--danger);
 }
 

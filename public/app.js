@@ -45,11 +45,11 @@ let setupStatus = null;
 
 load();
 
-saveBtn.addEventListener('click', saveConfig);
-saveJsonBtn.addEventListener('click', saveJsonConfig);
+saveBtn.addEventListener('click', () => saveConfig(saveBtn));
+saveJsonBtn.addEventListener('click', () => saveJsonConfig(saveJsonBtn));
 reloadJsonBtn.addEventListener('click', syncJsonFromForms);
-speakBtn.addEventListener('click', () => postText('/tts/speak', ttsText.value));
-alarmBtn.addEventListener('click', () => postText('/tts/alarm', ttsText.value));
+speakBtn.addEventListener('click', () => postText('/tts/speak', ttsText.value, speakBtn, 'TTS gesendet'));
+alarmBtn.addEventListener('click', () => postText('/tts/alarm', ttsText.value, alarmBtn, 'Alarm gesendet'));
 refreshEventsBtn.addEventListener('click', loadEvents);
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 addRoomBtn.addEventListener('click', addRoom);
@@ -102,7 +102,7 @@ function renderCommands() {
       const button = document.createElement('button');
       button.className = 'secondary';
       button.textContent = command.label || command.action || command.function || commandKey;
-      button.addEventListener('click', () => sendCommand(commandKey));
+      button.addEventListener('click', () => sendCommand(commandKey, button));
       sceneGrid.append(button);
     });
 
@@ -111,17 +111,23 @@ function renderCommands() {
   });
 }
 
-async function sendCommand(commandKey) {
+async function sendCommand(commandKey, button) {
+  setButtonFeedback(button, 'pending', 'Wird ausgefuehrt');
   try {
     await postJson('/api/command', { command: commandKey });
     await loadEvents();
     setStatus(commandKey, 'ok');
+    setButtonFeedback(button, 'success', 'Ausgefuehrt');
+    showToast(`Befehl ausgefuehrt: ${commandKey}`, 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
   }
 }
 
-async function saveConfig() {
+async function saveConfig(button) {
+  setButtonFeedback(button, 'pending', 'Speichert');
   try {
     const nextConfig = collectConfigFromForms();
     const result = await putJson('/api/config', nextConfig);
@@ -135,12 +141,17 @@ async function saveConfig() {
     await loadSetupStatus();
     renderIntegrations();
     setStatus('Gespeichert', 'ok');
+    setButtonFeedback(button, 'success', 'Gespeichert');
+    showToast('Konfiguration gespeichert', 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
   }
 }
 
-async function saveJsonConfig() {
+async function saveJsonConfig(button) {
+  setButtonFeedback(button, 'pending', 'Speichert');
   try {
     const nextConfig = JSON.parse(configEditor.value);
     const result = await putJson('/api/config', nextConfig);
@@ -154,12 +165,17 @@ async function saveJsonConfig() {
     await loadSetupStatus();
     renderIntegrations();
     setStatus('JSON gespeichert', 'ok');
+    setButtonFeedback(button, 'success', 'Gespeichert');
+    showToast('JSON gespeichert', 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
   }
 }
 
-async function postText(url, text) {
+async function postText(url, text, button, successText = 'TTS gesendet') {
+  setButtonFeedback(button, 'pending', 'Sendet');
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -169,9 +185,13 @@ async function postText(url, text) {
     await ensureOk(response);
     await loadTtsStatus();
     await loadEvents();
-    setStatus('TTS gesendet', 'ok');
+    setStatus(successText, 'ok');
+    setButtonFeedback(button, 'success', 'Gesendet');
+    showToast(successText, 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
   }
 }
 
@@ -204,6 +224,65 @@ async function ensureOk(response) {
 function setStatus(text, type) {
   statusEl.textContent = text;
   statusEl.className = `status ${type || ''}`.trim();
+}
+
+function setButtonFeedback(button, state, label) {
+  if (!button) return;
+
+  if (!button.dataset.defaultLabel) {
+    button.dataset.defaultLabel = button.textContent;
+  }
+  if (!button.dataset.feedbackWidth) {
+    button.dataset.feedbackWidth = `${Math.ceil(button.getBoundingClientRect().width)}px`;
+  }
+  if (button.dataset.feedbackTimer) {
+    window.clearTimeout(Number(button.dataset.feedbackTimer));
+  }
+
+  button.style.minWidth = button.dataset.feedbackWidth;
+  button.classList.remove('action-pending', 'action-success', 'action-error');
+
+  if (state === 'pending') {
+    button.disabled = true;
+    button.textContent = label;
+    button.classList.add('action-pending');
+    return;
+  }
+
+  button.disabled = false;
+  button.textContent = label;
+  button.classList.add(state === 'error' ? 'action-error' : 'action-success');
+
+  button.dataset.feedbackTimer = String(window.setTimeout(() => {
+    button.textContent = button.dataset.defaultLabel;
+    button.classList.remove('action-pending', 'action-success', 'action-error');
+    button.style.minWidth = '';
+    delete button.dataset.feedbackWidth;
+    delete button.dataset.feedbackTimer;
+  }, 1600));
+}
+
+function showToast(text, type = 'ok') {
+  let region = document.querySelector('#toastRegion');
+  if (!region) {
+    region = document.createElement('div');
+    region.id = 'toastRegion';
+    region.className = 'toast-region';
+    region.setAttribute('aria-live', 'polite');
+    region.setAttribute('aria-atomic', 'true');
+    document.body.append(region);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type === 'error' ? 'error' : 'ok'}`;
+  toast.textContent = text;
+  region.append(toast);
+
+  window.requestAnimationFrame(() => toast.classList.add('show'));
+  window.setTimeout(() => {
+    toast.classList.remove('show');
+    window.setTimeout(() => toast.remove(), 220);
+  }, 2600);
 }
 
 async function loadTtsStatus() {
@@ -568,11 +647,12 @@ function createTestButton(label, action) {
   button.type = 'button';
   button.className = 'small';
   button.textContent = label;
-  button.addEventListener('click', action);
+  button.addEventListener('click', () => action(button));
   return button;
 }
 
-async function testEndpoint({ method, url, body, contentType, successText }) {
+async function testEndpoint({ method, url, body, contentType, successText }, button) {
+  setButtonFeedback(button, 'pending', 'Test laeuft');
   try {
     const options = { method };
     if (body) {
@@ -584,8 +664,12 @@ async function testEndpoint({ method, url, body, contentType, successText }) {
     await loadTtsStatus();
     await loadEvents();
     setStatus(`${successText} getestet`, 'ok');
+    setButtonFeedback(button, 'success', 'Getestet');
+    showToast(`${successText} getestet`, 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
   }
 }
 
@@ -595,11 +679,16 @@ function createCopyButton(label, value) {
   button.className = 'secondary small';
   button.textContent = label;
   button.addEventListener('click', async () => {
+    setButtonFeedback(button, 'pending', 'Kopiert');
     try {
       await navigator.clipboard.writeText(value);
       setStatus('Kopiert', 'ok');
+      setButtonFeedback(button, 'success', 'Kopiert');
+      showToast('In Zwischenablage kopiert', 'ok');
     } catch {
       setStatus('Kopieren nicht erlaubt', 'error');
+      setButtonFeedback(button, 'error', 'Fehler');
+      showToast('Kopieren nicht erlaubt', 'error');
     }
   });
   return button;

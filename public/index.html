@@ -28,7 +28,7 @@
       </section>
 
       <nav class="tab-nav wide" aria-label="LoxEvo Bereiche">
-        <button class="tab-button active" type="button" data-tab-target="controlView">Bedienen</button>
+        <button class="tab-button active" type="button" data-tab-target="controlView">Steuerung</button>
         <button class="tab-button" type="button" data-tab-target="integrationView">Alexa / Endpunkte</button>
         <button class="tab-button" type="button" data-tab-target="configView">Konfiguration</button>
         <button class="tab-button" type="button" data-tab-target="eventsView">Protokoll</button>
@@ -49,8 +49,8 @@
       <section class="panel">
         <div class="section-head">
           <div>
-            <h2>Befehle testen</h2>
-            <p>Sendet frei konfigurierte Loxone-Befehle aus allen Rubriken.</p>
+            <h2>Steuerung</h2>
+            <p>Führt die konfigurierten Befehle nach Rubrik gruppiert aus.</p>
           </div>
         </div>
         <div id="rooms" class="rooms"></div>
@@ -78,12 +78,12 @@
             <h2>Alexa- und HTTP-Endpunkte</h2>
             <p>Fertige Aufrufe fuer Sprachroutinen, Node-RED, Loxone und Tests.</p>
           </div>
-          <button id="refreshIntegrationsBtn" type="button" class="secondary">Neu erzeugen</button>
+          <button id="refreshIntegrationsBtn" type="button" class="secondary">Endpunkte aktualisieren</button>
         </div>
 
         <div class="endpoint-block">
           <h3>Befehle</h3>
-          <p>Jeder Befehl kann per POST aufgerufen werden. Diese URLs eignen sich als Ziel fuer Node-RED, Loxone oder spaetere Alexa-Bridge-Logik.</p>
+          <p>Jeder Befehl kann per POST aufgerufen werden. Die Liste wird automatisch aus der aktuellen Konfiguration erzeugt.</p>
           <div id="lightEndpoints" class="endpoint-list"></div>
         </div>
 

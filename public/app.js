@@ -53,7 +53,10 @@ alarmBtn.addEventListener('click', () => postText('/tts/alarm', ttsText.value, a
 refreshEventsBtn.addEventListener('click', loadEvents);
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 addRoomBtn.addEventListener('click', addRoom);
-refreshIntegrationsBtn.addEventListener('click', renderIntegrations);
+refreshIntegrationsBtn.addEventListener('click', () => {
+  renderIntegrations();
+  showToast('Endpunkte aktualisiert', 'ok');
+});
 setupConfigBtn.addEventListener('click', () => showView('configView'));
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => showView(button.dataset.tabTarget));
@@ -87,13 +90,8 @@ function renderCommands() {
     return;
   }
 
-  Object.entries(groupCommandsByCategory(runnableCommands)).forEach(([category, commands]) => {
-    const roomEl = document.createElement('div');
-    roomEl.className = 'room';
-
-    const title = document.createElement('h3');
-    title.textContent = category;
-    roomEl.append(title);
+  Object.entries(groupCommandsByCategory(runnableCommands)).forEach(([category, commands], index) => {
+    const group = createCategoryGroup(category, commands.length, index === 0);
 
     const sceneGrid = document.createElement('div');
     sceneGrid.className = 'scene-grid';
@@ -106,8 +104,8 @@ function renderCommands() {
       sceneGrid.append(button);
     });
 
-    roomEl.append(sceneGrid);
-    roomsEl.append(roomEl);
+    group.append(sceneGrid);
+    roomsEl.append(group);
   });
 }
 
@@ -420,8 +418,13 @@ function populateForms() {
 
 function renderCommandEditor() {
   roomEditor.innerHTML = '';
-  Object.entries(getConfiguredCommands()).forEach(([commandKey, command]) => {
-    roomEditor.append(createCommandCard(commandKey, command));
+  const commandGroups = groupCommandsByCategory(Object.entries(getConfiguredCommands()));
+  Object.entries(commandGroups).forEach(([category, commands], index) => {
+    const group = createCategoryGroup(category, commands.length, index === 0);
+    commands.forEach(([commandKey, command]) => {
+      group.append(createCommandCard(commandKey, command));
+    });
+    roomEditor.append(group);
   });
 }
 
@@ -537,20 +540,24 @@ function renderIntegrations() {
     lightEndpoints.innerHTML = '<p class="empty">Noch keine aktiven Befehle vorhanden.</p>';
   }
 
-  runnableCommands.forEach(([commandKey, command]) => {
-    lightEndpoints.append(createEndpointCard({
-      title: command.label || commandKey,
-      method: 'POST',
-      url: `${baseUrl}/command/${encodeURIComponent(commandKey)}`,
-      body: '',
-      note: `${command.category || command.function || 'Allgemein'} | Sprachname: ${command.voiceName || command.label || commandKey} | Loxone: ${formatCommandTarget(command)}`,
-      testLabel: 'Befehl testen',
-      testAction: () => testEndpoint({
+  Object.entries(groupCommandsByCategory(runnableCommands)).forEach(([category, commands], index) => {
+    const group = createCategoryGroup(category, commands.length, index === 0);
+    commands.forEach(([commandKey, command]) => {
+      group.append(createEndpointCard({
+        title: command.label || commandKey,
         method: 'POST',
         url: `${baseUrl}/command/${encodeURIComponent(commandKey)}`,
-        successText: command.label || commandKey
-      })
-    }));
+        body: '',
+        note: `Sprachname: ${command.voiceName || command.label || commandKey} | Loxone: ${formatCommandTarget(command)}`,
+        testLabel: 'Befehl testen',
+        testAction: (button) => testEndpoint({
+          method: 'POST',
+          url: `${baseUrl}/command/${encodeURIComponent(commandKey)}`,
+          successText: command.label || commandKey
+        }, button)
+      }));
+    });
+    lightEndpoints.append(group);
   });
 
   ttsEndpoints.innerHTML = '';
@@ -561,13 +568,13 @@ function renderIntegrations() {
     body: 'Geschirrspueler ist fertig.',
     note: 'Einfacher Text im Request-Body.',
     testLabel: 'TTS testen',
-    testAction: () => testEndpoint({
+    testAction: (button) => testEndpoint({
       method: 'POST',
       url: `${baseUrl}/tts/speak`,
       body: 'Geschirrspueler ist fertig.',
       contentType: 'text/plain',
       successText: 'TTS normal'
-    })
+    }, button)
   }));
   ttsEndpoints.append(createEndpointCard({
     title: 'Alarm',
@@ -576,13 +583,13 @@ function renderIntegrations() {
     body: 'Achtung, Alarm wurde ausgeloest.',
     note: 'Nutzt die Alarm-Geraeteliste und Alarm-Lautstaerke.',
     testLabel: 'Alarm testen',
-    testAction: () => testEndpoint({
+    testAction: (button) => testEndpoint({
       method: 'POST',
       url: `${baseUrl}/tts/alarm`,
       body: 'Achtung, Alarm wurde ausgeloest.',
       contentType: 'text/plain',
       successText: 'Alarm'
-    })
+    }, button)
   }));
   ttsEndpoints.append(createEndpointCard({
     title: 'Alexa2Lox-kompatibel',
@@ -591,11 +598,11 @@ function renderIntegrations() {
     body: '',
     note: 'Kompatibler Einstieg fuer bestehende Loxone-Aufrufe.',
     testLabel: 'Compat testen',
-    testAction: () => testEndpoint({
+    testAction: (button) => testEndpoint({
       method: 'GET',
       url: `${baseUrl}/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50`,
       successText: 'Alexa2Lox TTS'
-    })
+    }, button)
   }));
 }
 
@@ -681,7 +688,7 @@ function createCopyButton(label, value) {
   button.addEventListener('click', async () => {
     setButtonFeedback(button, 'pending', 'Kopiert');
     try {
-      await navigator.clipboard.writeText(value);
+      await copyText(value);
       setStatus('Kopiert', 'ok');
       setButtonFeedback(button, 'success', 'Kopiert');
       showToast('In Zwischenablage kopiert', 'ok');
@@ -692,6 +699,51 @@ function createCopyButton(label, value) {
     }
   });
   return button;
+}
+
+async function copyText(value) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.top = '0';
+  document.body.append(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
+  try {
+    if (!document.execCommand('copy')) {
+      throw new Error('copy failed');
+    }
+  } finally {
+    textarea.remove();
+  }
+}
+
+function createCategoryGroup(category, count, open = true) {
+  const group = document.createElement('details');
+  group.className = 'category-group';
+  group.open = open;
+
+  const summary = document.createElement('summary');
+  summary.className = 'category-summary';
+
+  const title = document.createElement('span');
+  title.textContent = category || 'Allgemein';
+
+  const badge = document.createElement('span');
+  badge.className = 'count-badge';
+  badge.textContent = String(count);
+
+  summary.append(title, badge);
+  group.append(summary);
+  return group;
 }
 
 function buildPowerShellExample(method, url, body) {

@@ -89,12 +89,13 @@ export class LoxoneClient {
       return applyPathTemplate(entry.path, entry);
     }
 
-    if (!entry.uuid) {
+    const uuid = normalizeLoxoneUuid(entry.uuid);
+    if (!uuid) {
       throw new Error(`Loxone UUID fehlt fuer "${entry.label}".`);
     }
 
     if (type === 'pulse') {
-      return `/jdev/sps/io/${encodeURIComponent(entry.uuid)}/pulse`;
+      return `/jdev/sps/io/${encodeURIComponent(uuid)}/pulse`;
     }
 
     if (!entry.command) {
@@ -102,11 +103,11 @@ export class LoxoneClient {
     }
 
     if (type === 'direct') {
-      return `/jdev/sps/io/${encodeURIComponent(entry.uuid)}/${encodeURIComponent(entry.command)}`;
+      return `/jdev/sps/io/${encodeURIComponent(uuid)}/${encodeURIComponent(entry.command)}`;
     }
 
     if (type === 'changeTo') {
-      return `/jdev/sps/io/${encodeURIComponent(entry.uuid)}/changeTo/${encodeURIComponent(entry.command)}`;
+      return `/jdev/sps/io/${encodeURIComponent(uuid)}/changeTo/${encodeURIComponent(entry.command)}`;
     }
 
     throw new Error(`Unbekannter Loxone-Befehlstyp "${type}" fuer "${entry.label}".`);
@@ -141,9 +142,17 @@ function normalizeType(value) {
   return raw || 'changeTo';
 }
 
+function normalizeLoxoneUuid(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if (match) return match[0].toLowerCase();
+  return raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
+}
+
 function applyPathTemplate(path, entry) {
+  const uuid = normalizeLoxoneUuid(entry.uuid);
   return String(path)
-    .replaceAll('{uuid}', encodeURIComponent(entry.uuid || ''))
+    .replaceAll('{uuid}', encodeURIComponent(uuid || ''))
     .replaceAll('{value}', encodeURIComponent(entry.command || ''))
     .replaceAll('{command}', encodeURIComponent(entry.command || ''));
 }

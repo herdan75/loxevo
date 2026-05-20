@@ -485,12 +485,21 @@ function createCommandCard(commandKey, command) {
       <option value="pulse">pulse</option>
       <option value="raw">raw</option>
     </select></label>
-    <label>Loxone UUID<input class="command-uuid" type="text"></label>
+    <label>Loxone UUID (nur UUID)<input class="command-uuid" type="text" placeholder="2030c0ad-02a5-5919-ffffba27bfcae6ca"></label>
     <label>Wert/Befehl<input class="command-value" type="text"></label>
     <label>Aktiv<span class="checkbox-row inline"><input class="command-enabled" type="checkbox"><span>Befehl verwenden</span></span></label>
   `;
   loxone.querySelector('.command-type').value = target.type;
-  loxone.querySelector('.command-uuid').value = target.uuid;
+  const uuidInput = loxone.querySelector('.command-uuid');
+  uuidInput.value = target.uuid;
+  uuidInput.addEventListener('blur', () => {
+    const normalizedUuid = normalizeLoxoneUuidInput(uuidInput.value);
+    if (normalizedUuid && normalizedUuid !== uuidInput.value.trim()) {
+      uuidInput.value = normalizedUuid;
+      showToast('UUID aus Loxone-Pfad uebernommen', 'ok');
+      syncConfigFromForms();
+    }
+  });
   loxone.querySelector('.command-value').value = target.value;
   loxone.querySelector('.command-enabled').checked = command.enabled !== false;
   loxone.querySelector('.command-type').addEventListener('change', () => updatePathFieldState(card));
@@ -801,7 +810,7 @@ function collectCommands() {
       action: normalizeInputKey(card.querySelector('.command-action').value),
       loxone: {
         type: loxoneType,
-        uuid: card.querySelector('.command-uuid').value.trim(),
+        uuid: normalizeLoxoneUuidInput(card.querySelector('.command-uuid').value),
         value: card.querySelector('.command-value').value.trim(),
         path: loxoneType === 'raw' ? card.querySelector('.command-path').value.trim() : ''
       },
@@ -886,6 +895,13 @@ function normalizeCommandType(value) {
   if (raw === 'pulse') return 'pulse';
   if (raw === 'raw' || raw === 'path') return 'raw';
   return raw || 'changeTo';
+}
+
+function normalizeLoxoneUuidInput(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if (match) return match[0].toLowerCase();
+  return raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
 }
 
 function formatCommandTarget(command) {

@@ -50,7 +50,7 @@ http://<loxberry>:8080
 In `data/config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie unter "Letzte Befehle", sendet aber noch nichts an Loxone.
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
-TTS braucht zusaetzlich das optionale Paket `alexa-remote2` und eine gueltige Alexa-Cookie-Datei. Im Docker/LoxBerry-Betrieb wird das Paket ueber die Projektabhaengigkeiten installiert. Lokal ohne installierte Node-Abhaengigkeiten bleibt TTS sichtbar, aber als "nicht bereit" markiert.
+TTS braucht das Paket `alexa-remote2` und eine gueltige Alexa-Cookie-Datei. Im Docker/LoxBerry-Betrieb wird das Paket ueber die Projektabhaengigkeiten installiert. Lokal ohne installierte Node-Abhaengigkeiten bleibt TTS sichtbar, aber als "nicht bereit" markiert.
 Fuer den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
 Private Daten gehoeren in `data/`:

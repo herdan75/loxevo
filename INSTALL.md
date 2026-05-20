@@ -9,7 +9,7 @@ Diese Anleitung beschreibt den Docker-Weg. Private Daten werden erst nach der In
 - LoxBerry oder Linux-System mit Docker
 - Docker Compose
 - Loxone-Miniserver mit erreichbarer HTTP-Schnittstelle
-- Optional fuer TTS: Alexa-Cookie-Datei fuer `alexa-remote2`
+- Fuer TTS: Alexa-Cookie-Datei fuer `alexa-remote2`
 
 ## Schnellstart auf LoxBerry
 

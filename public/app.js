@@ -99,7 +99,7 @@ function renderCommands() {
     commands.forEach(([commandKey, command]) => {
       const button = document.createElement('button');
       button.className = 'secondary';
-      button.textContent = command.label || command.action || command.function || commandKey;
+      button.textContent = getCommandDisplayName(commandKey, command);
       button.addEventListener('click', () => sendCommand(commandKey, button));
       sceneGrid.append(button);
     });
@@ -220,6 +220,7 @@ async function ensureOk(response) {
 }
 
 function setStatus(text, type) {
+  if (!statusEl) return;
   statusEl.textContent = text;
   statusEl.className = `status ${type || ''}`.trim();
 }
@@ -429,21 +430,24 @@ function renderCommandEditor() {
 }
 
 function createCommandCard(commandKey, command) {
-  const card = document.createElement('div');
+  const card = document.createElement('details');
   card.className = 'room-card';
   card.dataset.commandOriginal = commandKey;
+  card.open = false;
 
-  const head = document.createElement('div');
+  const head = document.createElement('summary');
   head.className = 'room-card-head';
 
   const title = document.createElement('strong');
-  title.textContent = command.label || commandKey;
+  title.textContent = getCommandDisplayName(commandKey, command);
 
   const deleteButton = document.createElement('button');
   deleteButton.type = 'button';
   deleteButton.className = 'secondary small danger-text';
   deleteButton.textContent = 'Entfernen';
-  deleteButton.addEventListener('click', () => {
+  deleteButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     card.remove();
     syncConfigFromForms();
     renderCommands();
@@ -459,8 +463,8 @@ function createCommandCard(commandKey, command) {
     <label>Sprachname<input class="command-voice" type="text"></label>
   `;
   fields.querySelector('.command-key').value = commandKey;
-  fields.querySelector('.command-label').value = command.label || '';
-  fields.querySelector('.command-voice').value = command.voiceName || '';
+  fields.querySelector('.command-label').value = getCommandDisplayName(commandKey, command);
+  fields.querySelector('.command-voice').value = getCommandVoiceName(commandKey, command);
 
   const details = document.createElement('div');
   details.className = 'form-row four';
@@ -746,7 +750,7 @@ function createCategoryGroup(category, count, open = true) {
   summary.className = 'category-summary';
 
   const title = document.createElement('span');
-  title.textContent = category || 'Allgemein';
+  title.textContent = displayPart(category) || 'Allgemein';
 
   const badge = document.createElement('span');
   badge.className = 'count-badge';
@@ -854,7 +858,7 @@ function getConfiguredCommands() {
       const key = normalizeInputKey(`${roomName}_${sceneName}`);
       commands[key] = {
         label: `${room.label || roomName} ${sceneName}`,
-        voiceName: `${room.label || roomName} ${sceneName}`,
+        voiceName: `Licht ${room.label || roomName} ${sceneName} an`,
         category: 'Licht',
         room: roomName,
         function: 'licht',
@@ -886,6 +890,101 @@ function getCommandTarget(command) {
     value: loxone.value ?? loxone.command ?? command.loxoneCommand ?? '',
     path: loxone.path || command.loxonePath || ''
   };
+}
+
+function getCommandDisplayName(commandKey, command) {
+  const generated = buildCommandDisplayName(command);
+  if (!generated) return command.label || commandKey;
+
+  const current = command.label || '';
+  if (!current || isGeneratedCommandName(current, command)) {
+    return generated;
+  }
+  return current;
+}
+
+function getCommandVoiceName(commandKey, command) {
+  const generated = buildCommandVoiceName(command);
+  if (!generated) return command.voiceName || getCommandDisplayName(commandKey, command);
+
+  const current = command.voiceName || '';
+  if (!current || isGeneratedCommandName(current, command) || isGeneratedCommandName(current.replace(/\s+an$/i, ''), command)) {
+    return generated;
+  }
+  return current;
+}
+
+function buildCommandVoiceName(command) {
+  const displayName = buildCommandDisplayName(command);
+  if (!displayName) return '';
+  const action = String(command.action || '').trim().toLowerCase();
+  if (['an', 'aus', 'auf', 'ab', 'zu', 'ein', 'up', 'down', 'on', 'off'].includes(action)) {
+    return displayName;
+  }
+  return `${displayName} an`;
+}
+
+function buildCommandDisplayName(command) {
+  const functionName = displayPart(command.function || command.category);
+  const roomName = displayPart(command.room);
+  const actionName = displayPart(command.action);
+  return [functionName, roomName, actionName].filter(Boolean).join(' ');
+}
+
+function isGeneratedCommandName(value, command) {
+  const roomName = displayPart(command.room);
+  const functionName = displayPart(command.function || command.category);
+  const actionName = displayPart(command.action);
+  const candidates = [
+    [functionName, roomName, actionName],
+    [roomName, functionName, actionName],
+    [functionName, actionName, roomName],
+    [roomName, actionName, functionName]
+  ].map((parts) => normalizeComparableName(parts.filter(Boolean).join(' ')));
+
+  return candidates.includes(normalizeComparableName(value));
+}
+
+function displayPart(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const mapped = {
+    licht: 'Licht',
+    lueftung: 'Lueftung',
+    rolladen: 'Rollladen',
+    rollladen: 'Rollladen',
+    kueche: 'Kueche',
+    buero: 'Buero',
+    tv: 'TV',
+    up: 'Auf',
+    down: 'Ab',
+    on: 'An',
+    off: 'Aus',
+    ein: 'An',
+    aus: 'Aus',
+    hell: 'Hell',
+    ambient: 'Ambient',
+    nacht: 'Nacht'
+  }[raw.toLowerCase()];
+  if (mapped) return mapped;
+  return raw
+    .replaceAll('_', ' ')
+    .replaceAll('-', ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.toUpperCase() === word ? word : word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function normalizeComparableName(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replaceAll('\u00fc', 'ue')
+    .replaceAll('\u00f6', 'oe')
+    .replaceAll('\u00e4', 'ae')
+    .replaceAll('\u00df', 'ss');
 }
 
 function normalizeCommandType(value) {

@@ -420,7 +420,7 @@ textarea:disabled {
 }
 
 .room-card {
-  padding: 14px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
@@ -431,7 +431,42 @@ textarea:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-height: 48px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.room-card-head::marker {
+  content: '';
+}
+
+.room-card-head::before {
+  content: '>';
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.room-card[open] .room-card-head::before {
+  content: 'v';
+}
+
+.room-card[open] {
+  padding-bottom: 12px;
+}
+
+.room-card[open] .room-card-head {
   margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.room-card > .form-row {
+  margin-left: 12px;
+  margin-right: 12px;
+}
+
+.room-card > .form-row:last-child {
+  margin-bottom: 0;
 }
 
 .scene-editor {

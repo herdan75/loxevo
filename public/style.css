@@ -203,9 +203,9 @@ main {
 }
 
 .mode-banner.live {
-  border-color: #e1b4ae;
-  background: #fff0ee;
-  color: #8d2d25;
+  border-color: #7fc293;
+  background: #e7f7ec;
+  color: #194f31;
 }
 
 .mode-banner h2 {
@@ -296,6 +296,10 @@ label {
   font-weight: 700;
 }
 
+label.is-disabled {
+  color: #8a96a3;
+}
+
 input,
 select,
 textarea {
@@ -313,6 +317,14 @@ select:focus,
 textarea:focus {
   outline: 2px solid rgba(37, 111, 116, 0.18);
   border-color: var(--accent);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: #f1f4f7;
+  color: #8a96a3;
+  cursor: not-allowed;
 }
 
 .form-row {

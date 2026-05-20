@@ -493,15 +493,17 @@ function createCommandCard(commandKey, command) {
   loxone.querySelector('.command-uuid').value = target.uuid;
   loxone.querySelector('.command-value').value = target.value;
   loxone.querySelector('.command-enabled').checked = command.enabled !== false;
+  loxone.querySelector('.command-type').addEventListener('change', () => updatePathFieldState(card));
 
   const raw = document.createElement('div');
   raw.className = 'form-row';
   raw.innerHTML = `
-    <label>Loxone Pfad / Spezialpfad<input class="command-path" type="text" placeholder="/jdev/sps/io/{uuid}/pulse"></label>
+    <label>Loxone Pfad / Spezialpfad<input class="command-path" type="text" placeholder="Nur fuer Befehlstyp raw"></label>
   `;
   raw.querySelector('.command-path').value = target.path;
 
   card.append(head, fields, details, loxone, raw);
+  updatePathFieldState(card);
   return card;
 }
 
@@ -788,6 +790,7 @@ function collectCommands() {
   roomEditor.querySelectorAll('.room-card').forEach((card) => {
     const commandKey = normalizeInputKey(card.querySelector('.command-key').value);
     if (!commandKey) return;
+    const loxoneType = card.querySelector('.command-type').value;
 
     commands[commandKey] = {
       label: card.querySelector('.command-label').value.trim() || commandKey,
@@ -797,10 +800,10 @@ function collectCommands() {
       function: normalizeInputKey(card.querySelector('.command-function').value),
       action: normalizeInputKey(card.querySelector('.command-action').value),
       loxone: {
-        type: card.querySelector('.command-type').value,
+        type: loxoneType,
         uuid: card.querySelector('.command-uuid').value.trim(),
         value: card.querySelector('.command-value').value.trim(),
-        path: card.querySelector('.command-path').value.trim()
+        path: loxoneType === 'raw' ? card.querySelector('.command-path').value.trim() : ''
       },
       enabled: card.querySelector('.command-enabled').checked
     };
@@ -892,6 +895,19 @@ function formatCommandTarget(command) {
   return `${target.type} ${target.uuid || ''} ${target.value || ''}`.trim();
 }
 
+function updatePathFieldState(card) {
+  const type = card.querySelector('.command-type')?.value;
+  const pathInput = card.querySelector('.command-path');
+  if (!pathInput) return;
+
+  const isRaw = type === 'raw';
+  pathInput.disabled = !isRaw;
+  pathInput.placeholder = isRaw
+    ? '/jdev/sps/io/{uuid}/pulse oder kompletter Spezialpfad'
+    : 'Nur fuer Befehlstyp raw';
+  pathInput.closest('label')?.classList.toggle('is-disabled', !isRaw);
+}
+
 function groupCommandsByCategory(entries) {
   return entries.reduce((groups, [commandKey, command]) => {
     const category = command.category || command.function || 'Allgemein';
@@ -936,7 +952,7 @@ function updateDryRunUi(enabled) {
   modeTitle.textContent = enabled ? 'Testmodus' : 'Live-Modus';
   modeText.textContent = enabled
     ? 'Loxone-Befehle werden nur simuliert und im Event-Log angezeigt.'
-    : 'Loxone-Befehle werden wirklich an den Miniserver gesendet.';
+    : 'Aktiv: Loxone-Befehle werden wirklich an den Miniserver gesendet.';
 }
 
 async function loadEvents() {

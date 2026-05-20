@@ -21,11 +21,14 @@ export class LoxoneClient {
       key: commandKey,
       label: command.label || commandKey,
       voiceName: command.voiceName || command.label || commandKey,
+      category: command.category || command.function || 'allgemein',
       room: command.room || '',
       functionName: command.function || '',
       action: command.action || '',
-      uuid: command.loxoneUuid,
-      command: command.loxoneCommand
+      type: resolveCommandType(command),
+      uuid: command.loxone?.uuid || command.loxoneUuid,
+      command: command.loxone?.value ?? command.loxone?.command ?? command.loxoneCommand ?? '',
+      path: command.loxone?.path || command.loxonePath || ''
     });
   }
 
@@ -43,24 +46,19 @@ export class LoxoneClient {
     return await this.sendLoxoneCommand({
       key: `${roomName}_${sceneName}`,
       label: `${room.label || roomName} ${sceneName}`,
+      category: 'licht',
       room: roomName,
       functionName: 'licht',
       action: sceneName,
+      type: 'changeTo',
       uuid: room.uuid,
       command
     });
   }
 
   async sendLoxoneCommand(entry) {
-    if (!entry.uuid) {
-      throw new Error(`Loxone UUID fehlt fuer "${entry.label}".`);
-    }
-    if (!entry.command) {
-      throw new Error(`Loxone Befehl fehlt fuer "${entry.label}".`);
-    }
-
-    const path = `/jdev/sps/io/${encodeURIComponent(entry.uuid)}/changeTo/${encodeURIComponent(entry.command)}`;
-    const url = `${this.baseUrl}${path}`;
+    const path = this.buildPath(entry);
+    const url = this.toUrl(path);
     const headers = {};
 
     if (this.dryRun) {
@@ -81,4 +79,71 @@ export class LoxoneClient {
 
     return { ...entry, url, response: text };
   }
+
+  buildPath(entry) {
+    const type = resolveCommandType(entry);
+    if (type === 'raw') {
+      if (!entry.path) {
+        throw new Error(`Loxone Pfad fehlt fuer "${entry.label}".`);
+      }
+      return applyPathTemplate(entry.path, entry);
+    }
+
+    if (!entry.uuid) {
+      throw new Error(`Loxone UUID fehlt fuer "${entry.label}".`);
+    }
+
+    if (type === 'pulse') {
+      return `/jdev/sps/io/${encodeURIComponent(entry.uuid)}/pulse`;
+    }
+
+    if (!entry.command) {
+      throw new Error(`Loxone Befehl fehlt fuer "${entry.label}".`);
+    }
+
+    if (type === 'direct') {
+      return `/jdev/sps/io/${encodeURIComponent(entry.uuid)}/${encodeURIComponent(entry.command)}`;
+    }
+
+    if (type === 'changeTo') {
+      return `/jdev/sps/io/${encodeURIComponent(entry.uuid)}/changeTo/${encodeURIComponent(entry.command)}`;
+    }
+
+    throw new Error(`Unbekannter Loxone-Befehlstyp "${type}" fuer "${entry.label}".`);
+  }
+
+  toUrl(path) {
+    if (/^https?:\/\//i.test(path)) {
+      return path;
+    }
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${this.baseUrl}${normalizedPath}`;
+  }
+}
+
+function resolveCommandType(command) {
+  const rawType = command.loxone?.type || command.loxoneType || command.type;
+  if (rawType) {
+    return normalizeType(rawType);
+  }
+  if (command.loxone?.path || command.loxonePath) {
+    return 'raw';
+  }
+  return 'changeTo';
+}
+
+function normalizeType(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'changeto' || raw === 'change_to') return 'changeTo';
+  if (raw === 'command' || raw === 'direct') return 'direct';
+  if (raw === 'pulse') return 'pulse';
+  if (raw === 'raw' || raw === 'path') return 'raw';
+  return raw || 'changeTo';
+}
+
+function applyPathTemplate(path, entry) {
+  return String(path)
+    .replaceAll('{uuid}', encodeURIComponent(entry.uuid || ''))
+    .replaceAll('{value}', encodeURIComponent(entry.command || ''))
+    .replaceAll('{command}', encodeURIComponent(entry.command || ''));
 }

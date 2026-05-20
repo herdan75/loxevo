@@ -10,7 +10,7 @@ LoxEvo laeuft als eigener Docker-Container auf dem LoxBerry:
 
 ```text
 Loxone -> http://<loxberry>:8080/... -> LoxEvo -> Alexa TTS
-Alexa/HTTP -> LoxEvo -> Loxone changeTo
+Alexa/HTTP -> LoxEvo -> Loxone-Befehl
 ```
 
 ## Dateien auf dem LoxBerry

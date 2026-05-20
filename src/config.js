@@ -40,11 +40,29 @@ function validateConfig(config) {
       if (command.enabled === false) {
         continue;
       }
-      if (!command.loxoneUuid) {
+      const target = readCommandTarget(command);
+      if (!['changeTo', 'direct', 'pulse', 'raw'].includes(target.type)) {
+        throw new Error(`Unbekannter Loxone-Befehlstyp "${target.type}" fuer Befehl "${commandName}".`);
+      }
+
+      if (target.type === 'raw') {
+        if (!target.path) {
+          throw new Error(`Loxone Pfad fuer Befehl "${commandName}" fehlt.`);
+        }
+        if (target.path.includes('{uuid}') && !target.uuid) {
+          throw new Error(`Loxone UUID fuer Befehl "${commandName}" fehlt.`);
+        }
+        if ((target.path.includes('{value}') || target.path.includes('{command}')) && !target.value) {
+          throw new Error(`Loxone Wert fuer Befehl "${commandName}" fehlt.`);
+        }
+        continue;
+      }
+
+      if (!target.uuid) {
         throw new Error(`Loxone UUID fuer Befehl "${commandName}" fehlt.`);
       }
-      if (!command.loxoneCommand) {
-        throw new Error(`Loxone changeTo-Wert fuer Befehl "${commandName}" fehlt.`);
+      if (target.type !== 'pulse' && !target.value) {
+        throw new Error(`Loxone Wert/Befehl fuer Befehl "${commandName}" fehlt.`);
       }
     }
   }
@@ -84,4 +102,25 @@ function normalizeConfig(config) {
   config.server ||= {};
   config.server.port = Number(process.env.PORT || config.server.port || config.bridge?.port || 8080);
   config.server.name ||= config.bridge?.name || 'LoxEvo';
+}
+
+function readCommandTarget(command) {
+  const loxone = command.loxone || {};
+  const type = normalizeType(loxone.type || command.loxoneType || command.type || (loxone.path || command.loxonePath ? 'raw' : 'changeTo'));
+
+  return {
+    type,
+    uuid: loxone.uuid || command.loxoneUuid || '',
+    value: loxone.value ?? loxone.command ?? command.loxoneCommand ?? '',
+    path: loxone.path || command.loxonePath || ''
+  };
+}
+
+function normalizeType(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'changeto' || raw === 'change_to') return 'changeTo';
+  if (raw === 'command' || raw === 'direct') return 'direct';
+  if (raw === 'pulse') return 'pulse';
+  if (raw === 'raw' || raw === 'path') return 'raw';
+  return raw || 'changeTo';
 }

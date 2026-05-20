@@ -37,7 +37,7 @@ Die Web-UI ist fuer das eigene LAN gedacht. Port `8080` sollte nicht direkt ins 
 2. Im Bereich `Einrichtung` die offenen Punkte anschauen.
 3. `Zur Konfiguration` waehlen.
 4. Loxone-Miniserver URL, Benutzer und Passwort eintragen.
-5. Befehle mit Sprachname, Raum, Funktion, Aktion, Loxone-UUID und changeTo-Wert eintragen.
+5. Rubriken und Befehle mit Sprachname, Raum, Funktion, Aktion, Loxone-Typ, UUID und Wert oder Pfad eintragen.
 6. `Dry-Run aktiv` eingeschaltet lassen.
 7. Konfiguration speichern.
 8. Unter `Bedienen` einen Befehl testen.
@@ -151,6 +151,6 @@ docker compose up -d
 
 - Miniserver URL pruefen
 - Benutzer/Passwort pruefen
-- Befehl, Loxone-UUID und changeTo-Wert pruefen
+- Befehl, Loxone-Typ, UUID, Wert oder Pfad pruefen
 - Vom LoxBerry aus testen, ob die Miniserver-IP erreichbar ist
 - Dry-Run erst deaktivieren, wenn die erzeugten URLs korrekt aussehen

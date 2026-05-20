@@ -130,9 +130,11 @@ async function runConfiguredCommand(res, commandKey) {
     status: result.dryRun ? 'dry-run' : 'sent',
     key: result.key,
     label: result.label,
+    category: result.category,
     room: result.room,
     function: result.functionName,
     action: result.action,
+    commandType: result.type,
     url: result.url
   });
   return sendJson(res, { ok: true, result });
@@ -210,7 +212,7 @@ function getSetupStatus() {
       id: 'commands',
       label: 'Befehle konfigurieren',
       ok: commandsConfigured(config.commands) || roomsConfigured(config.rooms),
-      detail: 'Jeder Befehl braucht Namen, Loxone-UUID und changeTo-Wert.'
+      detail: 'Jeder aktive Befehl braucht einen gueltigen Loxone-Zieltyp mit UUID, Wert oder Pfad.'
     },
     {
       id: 'dry-run',
@@ -251,11 +253,7 @@ function isConfiguredSecret(value) {
 function commandsConfigured(commands) {
   const entries = Object.values(commands || {}).filter((command) => command.enabled !== false);
   if (!entries.length) return false;
-  return entries.every((command) => {
-    const uuid = String(command.loxoneUuid || '');
-    const loxoneCommand = String(command.loxoneCommand || '');
-    return uuid && !uuid.includes('replace-with') && loxoneCommand;
-  });
+  return entries.every(isCommandConfigured);
 }
 
 function roomsConfigured(rooms) {
@@ -283,6 +281,47 @@ function ttsDetail(status) {
     return 'Mindestens ein Alexa-Geraet fuer TTS eintragen.';
   }
   return 'Alexa TTS ist bereit.';
+}
+
+function isCommandConfigured(command) {
+  const target = readCommandTarget(command);
+  if (!['changeTo', 'direct', 'pulse', 'raw'].includes(target.type)) return false;
+
+  if (target.type === 'raw') {
+    if (!target.path || target.path.includes('replace-with')) return false;
+    if (target.path.includes('{uuid}') && !isConfiguredValue(target.uuid)) return false;
+    if ((target.path.includes('{value}') || target.path.includes('{command}')) && !isConfiguredValue(target.value)) return false;
+    return true;
+  }
+
+  if (!isConfiguredValue(target.uuid)) return false;
+  if (target.type === 'pulse') return true;
+  return isConfiguredValue(target.value);
+}
+
+function readCommandTarget(command) {
+  const loxone = command.loxone || {};
+  const type = normalizeCommandType(loxone.type || command.loxoneType || command.type || (loxone.path || command.loxonePath ? 'raw' : 'changeTo'));
+  return {
+    type,
+    uuid: loxone.uuid || command.loxoneUuid || '',
+    value: loxone.value ?? loxone.command ?? command.loxoneCommand ?? '',
+    path: loxone.path || command.loxonePath || ''
+  };
+}
+
+function normalizeCommandType(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'changeto' || raw === 'change_to') return 'changeTo';
+  if (raw === 'command' || raw === 'direct') return 'direct';
+  if (raw === 'pulse') return 'pulse';
+  if (raw === 'raw' || raw === 'path') return 'raw';
+  return raw || 'changeTo';
+}
+
+function isConfiguredValue(value) {
+  const raw = String(value || '').trim();
+  return raw && !raw.includes('replace-with');
 }
 
 async function handleAlexa2LoxCompat(req, res, url) {

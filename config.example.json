@@ -13,31 +13,71 @@
     "kueche_licht_hell": {
       "label": "Kueche Licht Hell",
       "voiceName": "Kueche Licht Hell",
+      "category": "Licht",
       "room": "kueche",
       "function": "licht",
       "action": "hell",
-      "loxoneUuid": "replace-with-loxone-lightcontroller-uuid",
-      "loxoneCommand": "777",
+      "loxone": {
+        "type": "changeTo",
+        "uuid": "replace-with-loxone-lightcontroller-uuid",
+        "value": "777"
+      },
       "enabled": true
     },
-    "kueche_licht_ambient": {
-      "label": "Kueche Licht Ambient",
-      "voiceName": "Kueche Licht Ambient",
+    "rolladen_tv_auf": {
+      "label": "Rollladen TV Auf",
+      "voiceName": "Rollladen TV Auf",
+      "category": "Rollladen",
+      "room": "tv",
+      "function": "rolladen",
+      "action": "auf",
+      "loxone": {
+        "type": "direct",
+        "uuid": "replace-with-loxone-shutter-uuid",
+        "value": "FullUp"
+      },
+      "enabled": true
+    },
+    "lueftung_bad_ein": {
+      "label": "Lueftung Bad Ein",
+      "voiceName": "Lueftung Bad Ein",
+      "category": "Lueftung",
+      "room": "bad",
+      "function": "lueftung",
+      "action": "ein",
+      "loxone": {
+        "type": "direct",
+        "uuid": "replace-with-loxone-ventilation-uuid",
+        "value": "on"
+      },
+      "enabled": true
+    },
+    "roboter_stop": {
+      "label": "Roboter Stop",
+      "voiceName": "Roboter Stop",
+      "category": "Reinigung",
+      "room": "",
+      "function": "roboter",
+      "action": "stop",
+      "loxone": {
+        "type": "pulse",
+        "uuid": "replace-with-loxone-robot-stop-button-uuid",
+        "value": ""
+      },
+      "enabled": true
+    },
+    "roboter_kueche": {
+      "label": "Roboter Kueche",
+      "voiceName": "Roboter Kueche",
+      "category": "Reinigung",
       "room": "kueche",
-      "function": "licht",
-      "action": "ambient",
-      "loxoneUuid": "replace-with-loxone-lightcontroller-uuid",
-      "loxoneCommand": "1",
-      "enabled": true
-    },
-    "wohnzimmer_licht_aus": {
-      "label": "Wohnzimmer Licht Aus",
-      "voiceName": "Wohnzimmer Licht Aus",
-      "room": "wohnzimmer",
-      "function": "licht",
-      "action": "aus",
-      "loxoneUuid": "replace-with-loxone-lightcontroller-uuid",
-      "loxoneCommand": "778",
+      "function": "roboter",
+      "action": "reinigen",
+      "loxone": {
+        "type": "direct",
+        "uuid": "replace-with-loxone-robot-room-selector-uuid",
+        "value": "2"
+      },
       "enabled": true
     }
   },

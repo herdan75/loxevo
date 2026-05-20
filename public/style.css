@@ -283,6 +283,7 @@ label {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -294,6 +295,7 @@ textarea {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
   outline: 2px solid rgba(37, 111, 116, 0.18);
   border-color: var(--accent);
@@ -308,6 +310,10 @@ textarea:focus {
 
 .form-row.three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.form-row.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .checkbox-row {
@@ -612,6 +618,7 @@ pre {
   .config-grid,
   .form-row,
   .form-row.three,
+  .form-row.four,
   .view,
   .scene-row {
     grid-template-columns: 1fr;

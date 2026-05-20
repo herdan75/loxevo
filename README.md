@@ -26,7 +26,7 @@ Loxone
   -> Echo spricht
 ```
 
-Der aktuelle Stand ist ein Docker-faehiger Prototyp mit HTTP-API, Web-UI, Loxone-`changeTo` und integriertem TTS-Modul.
+Der aktuelle Stand ist ein Docker-faehiger Prototyp mit HTTP-API, Web-UI, generischen Loxone-Befehlen und integriertem TTS-Modul.
 Loxone-Befehle laufen standardmaessig im Dry-Run-Modus, damit lokal gefahrlos getestet werden kann.
 Wenn TTS aktiviert wird, aber `alexa-remote2` oder die Cookie-Datei noch fehlt, startet LoxEvo trotzdem weiter und zeigt den TTS-Status in der Web-UI an.
 
@@ -67,14 +67,14 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt w
 
 - Loxone-Miniserver URL, Benutzer und Passwort
 - Dry-Run/Live-Modus
-- frei definierbare Befehle mit Sprachname, Raum, Funktion, Aktion, UUID und changeTo-Wert
+- frei definierbare Rubriken und Befehle mit Sprachname, Raum, Funktion, Aktion, Loxone-Typ, UUID, Wert oder Pfad
 - TTS-Aktivierung, Cookie-Datei, Lautstaerken und Alexa-Geraetelisten
 - TTS-Status mit klarer Fehlermeldung, falls Alexa noch nicht bereit ist
 
 Die Oberflaeche ist in drei Bereiche gegliedert:
 
 - `Bedienen`: frei definierte Befehle und TTS direkt ausloesen
-- `Alexa / Endpunkte`: fertige HTTP-Aufrufe fuer Licht, TTS und Alexa2Lox-kompatible URLs testen und kopieren
+- `Alexa / Endpunkte`: fertige HTTP-Aufrufe fuer Befehle, TTS und Alexa2Lox-kompatible URLs testen und kopieren
 - `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
 - `Protokoll`: letzte Befehle und Dry-Run/Live-Aktionen ansehen
 
@@ -88,7 +88,7 @@ Echte Loxone-Requests aktivieren:
 }
 ```
 
-## Licht-API
+## Befehls-API
 
 ```text
 POST http://<loxberry>:8080/api/command
@@ -98,6 +98,13 @@ Content-Type: application/json
 ```
 
 Die Befehle werden in der Web-UI frei angelegt. Beispiel: `kueche_licht_hell` kann als Sprachname `Kueche Licht Hell`, als Raum `kueche`, als Funktion `licht` und als Aktion `hell` bekommen.
+
+Unterstuetzte Loxone-Befehlstypen:
+
+- `changeTo`: `/jdev/sps/io/<uuid>/changeTo/<wert>` fuer Lichtstimmungen und Szenen
+- `direct`: `/jdev/sps/io/<uuid>/<wert>` fuer Befehle wie `FullUp`, `FullDown`, `on`, `off` oder Nummernwerte
+- `pulse`: `/jdev/sps/io/<uuid>/pulse` fuer Taster
+- `raw`: frei definierter Pfad, optional mit `{uuid}`, `{value}` oder `{command}`
 
 Letzte Aktionen:
 

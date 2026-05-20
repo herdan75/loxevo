@@ -87,22 +87,24 @@ function renderCommands() {
     return;
   }
 
-  runnableCommands.forEach(([commandKey, command]) => {
+  Object.entries(groupCommandsByCategory(runnableCommands)).forEach(([category, commands]) => {
     const roomEl = document.createElement('div');
     roomEl.className = 'room';
 
     const title = document.createElement('h3');
-    title.textContent = command.label || commandKey;
+    title.textContent = category;
     roomEl.append(title);
 
     const sceneGrid = document.createElement('div');
     sceneGrid.className = 'scene-grid';
 
-    const button = document.createElement('button');
-    button.className = 'secondary';
-    button.textContent = command.action || command.function || 'Ausfuehren';
-    button.addEventListener('click', () => sendCommand(commandKey));
-    sceneGrid.append(button);
+    commands.forEach(([commandKey, command]) => {
+      const button = document.createElement('button');
+      button.className = 'secondary';
+      button.textContent = command.label || command.action || command.function || commandKey;
+      button.addEventListener('click', () => sendCommand(commandKey));
+      sceneGrid.append(button);
+    });
 
     roomEl.append(sceneGrid);
     roomsEl.append(roomEl);
@@ -379,28 +381,45 @@ function createCommandCard(commandKey, command) {
   fields.querySelector('.command-voice').value = command.voiceName || '';
 
   const details = document.createElement('div');
-  details.className = 'form-row three';
+  details.className = 'form-row four';
   details.innerHTML = `
+    <label>Rubrik<input class="command-category" type="text"></label>
     <label>Raum<input class="command-room" type="text"></label>
     <label>Funktion<input class="command-function" type="text"></label>
     <label>Aktion/Szene<input class="command-action" type="text"></label>
   `;
+  details.querySelector('.command-category').value = command.category || command.function || 'Allgemein';
   details.querySelector('.command-room').value = command.room || '';
   details.querySelector('.command-function').value = command.function || '';
   details.querySelector('.command-action').value = command.action || '';
 
+  const target = getCommandTarget(command);
   const loxone = document.createElement('div');
-  loxone.className = 'form-row three';
+  loxone.className = 'form-row four';
   loxone.innerHTML = `
+    <label>Befehlstyp<select class="command-type">
+      <option value="changeTo">changeTo</option>
+      <option value="direct">direct</option>
+      <option value="pulse">pulse</option>
+      <option value="raw">raw</option>
+    </select></label>
     <label>Loxone UUID<input class="command-uuid" type="text"></label>
-    <label>changeTo Wert<input class="command-value" type="text"></label>
+    <label>Wert/Befehl<input class="command-value" type="text"></label>
     <label>Aktiv<span class="checkbox-row inline"><input class="command-enabled" type="checkbox"><span>Befehl verwenden</span></span></label>
   `;
-  loxone.querySelector('.command-uuid').value = command.loxoneUuid || '';
-  loxone.querySelector('.command-value').value = command.loxoneCommand || '';
+  loxone.querySelector('.command-type').value = target.type;
+  loxone.querySelector('.command-uuid').value = target.uuid;
+  loxone.querySelector('.command-value').value = target.value;
   loxone.querySelector('.command-enabled').checked = command.enabled !== false;
 
-  card.append(head, fields, details, loxone);
+  const raw = document.createElement('div');
+  raw.className = 'form-row';
+  raw.innerHTML = `
+    <label>Loxone Pfad / Spezialpfad<input class="command-path" type="text" placeholder="/jdev/sps/io/{uuid}/pulse"></label>
+  `;
+  raw.querySelector('.command-path').value = target.path;
+
+  card.append(head, fields, details, loxone, raw);
   return card;
 }
 
@@ -410,11 +429,16 @@ function addRoom() {
   config.commands[nextName] = {
     label: 'Neuer Befehl',
     voiceName: 'Neuer Befehl',
+    category: 'Allgemein',
     room: '',
-    function: 'licht',
+    function: '',
     action: '',
-    loxoneUuid: '',
-    loxoneCommand: '',
+    loxone: {
+      type: 'changeTo',
+      uuid: '',
+      value: '',
+      path: ''
+    },
     enabled: false
   };
   renderCommandEditor();
@@ -440,7 +464,7 @@ function renderIntegrations() {
       method: 'POST',
       url: `${baseUrl}/command/${encodeURIComponent(commandKey)}`,
       body: '',
-      note: `Sprachname: ${command.voiceName || command.label || commandKey}`,
+      note: `${command.category || command.function || 'Allgemein'} | Sprachname: ${command.voiceName || command.label || commandKey} | Loxone: ${formatCommandTarget(command)}`,
       testLabel: 'Befehl testen',
       testAction: () => testEndpoint({
         method: 'POST',
@@ -627,11 +651,16 @@ function collectCommands() {
     commands[commandKey] = {
       label: card.querySelector('.command-label').value.trim() || commandKey,
       voiceName: card.querySelector('.command-voice').value.trim() || commandKey,
+      category: card.querySelector('.command-category').value.trim() || 'Allgemein',
       room: normalizeInputKey(card.querySelector('.command-room').value),
       function: normalizeInputKey(card.querySelector('.command-function').value),
       action: normalizeInputKey(card.querySelector('.command-action').value),
-      loxoneUuid: card.querySelector('.command-uuid').value.trim(),
-      loxoneCommand: card.querySelector('.command-value').value.trim(),
+      loxone: {
+        type: card.querySelector('.command-type').value,
+        uuid: card.querySelector('.command-uuid').value.trim(),
+        value: card.querySelector('.command-value').value.trim(),
+        path: card.querySelector('.command-path').value.trim()
+      },
       enabled: card.querySelector('.command-enabled').checked
     };
   });
@@ -673,11 +702,15 @@ function getConfiguredCommands() {
       commands[key] = {
         label: `${room.label || roomName} ${sceneName}`,
         voiceName: `${room.label || roomName} ${sceneName}`,
+        category: 'Licht',
         room: roomName,
         function: 'licht',
         action: sceneName,
-        loxoneUuid: room.uuid || '',
-        loxoneCommand: value,
+        loxone: {
+          type: 'changeTo',
+          uuid: room.uuid || '',
+          value
+        },
         enabled: true
       };
     });
@@ -689,6 +722,42 @@ function getRunnableCommands() {
   return Object.fromEntries(
     Object.entries(getConfiguredCommands()).filter(([, command]) => command.enabled !== false)
   );
+}
+
+function getCommandTarget(command) {
+  const loxone = command.loxone || {};
+  const type = normalizeCommandType(loxone.type || command.loxoneType || command.type || (loxone.path || command.loxonePath ? 'raw' : 'changeTo'));
+  return {
+    type,
+    uuid: loxone.uuid || command.loxoneUuid || '',
+    value: loxone.value ?? loxone.command ?? command.loxoneCommand ?? '',
+    path: loxone.path || command.loxonePath || ''
+  };
+}
+
+function normalizeCommandType(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'changeto' || raw === 'change_to') return 'changeTo';
+  if (raw === 'command' || raw === 'direct') return 'direct';
+  if (raw === 'pulse') return 'pulse';
+  if (raw === 'raw' || raw === 'path') return 'raw';
+  return raw || 'changeTo';
+}
+
+function formatCommandTarget(command) {
+  const target = getCommandTarget(command);
+  if (target.type === 'raw') return target.path || 'raw';
+  if (target.type === 'pulse') return `${target.type} ${target.uuid || ''}`.trim();
+  return `${target.type} ${target.uuid || ''} ${target.value || ''}`.trim();
+}
+
+function groupCommandsByCategory(entries) {
+  return entries.reduce((groups, [commandKey, command]) => {
+    const category = command.category || command.function || 'Allgemein';
+    groups[category] ||= [];
+    groups[category].push([commandKey, command]);
+    return groups;
+  }, {});
 }
 
 function listToLines(value) {

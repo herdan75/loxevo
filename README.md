@@ -138,6 +138,10 @@ Die alte Kurzform `/light/<raum>/<szene>` bleibt vorerst als Legacy-Einstieg erh
 
 Wenn `alexaBridge.enabled` aktiv ist, bietet LoxEvo jeden aktiven Befehl als virtuelles Alexa-Geraet an. In der Web-UI unter `Konfiguration -> Alexa Geraete` kann die lokale Bruecke aktiviert werden.
 
+Technisch ist das ein lokaler Hue-kompatibler V1-Bridge-Eingang nur fuer Alexa-Discovery und Ein/Aus-Befehle. Es wird keine Hue-Bridge und keine Hue-Lampe benoetigt; LoxEvo nutzt nur das lokale Discovery/API-Verhalten, damit Alexa ohne eigene Cloud-Skill-Entwicklung virtuelle Geraete finden kann.
+
+Fuer die Geraetesuche muss LoxEvo im gleichen LAN wie die Echo-Geraete erreichbar sein. Im Docker/LoxBerry-Betrieb ist `network_mode: host` deshalb der empfohlene Modus, weil SSDP/UDP 1900 sonst oft nicht sauber bis in den Container gelangt.
+
 Typischer Ablauf:
 
 ```text

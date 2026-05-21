@@ -358,7 +358,8 @@ function renderAlexaBridgeStatus() {
     return;
   }
 
-  alexaBridgeStatus.textContent = `Bereit: ${devices.length} virtuelle Geräte auf ${status.ip}:${status.port}.`;
+  const ssdpText = status.ssdpPort ? `, SSDP/UDP ${status.ssdpPort}` : '';
+  alexaBridgeStatus.textContent = `Bereit: ${devices.length} virtuelle Geräte auf ${status.ip}:${status.port}${ssdpText}.`;
   alexaBridgeStatus.className = 'service-status ready';
   renderAlexaDevices();
 }

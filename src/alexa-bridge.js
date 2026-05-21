@@ -58,6 +58,8 @@ export class AlexaBridgeService {
       error: this.lastError,
       ip: this.getAdvertiseIp(),
       port: this.getAdvertisePort(),
+      ssdpPort: SSDP_PORT,
+      descriptionUrl: `http://${this.getAdvertiseIp()}:${this.getAdvertisePort()}/description.xml`,
       bridgeId: this.getBridgeId(),
       deviceCount: devices.length,
       devices: devices.map((device) => ({
@@ -157,15 +159,20 @@ export class AlexaBridgeService {
 
       socket.bind(SSDP_PORT, () => {
         try {
-          socket.addMembership(SSDP_ADDRESS);
+          const multicastInterface = this.getMulticastInterface();
+          if (multicastInterface) {
+            socket.addMembership(SSDP_ADDRESS, multicastInterface);
+          } else {
+            socket.addMembership(SSDP_ADDRESS);
+          }
           socket.setMulticastTTL(2);
-        this.socket = socket;
-        finish();
-      } catch (error) {
-        socket.close();
-        finish(error);
-      }
-    });
+          this.socket = socket;
+          finish();
+        } catch (error) {
+          socket.close();
+          finish(error);
+        }
+      });
     });
   }
 
@@ -173,13 +180,15 @@ export class AlexaBridgeService {
     const text = message.toString();
     const lower = text.toLowerCase();
     if (!lower.startsWith('m-search') || !lower.includes('ssdp:discover')) return;
-    if (!lower.includes('ssdp:all') && !lower.includes('upnp:rootdevice') && !lower.includes('basic:1')) return;
 
-    const response = this.buildSsdpResponse();
+    const searchTarget = normalizeSsdpSearchTarget(readSsdpHeader(text, 'st'));
+    if (!searchTarget) return;
+
+    const response = this.buildSsdpResponse(searchTarget);
     socket.send(response, remote.port, remote.address);
   }
 
-  buildSsdpResponse() {
+  buildSsdpResponse(searchTarget = 'upnp:rootdevice') {
     const uuid = this.getUuid();
     return [
       'HTTP/1.1 200 OK',
@@ -188,8 +197,8 @@ export class AlexaBridgeService {
       `LOCATION: http://${this.getAdvertiseIp()}:${this.getAdvertisePort()}/description.xml`,
       'SERVER: Linux/3.14.0 UPnP/1.0 IpBridge/1.50.0',
       `hue-bridgeid: ${this.getBridgeId()}`,
-      'ST: upnp:rootdevice',
-      `USN: uuid:${uuid}::upnp:rootdevice`,
+      `ST: ${searchTarget}`,
+      `USN: uuid:${uuid}::${searchTarget}`,
       '',
       ''
     ].join('\r\n');
@@ -286,6 +295,11 @@ export class AlexaBridgeService {
     return Number(this.config.alexaBridge?.advertisePort || this.config.server?.port || process.env.PORT || 8080);
   }
 
+  getMulticastInterface() {
+    const ip = this.getAdvertiseIp();
+    return isUsableLanAddress(ip) ? ip : '';
+  }
+
   getBridgeId() {
     const configured = String(this.config.alexaBridge?.bridgeId || '').replace(/[^0-9a-f]/gi, '').toUpperCase();
     if (configured.length >= 12) return configured.slice(0, 16).padEnd(16, '0');
@@ -373,6 +387,23 @@ function bridgeIdToMac(bridgeId) {
     .match(/.{1,2}/g)
     .join(':')
     .toLowerCase();
+}
+
+function readSsdpHeader(message, headerName) {
+  const pattern = new RegExp(`^${headerName}\\s*:\\s*(.+)$`, 'im');
+  return String(message).match(pattern)?.[1]?.trim() || '';
+}
+
+function normalizeSsdpSearchTarget(value) {
+  const raw = String(value || '').toLowerCase();
+  if (raw.includes('ssdp:all') || raw.includes('upnp:rootdevice')) return 'upnp:rootdevice';
+  if (raw.includes('basic:1')) return 'urn:schemas-upnp-org:device:Basic:1';
+  return '';
+}
+
+function isUsableLanAddress(value) {
+  const ip = String(value || '').trim();
+  return Boolean(ip && ip !== '127.0.0.1' && ip !== '0.0.0.0' && !ip.startsWith('169.254.'));
 }
 
 function parseJson(body) {

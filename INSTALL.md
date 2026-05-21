@@ -102,7 +102,7 @@ docker compose up -d --build
 
 Die Dateien in `data/` bleiben dabei erhalten.
 
-Die installierte `alexa-remote2`-Version und verfuegbare Updates sind in der Web-UI unter "Wartung" sichtbar.
+Die installierte `alexa-remote2`-Version, der Installationspfad und verfuegbare Versionen sind in der Web-UI unter "Wartung" sichtbar.
 
 ## Neuinstallation oder Ruecksetzen
 
@@ -138,10 +138,7 @@ docker compose logs loxevo
 
 `alexa-remote2 ist nicht installiert`:
 
-```bash
-docker compose build --no-cache
-docker compose up -d
-```
+In der Web-UI unter "Wartung" eine Version auswaehlen und `Installieren` klicken. Danach `LoxEvo neu starten`.
 
 `Alexa-Cookie konnte nicht gelesen werden`:
 

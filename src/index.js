@@ -1,8 +1,8 @@
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { extname, join, normalize } from 'node:path';
+import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, saveConfig } from './config.js';
 import { LoxoneClient } from './loxone.js';
@@ -93,7 +93,8 @@ async function handleApi(req, res, pathParts, body) {
   }
 
   if (req.method === 'POST' && pathParts[1] === 'dependencies' && pathParts[2] === 'alexa-remote2' && pathParts[3] === 'update') {
-    return await updateDependency(res, 'alexa-remote2');
+    const payload = parseJson(body);
+    return await updateDependency(res, 'alexa-remote2', payload.version || 'latest');
   }
 
   if (req.method === 'POST' && pathParts[1] === 'system' && pathParts[2] === 'restart') {
@@ -260,35 +261,45 @@ function getSetupStatus() {
 
 async function getDependencyStatus(name) {
   const installedVersion = await getInstalledPackageVersion(name);
-  const latest = await getLatestPackageVersion(name);
-  const updateAvailable = Boolean(installedVersion && latest.version && compareVersions(installedVersion, latest.version) < 0);
+  const registry = await getRegistryPackageInfo(name);
+  const updateAvailable = Boolean(registry.latestVersion && (!installedVersion || compareVersions(installedVersion, registry.latestVersion) < 0));
 
   return {
     name,
     installedVersion,
-    latestVersion: latest.version,
+    latestVersion: registry.latestVersion,
+    availableVersions: registry.availableVersions,
     updateAvailable,
-    latestCheckedAt: latest.checkedAt,
-    latestError: latest.error,
+    latestCheckedAt: registry.checkedAt,
+    latestError: registry.error,
+    installPath: getDependencyInstallDir(),
     update: dependencyUpdate?.name === name ? dependencyUpdate : null
   };
 }
 
 async function getInstalledPackageVersion(name) {
-  try {
-    const packagePath = require.resolve(`${name}/package.json`);
-    const packageJson = JSON.parse(await readFile(packagePath, 'utf8'));
-    return packageJson.version || null;
-  } catch {
-    return null;
+  const requires = [
+    createRequire(join(getDependencyInstallDir(), 'package.json')),
+    require
+  ];
+
+  for (const requireFn of requires) {
+    try {
+      const packagePath = requireFn.resolve(`${name}/package.json`);
+      const packageJson = JSON.parse(await readFile(packagePath, 'utf8'));
+      return packageJson.version || null;
+    } catch {
+      // Try the next installation location.
+    }
   }
+  return null;
 }
 
-async function getLatestPackageVersion(name) {
+async function getRegistryPackageInfo(name) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/latest`, {
+    const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}`, {
       headers: { accept: 'application/json' },
       signal: controller.signal
     });
@@ -296,21 +307,32 @@ async function getLatestPackageVersion(name) {
       throw new Error(`npm Registry HTTP ${response.status}`);
     }
     const payload = await response.json();
-    return { version: payload.version || null, checkedAt: new Date().toISOString(), error: null };
+    const availableVersions = Object.keys(payload.versions || {})
+      .sort(compareVersions)
+      .reverse()
+      .slice(0, 30);
+    return {
+      latestVersion: payload['dist-tags']?.latest || availableVersions[0] || null,
+      availableVersions,
+      checkedAt: new Date().toISOString(),
+      error: null
+    };
   } catch (error) {
-    return { version: null, checkedAt: new Date().toISOString(), error: error.message };
+    return { latestVersion: null, availableVersions: [], checkedAt: new Date().toISOString(), error: error.message };
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function updateDependency(res, name) {
+async function updateDependency(res, name, version) {
   if (dependencyUpdate?.status === 'running') {
     return sendJson(res, { ok: false, error: 'Ein Update laeuft bereits.' }, 409);
   }
+  const requestedVersion = normalizePackageVersion(version);
 
   dependencyUpdate = {
     name,
+    requestedVersion,
     status: 'running',
     startedAt: new Date().toISOString(),
     finishedAt: null,
@@ -319,12 +341,12 @@ async function updateDependency(res, name) {
   };
 
   try {
-    const output = await runNpmInstall(name);
+    const output = await runNpmInstall(name, requestedVersion);
     dependencyUpdate = {
       ...dependencyUpdate,
       status: 'done',
       finishedAt: new Date().toISOString(),
-      message: 'Update installiert. Bitte LoxEvo neu starten.',
+      message: `${name}@${requestedVersion} installiert. Bitte LoxEvo neu starten.`,
       restartRequired: true,
       output: output.slice(-4000)
     };
@@ -343,16 +365,18 @@ async function updateDependency(res, name) {
   }
 }
 
-function runNpmInstall(name) {
+async function runNpmInstall(name, version) {
+  await ensureDependencyInstallDir();
   const npmExecPath = process.env.npm_execpath;
   const command = npmExecPath ? process.execPath : 'npm';
+  const packageSpec = `${name}@${version}`;
   const args = npmExecPath
-    ? [npmExecPath, 'install', `${name}@latest`, '--omit=dev']
-    : ['install', `${name}@latest`, '--omit=dev'];
+    ? [npmExecPath, 'install', packageSpec, '--omit=dev', '--no-audit', '--no-fund']
+    : ['install', packageSpec, '--omit=dev', '--no-audit', '--no-fund'];
 
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      cwd: rootDir,
+      cwd: getDependencyInstallDir(),
       windowsHide: true,
       env: process.env
     });
@@ -373,6 +397,36 @@ function runNpmInstall(name) {
       reject(new Error(output.trim() || `npm install wurde mit Code ${code} beendet.`));
     });
   });
+}
+
+async function ensureDependencyInstallDir() {
+  const installDir = getDependencyInstallDir();
+  await mkdir(installDir, { recursive: true });
+  const packagePath = join(installDir, 'package.json');
+  try {
+    await readFile(packagePath, 'utf8');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    await writeFile(packagePath, `${JSON.stringify({ private: true, dependencies: {} }, null, 2)}\n`, 'utf8');
+  }
+}
+
+function normalizePackageVersion(version) {
+  const raw = String(version || 'latest').trim();
+  if (!/^[a-zA-Z0-9._~+-]+$/.test(raw)) {
+    throw new Error(`Ungueltige Paketversion: ${version}`);
+  }
+  return raw || 'latest';
+}
+
+function getDependencyInstallDir() {
+  if (process.env.DEPENDENCY_INSTALL_DIR) {
+    return process.env.DEPENDENCY_INSTALL_DIR;
+  }
+  if (process.env.CONFIG_PATH) {
+    return resolve(dirname(process.env.CONFIG_PATH));
+  }
+  return rootDir;
 }
 
 function compareVersions(left, right) {

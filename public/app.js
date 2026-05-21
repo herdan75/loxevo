@@ -383,8 +383,10 @@ function renderDependencyStatus() {
     const name = document.createElement('strong');
     name.textContent = dependency.name;
     const badge = document.createElement('span');
-    badge.className = dependency.updateAvailable ? 'update-badge update' : 'update-badge ok';
-    badge.textContent = dependency.updateAvailable ? 'Update verfuegbar' : 'Aktuell';
+    badge.className = dependency.updateAvailable || !dependency.installedVersion ? 'update-badge update' : 'update-badge ok';
+    badge.textContent = !dependency.installedVersion
+      ? 'Nicht installiert'
+      : dependency.updateAvailable ? 'Update verfuegbar' : 'Aktuell';
     title.append(name, badge);
 
     const grid = document.createElement('div');
@@ -393,6 +395,7 @@ function renderDependencyStatus() {
       <div><span>Installiert</span><strong>${escapeHtml(dependency.installedVersion || 'Nicht installiert')}</strong></div>
       <div><span>Verfuegbar</span><strong>${escapeHtml(dependency.latestVersion || 'Unbekannt')}</strong></div>
       <div><span>Geprueft</span><strong>${escapeHtml(formatDateTime(dependency.latestCheckedAt))}</strong></div>
+      <div><span>Installationspfad</span><strong>${escapeHtml(dependency.installPath || 'Standard')}</strong></div>
     `;
 
     const message = document.createElement('p');
@@ -403,11 +406,30 @@ function renderDependencyStatus() {
 
     const actions = document.createElement('div');
     actions.className = 'actions';
+    const versionSelect = document.createElement('select');
+    versionSelect.className = 'version-select';
+    const versions = dependency.availableVersions || [];
+    if (versions.length) {
+      versions.forEach((version) => {
+        const option = document.createElement('option');
+        option.value = version;
+        option.textContent = version === dependency.latestVersion ? `${version} (latest)` : version;
+        versionSelect.append(option);
+      });
+    } else {
+      const option = document.createElement('option');
+      option.value = 'latest';
+      option.textContent = 'latest';
+      versionSelect.append(option);
+    }
+    versionSelect.value = dependency.latestVersion || versions[0] || 'latest';
+    actions.append(versionSelect);
+
     const updateButton = document.createElement('button');
     updateButton.type = 'button';
     updateButton.textContent = dependency.installedVersion ? 'Update installieren' : 'Installieren';
     updateButton.disabled = dependency.update?.status === 'running' || Boolean(dependency.latestError);
-    updateButton.addEventListener('click', () => updateDependency(dependency.name, updateButton));
+    updateButton.addEventListener('click', () => updateDependency(dependency.name, versionSelect.value, updateButton));
     actions.append(updateButton);
 
     if (dependency.update?.restartRequired) {
@@ -424,10 +446,14 @@ function renderDependencyStatus() {
   });
 }
 
-async function updateDependency(name, button) {
+async function updateDependency(name, version, button) {
   setButtonFeedback(button, 'pending', 'Installiert');
   try {
-    const response = await fetch(`/api/dependencies/${encodeURIComponent(name)}/update`, { method: 'POST' });
+    const response = await fetch(`/api/dependencies/${encodeURIComponent(name)}/update`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version })
+    });
     await ensureOk(response);
     dependencyInfo = await response.json();
     renderDependencyStatus();

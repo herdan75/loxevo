@@ -1,4 +1,8 @@
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
+
+const appRequire = createRequire(import.meta.url);
 
 export class TtsService {
   constructor(config) {
@@ -16,10 +20,10 @@ export class TtsService {
 
     let AlexaRemote;
     try {
-      ({ default: AlexaRemote } = await import('alexa-remote2'));
+      AlexaRemote = loadAlexaRemote2();
     } catch (error) {
       this.markUnavailable(
-        'alexa-remote2 ist nicht installiert. Bitte Abhaengigkeiten im LoxBerry/Docker-Container installieren.',
+        'alexa-remote2 ist nicht installiert. Bitte in der Web-UI unter Wartung installieren.',
         error
       );
       return;
@@ -141,4 +145,32 @@ export class TtsService {
       throw new Error('Keine Alexa-Geraete fuer TTS konfiguriert.');
     }
   }
+}
+
+function loadAlexaRemote2() {
+  const requires = [
+    createRequire(join(getDependencyInstallDir(), 'package.json')),
+    appRequire
+  ];
+
+  let lastError;
+  for (const requireFn of requires) {
+    try {
+      const module = requireFn('alexa-remote2');
+      return module.default || module;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
+function getDependencyInstallDir() {
+  if (process.env.DEPENDENCY_INSTALL_DIR) {
+    return process.env.DEPENDENCY_INSTALL_DIR;
+  }
+  if (process.env.CONFIG_PATH) {
+    return resolve(dirname(process.env.CONFIG_PATH));
+  }
+  return process.cwd();
 }

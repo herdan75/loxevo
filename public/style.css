@@ -226,7 +226,7 @@ h2 {
 
 .maintenance-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -251,6 +251,11 @@ h2 {
 .maintenance-message {
   color: var(--muted);
   font-size: 14px;
+}
+
+.version-select {
+  width: auto;
+  min-width: 160px;
 }
 
 main {

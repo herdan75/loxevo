@@ -42,27 +42,27 @@ function validateConfig(config) {
       }
       const target = readCommandTarget(command);
       if (!['changeTo', 'direct', 'pulse', 'raw'].includes(target.type)) {
-        throw new Error(`Unbekannter Loxone-Befehlstyp "${target.type}" fuer Befehl "${commandName}".`);
+        throw new Error(`Unbekannter Loxone-Befehlstyp "${target.type}" für Befehl "${commandName}".`);
       }
 
       if (target.type === 'raw') {
         if (!target.path) {
-          throw new Error(`Loxone Pfad fuer Befehl "${commandName}" fehlt.`);
+          throw new Error(`Loxone Pfad für Befehl "${commandName}" fehlt.`);
         }
         if (target.path.includes('{uuid}') && !target.uuid) {
-          throw new Error(`Loxone UUID fuer Befehl "${commandName}" fehlt.`);
+          throw new Error(`Loxone UUID für Befehl "${commandName}" fehlt.`);
         }
         if ((target.path.includes('{value}') || target.path.includes('{command}')) && !target.value) {
-          throw new Error(`Loxone Wert fuer Befehl "${commandName}" fehlt.`);
+          throw new Error(`Loxone Wert für Befehl "${commandName}" fehlt.`);
         }
         continue;
       }
 
       if (!target.uuid) {
-        throw new Error(`Loxone UUID fuer Befehl "${commandName}" fehlt.`);
+        throw new Error(`Loxone UUID für Befehl "${commandName}" fehlt.`);
       }
       if (target.type !== 'pulse' && !target.value) {
-        throw new Error(`Loxone Wert/Befehl fuer Befehl "${commandName}" fehlt.`);
+        throw new Error(`Loxone Wert/Befehl für Befehl "${commandName}" fehlt.`);
       }
     }
   }
@@ -73,10 +73,10 @@ function validateConfig(config) {
     }
     for (const [roomName, room] of Object.entries(config.rooms)) {
       if (!room.uuid) {
-        throw new Error(`UUID fuer Raum "${roomName}" fehlt.`);
+        throw new Error(`UUID für Raum "${roomName}" fehlt.`);
       }
       if (!room.scenes || typeof room.scenes !== 'object') {
-        throw new Error(`Szenen fuer Raum "${roomName}" fehlen.`);
+        throw new Error(`Szenen für Raum "${roomName}" fehlen.`);
       }
     }
   }

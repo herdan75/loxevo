@@ -93,7 +93,7 @@ export class TtsService {
     this.assertReady();
     const value = Number(volume);
     if (!Number.isFinite(value) || value < 0 || value > 100) {
-      throw new Error(`Ungueltige Alexa-Lautstaerke: ${volume}`);
+      throw new Error(`Ungültige Alexa-Lautstärke: ${volume}`);
     }
 
     const targets = this.normalizeDevices(devices);
@@ -142,7 +142,7 @@ export class TtsService {
 
   assertDevices(devices) {
     if (!devices.length) {
-      throw new Error('Keine Alexa-Geraete fuer TTS konfiguriert.');
+      throw new Error('Keine Alexa-Geräte für TTS konfiguriert.');
     }
   }
 }

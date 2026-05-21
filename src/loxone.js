@@ -40,7 +40,7 @@ export class LoxoneClient {
 
     const command = room.scenes?.[sceneName];
     if (!command) {
-      throw new Error(`Unbekannte Szene "${sceneName}" fuer Raum "${roomName}".`);
+      throw new Error(`Unbekannte Szene "${sceneName}" für Raum "${roomName}".`);
     }
 
     return await this.sendLoxoneCommand({
@@ -84,14 +84,14 @@ export class LoxoneClient {
     const type = resolveCommandType(entry);
     if (type === 'raw') {
       if (!entry.path) {
-        throw new Error(`Loxone Pfad fehlt fuer "${entry.label}".`);
+        throw new Error(`Loxone Pfad fehlt für "${entry.label}".`);
       }
       return applyPathTemplate(entry.path, entry);
     }
 
     const uuid = normalizeLoxoneUuid(entry.uuid);
     if (!uuid) {
-      throw new Error(`Loxone UUID fehlt fuer "${entry.label}".`);
+      throw new Error(`Loxone UUID fehlt für "${entry.label}".`);
     }
 
     if (type === 'pulse') {
@@ -99,7 +99,7 @@ export class LoxoneClient {
     }
 
     if (!entry.command) {
-      throw new Error(`Loxone Befehl fehlt fuer "${entry.label}".`);
+      throw new Error(`Loxone Befehl fehlt für "${entry.label}".`);
     }
 
     if (type === 'direct') {
@@ -110,7 +110,7 @@ export class LoxoneClient {
       return `/jdev/sps/io/${encodeURIComponent(uuid)}/changeTo/${encodeURIComponent(entry.command)}`;
     }
 
-    throw new Error(`Unbekannter Loxone-Befehlstyp "${type}" fuer "${entry.label}".`);
+    throw new Error(`Unbekannter Loxone-Befehlstyp "${type}" für "${entry.label}".`);
   }
 
   toUrl(path) {

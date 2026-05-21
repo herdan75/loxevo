@@ -53,7 +53,7 @@
         <div class="section-head">
           <div>
             <h2>Direkt testen</h2>
-            <p>Fuehrt konfigurierte Befehle aus dieser Web-UI aus. Im Dry-Run wird nur protokolliert.</p>
+            <p>Führt konfigurierte Befehle aus dieser Web-UI aus. Im Dry-Run wird nur protokolliert.</p>
           </div>
         </div>
         <div id="rooms" class="rooms"></div>
@@ -63,10 +63,10 @@
         <div class="section-head">
           <div>
             <h2>Alexa TTS direkt testen</h2>
-            <p>Sendet einen Testtext aus dieser Web-UI an die konfigurierten Echo-Geraete.</p>
+            <p>Sendet einen Testtext aus dieser Web-UI an die konfigurierten Echo-Geräte.</p>
           </div>
         </div>
-        <textarea id="ttsText" rows="3">Geschirrspueler ist fertig.</textarea>
+        <textarea id="ttsText" rows="3">Geschirrspüler ist fertig.</textarea>
         <div class="actions">
           <button id="speakBtn">Sprechen</button>
           <button id="alarmBtn" class="danger">Alarm</button>
@@ -79,7 +79,7 @@
         <div class="section-head">
           <div>
             <h2>Externe Aufrufe</h2>
-            <p>URLs fuer Alexa-Routinen, Loxone oder andere Systeme. Node-RED ist dafuer nicht erforderlich.</p>
+            <p>URLs für Alexa-Routinen, Loxone oder andere Systeme. Node-RED ist dafür nicht erforderlich.</p>
           </div>
           <button id="refreshIntegrationsBtn" type="button" class="secondary">Aufrufe aktualisieren</button>
         </div>
@@ -92,7 +92,7 @@
 
         <div class="endpoint-block">
           <h3>TTS</h3>
-          <p>Diese URLs loesen Alexa-Sprachausgabe aus, zum Beispiel aus Loxone.</p>
+          <p>Diese URLs lösen Alexa-Sprachausgabe aus, zum Beispiel aus Loxone.</p>
           <div id="ttsStatusCard" class="service-status">TTS-Status wird geladen...</div>
           <div id="ttsEndpoints" class="endpoint-list"></div>
         </div>
@@ -104,7 +104,7 @@
         <div class="section-head">
           <div>
             <h2>Konfiguration</h2>
-            <p>Loxone-Zugang, Rubriken, Befehle, Sprachnamen und TTS-Geraete bequem pflegen.</p>
+            <p>Loxone-Zugang, Rubriken, Befehle, Sprachnamen und TTS-Geräte bequem pflegen.</p>
           </div>
           <button id="saveBtn">Konfiguration speichern</button>
         </div>
@@ -130,7 +130,13 @@
 
           <fieldset>
             <legend>Alexa TTS</legend>
-            <div id="ttsConfigStatus" class="service-status">TTS-Status wird geladen...</div>
+            <div class="status-help-row">
+              <div id="ttsConfigStatus" class="service-status">TTS-Status wird geladen...</div>
+              <button id="ttsHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="ttsHelpText" aria-label="TTS-Hilfe anzeigen">i</button>
+            </div>
+            <div id="ttsHelpText" class="help-box" hidden>
+              Die rote Meldung bedeutet: TTS ist eingeschaltet, aber LoxEvo kann noch nicht über Alexa sprechen. Häufig fehlt die Cookie-Datei <code>Node.txt</code>. Im Docker/LoxBerry-Betrieb muss sie im lokalen Ordner <code>data/Node.txt</code> liegen; im Formular bleibt der Pfad <code>/config/Node.txt</code>. Wenn <code>alexa-remote2</code> fehlt, installiere es im Register <strong>Wartung</strong> und starte LoxEvo danach neu.
+            </div>
             <label class="checkbox-row">
               <input id="ttsEnabled" type="checkbox">
               <span>TTS aktivieren</span>
@@ -151,11 +157,11 @@
             </div>
             <div class="form-row">
               <label>
-                Standard-Lautstaerke
+                Standard-Lautstärke
                 <input id="ttsDefaultVolume" type="number" min="0" max="100">
               </label>
               <label>
-                Alarm-Lautstaerke
+                Alarm-Lautstärke
                 <input id="ttsAlarmVolume" type="number" min="0" max="100">
               </label>
             </div>
@@ -165,23 +171,23 @@
         <fieldset class="wide-fieldset">
           <legend>Befehle und Sprachnamen</legend>
           <div id="roomEditor" class="room-editor"></div>
-          <button id="addRoomBtn" type="button" class="secondary">Befehl hinzufuegen</button>
+          <button id="addRoomBtn" type="button" class="secondary">Befehl hinzufügen</button>
         </fieldset>
 
         <fieldset class="wide-fieldset">
-          <legend>TTS-Geraete</legend>
+          <legend>TTS-Geräte</legend>
           <div class="form-row three">
             <label>
-              Standard-Geraete
-              <textarea id="ttsDefaultDevices" rows="4" placeholder="Ein Geraet pro Zeile"></textarea>
+              Standard-Geräte
+              <textarea id="ttsDefaultDevices" rows="4" placeholder="Ein Gerät pro Zeile"></textarea>
             </label>
             <label>
-              Alle Geraete
-              <textarea id="ttsAllDevices" rows="4" placeholder="Ein Geraet pro Zeile"></textarea>
+              Alle Geräte
+              <textarea id="ttsAllDevices" rows="4" placeholder="Ein Gerät pro Zeile"></textarea>
             </label>
             <label>
-              Alarm-Geraete
-              <textarea id="ttsAlarmDevices" rows="4" placeholder="Ein Geraet pro Zeile"></textarea>
+              Alarm-Geräte
+              <textarea id="ttsAlarmDevices" rows="4" placeholder="Ein Gerät pro Zeile"></textarea>
             </label>
           </div>
         </fieldset>
@@ -212,9 +218,9 @@ Content-Type: application/json
         <div class="section-head">
           <div>
             <h2>Wartung</h2>
-            <p>Versionen pruefen und Updates fuer LoxEvo-Komponenten verwalten.</p>
+            <p>Versionen prüfen und Updates für LoxEvo-Komponenten verwalten.</p>
           </div>
-          <button id="refreshMaintenanceBtn" type="button" class="secondary">Versionen pruefen</button>
+          <button id="refreshMaintenanceBtn" type="button" class="secondary">Versionen prüfen</button>
         </div>
 
         <div id="dependencyStatus" class="maintenance-list"></div>

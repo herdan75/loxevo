@@ -34,6 +34,8 @@ const lightEndpoints = document.querySelector('#lightEndpoints');
 const ttsEndpoints = document.querySelector('#ttsEndpoints');
 const ttsStatusCard = document.querySelector('#ttsStatusCard');
 const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
+const ttsHelpBtn = document.querySelector('#ttsHelpBtn');
+const ttsHelpText = document.querySelector('#ttsHelpText');
 const setupPanel = document.querySelector('#setupPanel');
 const setupSummary = document.querySelector('#setupSummary');
 const setupChecks = document.querySelector('#setupChecks');
@@ -62,6 +64,7 @@ refreshIntegrationsBtn.addEventListener('click', () => {
 });
 setupConfigBtn.addEventListener('click', () => showView('configView'));
 refreshMaintenanceBtn.addEventListener('click', () => loadDependencyStatus(refreshMaintenanceBtn));
+ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => showView(button.dataset.tabTarget));
 });
@@ -115,13 +118,13 @@ function renderCommands() {
 }
 
 async function sendCommand(commandKey, button) {
-  setButtonFeedback(button, 'pending', 'Wird ausgefuehrt');
+  setButtonFeedback(button, 'pending', 'Wird ausgeführt');
   try {
     await postJson('/api/command', { command: commandKey });
     await loadEvents();
     setStatus(commandKey, 'ok');
-    setButtonFeedback(button, 'success', 'Ausgefuehrt');
-    showToast(`Befehl ausgefuehrt: ${commandKey}`, 'ok');
+    setButtonFeedback(button, 'success', 'Ausgeführt');
+    showToast(`Befehl ausgeführt: ${commandKey}`, 'ok');
   } catch (error) {
     setStatus(error.message, 'error');
     setButtonFeedback(button, 'error', 'Fehler');
@@ -313,7 +316,7 @@ function renderTtsStatus() {
     text = `TTS ist bereit. Standard: ${deviceCount(status.defaultDevices)}, Alarm: ${deviceCount(status.alarmDevices)}.`;
     className = 'service-status ready';
   } else if (status.enabled) {
-    text = `TTS ist aktiviert, aber noch nicht bereit: ${status.error || 'Status unbekannt'}`;
+    text = humanizeTtsStatusError(status.error);
     className = 'service-status error';
   }
 
@@ -325,7 +328,28 @@ function renderTtsStatus() {
 
 function deviceCount(devices) {
   const count = Array.isArray(devices) ? devices.length : 0;
-  return `${count} ${count === 1 ? 'Geraet' : 'Geraete'}`;
+  return `${count} ${count === 1 ? 'Gerät' : 'Geräte'}`;
+}
+
+function humanizeTtsStatusError(errorText = '') {
+  const text = String(errorText || '').toLowerCase();
+  if (text.includes('cookie') && (text.includes('enoent') || text.includes('no such file'))) {
+    return 'TTS ist aktiviert, aber die Cookie-Datei wurde nicht gefunden. Der Info-Button in der Konfiguration erklärt die nächsten Schritte.';
+  }
+  if (text.includes('alexa-remote2') && text.includes('nicht installiert')) {
+    return 'TTS ist aktiviert, aber alexa-remote2 ist noch nicht installiert. Installiere es im Register Wartung.';
+  }
+  if (text.includes('cookie')) {
+    return `TTS ist aktiviert, aber das Alexa-Cookie ist noch nicht nutzbar: ${errorText}`;
+  }
+  return `TTS ist aktiviert, aber noch nicht bereit: ${errorText || 'Status unbekannt'}`;
+}
+
+function toggleTtsHelp() {
+  if (!ttsHelpBtn || !ttsHelpText) return;
+  const nextHidden = !ttsHelpText.hidden;
+  ttsHelpText.hidden = nextHidden;
+  ttsHelpBtn.setAttribute('aria-expanded', String(!nextHidden));
 }
 
 function showView(viewId) {
@@ -345,16 +369,16 @@ function showView(viewId) {
 
 async function loadDependencyStatus(button) {
   if (!dependencyStatus) return;
-  if (button) setButtonFeedback(button, 'pending', 'Prueft');
-  dependencyStatus.innerHTML = '<p class="empty">Versionen werden geprueft...</p>';
+  if (button) setButtonFeedback(button, 'pending', 'Prüft');
+  dependencyStatus.innerHTML = '<p class="empty">Versionen werden geprüft...</p>';
   try {
     const response = await fetch('/api/dependencies');
     await ensureOk(response);
     dependencyInfo = await response.json();
     renderDependencyStatus();
     if (button) {
-      setButtonFeedback(button, 'success', 'Geprueft');
-      showToast('Versionen geprueft', 'ok');
+      setButtonFeedback(button, 'success', 'Geprüft');
+      showToast('Versionen geprüft', 'ok');
     }
   } catch (error) {
     dependencyStatus.innerHTML = `<div class="service-status error">${escapeHtml(error.message)}</div>`;
@@ -386,22 +410,22 @@ function renderDependencyStatus() {
     badge.className = dependency.updateAvailable || !dependency.installedVersion ? 'update-badge update' : 'update-badge ok';
     badge.textContent = !dependency.installedVersion
       ? 'Nicht installiert'
-      : dependency.updateAvailable ? 'Update verfuegbar' : 'Aktuell';
+      : dependency.updateAvailable ? 'Update verfügbar' : 'Aktuell';
     title.append(name, badge);
 
     const grid = document.createElement('div');
     grid.className = 'maintenance-grid';
     grid.innerHTML = `
       <div><span>Installiert</span><strong>${escapeHtml(dependency.installedVersion || 'Nicht installiert')}</strong></div>
-      <div><span>Verfuegbar</span><strong>${escapeHtml(dependency.latestVersion || 'Unbekannt')}</strong></div>
-      <div><span>Geprueft</span><strong>${escapeHtml(formatDateTime(dependency.latestCheckedAt))}</strong></div>
+      <div><span>Verfügbar</span><strong>${escapeHtml(dependency.latestVersion || 'Unbekannt')}</strong></div>
+      <div><span>Geprüft</span><strong>${escapeHtml(formatDateTime(dependency.latestCheckedAt))}</strong></div>
       <div><span>Installationspfad</span><strong>${escapeHtml(dependency.installPath || 'Standard')}</strong></div>
     `;
 
     const message = document.createElement('p');
     message.className = 'maintenance-message';
     message.textContent = dependency.latestError
-      ? `Update-Pruefung nicht moeglich: ${dependency.latestError}`
+      ? `Update-Prüfung nicht möglich: ${dependency.latestError}`
       : dependency.update?.message || (dependency.updateAvailable ? 'Eine neuere Version kann installiert werden.' : 'Die installierte Version ist aktuell.');
 
     const actions = document.createElement('div');
@@ -520,7 +544,7 @@ function renderSetupStatus(errorText) {
   setupPanel.classList.toggle('setup-complete', setupStatus.complete);
   setupPanel.classList.toggle('setup-warning', !setupStatus.complete);
   setupSummary.textContent = setupStatus.complete
-    ? 'Die Basiskonfiguration ist vollstaendig. Live-Modus erst nach erfolgreichem Test aktivieren.'
+    ? 'Die Basiskonfiguration ist vollständig. Live-Modus erst nach erfolgreichem Test aktivieren.'
     : `${setupStatus.openRequired} notwendige Einrichtungsschritte sind noch offen.`;
 
   setupChecks.innerHTML = '';
@@ -601,7 +625,7 @@ function createCommandCard(commandKey, command) {
   const fields = document.createElement('div');
   fields.className = 'form-row three';
   fields.innerHTML = `
-    <label>Befehl-Schluessel<input class="command-key" type="text"></label>
+    <label>Befehl-Schlüssel<input class="command-key" type="text"></label>
     <label>Anzeigename<input class="command-label" type="text"></label>
     <label>Sprachname<input class="command-voice" type="text"></label>
   `;
@@ -643,7 +667,7 @@ function createCommandCard(commandKey, command) {
     const normalizedUuid = normalizeLoxoneUuidInput(uuidInput.value);
     if (normalizedUuid && normalizedUuid !== uuidInput.value.trim()) {
       uuidInput.value = normalizedUuid;
-      showToast('UUID aus Loxone-Pfad uebernommen', 'ok');
+      showToast('UUID aus Loxone-Pfad übernommen', 'ok');
       syncConfigFromForms();
     }
   });
@@ -654,7 +678,7 @@ function createCommandCard(commandKey, command) {
   const raw = document.createElement('div');
   raw.className = 'form-row';
   raw.innerHTML = `
-    <label>Loxone Pfad / Spezialpfad<input class="command-path" type="text" placeholder="Nur fuer Befehlstyp raw"></label>
+    <label>Loxone Pfad / Spezialpfad<input class="command-path" type="text" placeholder="Nur für Befehlstyp raw"></label>
   `;
   raw.querySelector('.command-path').value = target.path;
 
@@ -723,13 +747,13 @@ function renderIntegrations() {
     title: 'TTS normal',
     method: 'POST',
     url: `${baseUrl}/tts/speak`,
-    body: 'Geschirrspueler ist fertig.',
+    body: 'Geschirrspüler ist fertig.',
     note: 'Einfacher Text im Request-Body.',
     testLabel: 'TTS testen',
     testAction: (button) => testEndpoint({
       method: 'POST',
       url: `${baseUrl}/tts/speak`,
-      body: 'Geschirrspueler ist fertig.',
+      body: 'Geschirrspüler ist fertig.',
       contentType: 'text/plain',
       successText: 'TTS normal'
     }, button)
@@ -738,13 +762,13 @@ function renderIntegrations() {
     title: 'Alarm',
     method: 'POST',
     url: `${baseUrl}/tts/alarm`,
-    body: 'Achtung, Alarm wurde ausgeloest.',
-    note: 'Nutzt die Alarm-Geraeteliste und Alarm-Lautstaerke.',
+    body: 'Achtung, Alarm wurde ausgelöst.',
+    note: 'Nutzt die Alarm-Geräteliste und Alarm-Lautstärke.',
     testLabel: 'Alarm testen',
     testAction: (button) => testEndpoint({
       method: 'POST',
       url: `${baseUrl}/tts/alarm`,
-      body: 'Achtung, Alarm wurde ausgeloest.',
+      body: 'Achtung, Alarm wurde ausgelöst.',
       contentType: 'text/plain',
       successText: 'Alarm'
     }, button)
@@ -754,7 +778,7 @@ function renderIntegrations() {
     method: 'GET',
     url: `${baseUrl}/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50`,
     body: '',
-    note: 'Kompatibler Einstieg fuer bestehende Loxone-Aufrufe.',
+    note: 'Kompatibler Einstieg für bestehende Loxone-Aufrufe.',
     testLabel: 'Compat testen',
     testAction: (button) => testEndpoint({
       method: 'GET',
@@ -817,7 +841,7 @@ function createTestButton(label, action) {
 }
 
 async function testEndpoint({ method, url, body, contentType, successText }, button) {
-  setButtonFeedback(button, 'pending', 'Test laeuft');
+  setButtonFeedback(button, 'pending', 'Test läuft');
   try {
     const options = { method };
     if (body) {
@@ -1093,11 +1117,11 @@ function displayPart(value) {
   if (!raw) return '';
   const mapped = {
     licht: 'Licht',
-    lueftung: 'Lueftung',
+    lueftung: 'Lüftung',
     rolladen: 'Rollladen',
     rollladen: 'Rollladen',
-    kueche: 'Kueche',
-    buero: 'Buero',
+    kueche: 'Küche',
+    buero: 'Büro',
     tv: 'TV',
     up: 'Auf',
     down: 'Ab',
@@ -1162,7 +1186,7 @@ function updatePathFieldState(card) {
   pathInput.disabled = !isRaw;
   pathInput.placeholder = isRaw
     ? '/jdev/sps/io/{uuid}/pulse oder kompletter Spezialpfad'
-    : 'Nur fuer Befehlstyp raw';
+    : 'Nur für Befehlstyp raw';
   pathInput.closest('label')?.classList.toggle('is-disabled', !isRaw);
 }
 

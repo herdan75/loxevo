@@ -51,7 +51,7 @@ const server = http.createServer(async (req, res) => {
       return await runConfiguredCommand(res, pathParts[1]);
     }
 
-    // Kurze Legacy-URL fuer Loxone oder optionale externe Tools: /light/kueche/ambient
+    // Kurze Legacy-URL für Loxone oder optionale externe Tools: /light/kueche/ambient
     if (req.method === 'POST' && pathParts[0] === 'light' && pathParts.length >= 3) {
       return await runLightCommand(res, pathParts[1], pathParts[2]);
     }
@@ -225,17 +225,17 @@ function getSetupStatus() {
       id: 'loxone-login',
       label: 'Loxone-Zugangsdaten eintragen',
       ok: isConfiguredSecret(config.loxone?.username) && isConfiguredSecret(config.loxone?.password),
-      detail: 'Benutzer und Passwort werden fuer Live-Befehle an Loxone benoetigt.'
+      detail: 'Benutzer und Passwort werden für Live-Befehle an Loxone benötigt.'
     },
     {
       id: 'commands',
       label: 'Befehle konfigurieren',
       ok: commandsConfigured(config.commands) || roomsConfigured(config.rooms),
-      detail: 'Jeder aktive Befehl braucht einen gueltigen Loxone-Zieltyp mit UUID, Wert oder Pfad.'
+      detail: 'Jeder aktive Befehl braucht einen gültigen Loxone-Zieltyp mit UUID, Wert oder Pfad.'
     },
     {
       id: 'dry-run',
-      label: 'Dry-Run fuer erste Tests aktiv lassen',
+      label: 'Dry-Run für erste Tests aktiv lassen',
       ok: config.loxone?.dryRun !== false,
       detail: 'Live-Modus erst aktivieren, wenn die Tests passen.'
     },
@@ -326,7 +326,7 @@ async function getRegistryPackageInfo(name) {
 
 async function updateDependency(res, name, version) {
   if (dependencyUpdate?.status === 'running') {
-    return sendJson(res, { ok: false, error: 'Ein Update laeuft bereits.' }, 409);
+    return sendJson(res, { ok: false, error: 'Ein Update läuft bereits.' }, 409);
   }
   const requestedVersion = normalizePackageVersion(version);
 
@@ -414,7 +414,7 @@ async function ensureDependencyInstallDir() {
 function normalizePackageVersion(version) {
   const raw = String(version || 'latest').trim();
   if (!/^[a-zA-Z0-9._~+-]+$/.test(raw)) {
-    throw new Error(`Ungueltige Paketversion: ${version}`);
+    throw new Error(`Ungültige Paketversion: ${version}`);
   }
   return raw || 'latest';
 }
@@ -472,13 +472,13 @@ function ttsDevicesConfigured(status) {
 
 function ttsDetail(status) {
   if (!config.tts?.enabled) {
-    return 'TTS ist deaktiviert und kann spaeter eingerichtet werden.';
+    return 'TTS ist deaktiviert und kann später eingerichtet werden.';
   }
   if (status.error) {
     return status.error;
   }
   if (!ttsDevicesConfigured(status)) {
-    return 'Mindestens ein Alexa-Geraet fuer TTS eintragen.';
+    return 'Mindestens ein Alexa-Gerät für TTS eintragen.';
   }
   return 'Alexa TTS ist bereit.';
 }
@@ -574,7 +574,7 @@ function readBody(req) {
     req.on('data', (chunk) => {
       data += chunk;
       if (data.length > 1024 * 256) {
-        reject(new Error('Request body zu gross.'));
+        reject(new Error('Request body zu groß.'));
         req.destroy();
       }
     });
@@ -587,7 +587,7 @@ function parseJson(body) {
   try {
     return JSON.parse(body || '{}');
   } catch {
-    throw new Error('Ungueltiges JSON.');
+    throw new Error('Ungültiges JSON.');
   }
 }
 

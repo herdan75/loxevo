@@ -11,8 +11,8 @@
   },
   "commands": {
     "kueche_licht_hell": {
-      "label": "Kueche Licht Hell",
-      "voiceName": "Kueche Licht Hell",
+      "label": "Küche Licht Hell",
+      "voiceName": "Küche Licht Hell",
       "category": "Licht",
       "room": "kueche",
       "function": "licht",
@@ -39,9 +39,9 @@
       "enabled": true
     },
     "lueftung_bad_ein": {
-      "label": "Lueftung Bad Ein",
-      "voiceName": "Lueftung Bad Ein",
-      "category": "Lueftung",
+      "label": "Lüftung Bad Ein",
+      "voiceName": "Lüftung Bad Ein",
+      "category": "Lüftung",
       "room": "bad",
       "function": "lueftung",
       "action": "ein",
@@ -67,8 +67,8 @@
       "enabled": true
     },
     "roboter_kueche": {
-      "label": "Roboter Kueche",
-      "voiceName": "Roboter Kueche",
+      "label": "Roboter Küche",
+      "voiceName": "Roboter Küche",
       "category": "Reinigung",
       "room": "kueche",
       "function": "roboter",

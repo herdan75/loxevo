@@ -120,6 +120,52 @@ h2 {
   color: var(--danger);
 }
 
+.status-help-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.status-help-row .service-status {
+  margin-bottom: 12px;
+}
+
+.info-button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #b9d0d2;
+  border-radius: 50%;
+  background: #eef7f7;
+  color: var(--accent-strong);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.info-button:hover,
+.info-button:focus-visible {
+  border-color: var(--accent);
+  background: #e0f1f1;
+  outline: none;
+}
+
+.help-box {
+  margin: -2px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #c8d7df;
+  border-radius: 6px;
+  background: #f5fafb;
+  color: #344553;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.help-box code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #e9eef3;
+}
+
 .setup-panel {
   border-color: #d8c58b;
   background: #fffaf0;

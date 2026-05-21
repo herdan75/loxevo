@@ -30,8 +30,8 @@
       </section>
 
       <nav class="tab-nav wide" aria-label="LoxEvo Bereiche">
-        <button class="tab-button active" type="button" data-tab-target="controlView">Steuerung</button>
-        <button class="tab-button" type="button" data-tab-target="integrationView">Alexa / Endpunkte</button>
+        <button class="tab-button active" type="button" data-tab-target="controlView">Direkttest</button>
+        <button class="tab-button" type="button" data-tab-target="integrationView">HTTP-Endpunkte</button>
         <button class="tab-button" type="button" data-tab-target="configView">Konfiguration</button>
         <button class="tab-button" type="button" data-tab-target="maintenanceView">Wartung</button>
         <button class="tab-button" type="button" data-tab-target="eventsView">Protokoll</button>
@@ -52,8 +52,8 @@
       <section class="panel">
         <div class="section-head">
           <div>
-            <h2>Steuerung</h2>
-            <p>Führt die konfigurierten Befehle nach Rubrik gruppiert aus.</p>
+            <h2>Loxone-Befehle testen</h2>
+            <p>Sendet Befehle direkt an Loxone oder simuliert sie im Dry-Run.</p>
           </div>
         </div>
         <div id="rooms" class="rooms"></div>
@@ -62,8 +62,8 @@
       <section class="panel">
         <div class="section-head">
           <div>
-            <h2>TTS testen</h2>
-            <p>Sendet Text an die konfigurierten Alexa-Geraete.</p>
+            <h2>Alexa TTS testen</h2>
+            <p>Sendet einen Testtext direkt an die konfigurierten Echo-Geraete.</p>
           </div>
         </div>
         <textarea id="ttsText" rows="3">Geschirrspueler ist fertig.</textarea>
@@ -78,21 +78,21 @@
       <section class="panel wide">
         <div class="section-head">
           <div>
-            <h2>Alexa- und HTTP-Endpunkte</h2>
-            <p>Fertige Aufrufe fuer Sprachroutinen, Node-RED, Loxone und Tests.</p>
+            <h2>HTTP-Endpunkte</h2>
+            <p>Aufrufe fuer Alexa-Routinen, Loxone und optionale externe Tools.</p>
           </div>
           <button id="refreshIntegrationsBtn" type="button" class="secondary">Endpunkte aktualisieren</button>
         </div>
 
         <div class="endpoint-block">
           <h3>Befehle</h3>
-          <p>Jeder Befehl kann per POST aufgerufen werden. Die Liste wird automatisch aus der aktuellen Konfiguration erzeugt.</p>
+          <p>Externe Systeme rufen diese URLs auf; LoxEvo sendet dann den passenden Loxone-Befehl.</p>
           <div id="lightEndpoints" class="endpoint-list"></div>
         </div>
 
         <div class="endpoint-block">
           <h3>TTS</h3>
-          <p>Diese Aufrufe sind fuer Sprachausgabe aus Loxone gedacht. Der Alexa2Lox-kompatible Pfad bleibt bewusst erhalten.</p>
+          <p>Externe Systeme rufen diese URLs fuer Alexa-Sprachausgabe auf.</p>
           <div id="ttsStatusCard" class="service-status">TTS-Status wird geladen...</div>
           <div id="ttsEndpoints" class="endpoint-list"></div>
         </div>

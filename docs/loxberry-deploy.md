@@ -90,7 +90,7 @@ Beim ersten Start ist `Dry-Run` aktiv. LoxEvo sendet dann noch keine echten Loxo
 
 1. In der Web-UI `Dry-Run aktiv` eingeschaltet lassen.
 2. Einen aktiven Befehl testen.
-3. Unter `Alexa / Endpunkte` die erzeugten Befehls- und TTS-Aufrufe pruefen.
+3. Unter `HTTP-Endpunkte` die erzeugten Befehls- und TTS-Aufrufe pruefen.
 4. TTS-Status kontrollieren.
 5. Wenn TTS bereit ist, eine kurze Testmeldung senden.
 6. Erst danach `Dry-Run` deaktivieren und Loxone live schalten.

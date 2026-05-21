@@ -51,7 +51,7 @@ const server = http.createServer(async (req, res) => {
       return await runConfiguredCommand(res, pathParts[1]);
     }
 
-    // Kurze Legacy-URL fuer Node-RED oder Loxone: /light/kueche/ambient
+    // Kurze Legacy-URL fuer Loxone oder optionale externe Tools: /light/kueche/ambient
     if (req.method === 'POST' && pathParts[0] === 'light' && pathParts.length >= 3) {
       return await runLightCommand(res, pathParts[1], pathParts[2]);
     }

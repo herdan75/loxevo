@@ -73,11 +73,12 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt w
 - TTS-Aktivierung, Cookie-Datei, Lautstaerken und Alexa-Geraetelisten
 - TTS-Status mit klarer Fehlermeldung, falls Alexa noch nicht bereit ist
 
-Die Oberflaeche ist in drei Bereiche gegliedert:
+Die Oberflaeche ist in klare Bereiche gegliedert:
 
-- `Bedienen`: frei definierte Befehle und TTS direkt ausloesen
-- `Alexa / Endpunkte`: fertige HTTP-Aufrufe fuer Befehle, TTS und Alexa2Lox-kompatible URLs testen und kopieren
+- `Direkttest`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI testen
+- `HTTP-Endpunkte`: fertige URLs fuer Alexa-Routinen, Loxone und optionale externe Tools testen und kopieren
 - `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
+- `Wartung`: Paketversionen pruefen und Alexa-TTS-Komponente verwalten
 - `Protokoll`: letzte Befehle und Dry-Run/Live-Aktionen ansehen
 
 Die JSON-Ansicht bleibt als Expertenmodus erhalten.

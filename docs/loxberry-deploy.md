@@ -10,7 +10,7 @@ LoxEvo laeuft als eigener Docker-Container auf dem LoxBerry:
 
 ```text
 Loxone -> http://<loxberry>:8080/... -> LoxEvo -> Alexa TTS
-Alexa/HTTP -> LoxEvo -> Loxone-Befehl
+Alexa-Routine/HTTP -> LoxEvo -> Loxone-Befehl
 ```
 
 ## Dateien auf dem LoxBerry
@@ -35,6 +35,7 @@ public/
 
 `data/config.json` enthaelt deine Loxone- und LoxEvo-Konfiguration.
 `data/Node.txt` ist die Alexa-Cookie-Datei, die bisher in Node-RED fuer `alexa-remote2` genutzt wurde.
+Node-RED muss fuer LoxEvo nicht laufen; die Cookie-Datei kann nur als bestehende Grundlage uebernommen werden.
 Der komplette Ordner `data/` ist fuer private lokale Daten gedacht und wird nicht ins GitHub-Repository uebernommen.
 
 Vor dem ersten Start:
@@ -90,7 +91,7 @@ Beim ersten Start ist `Dry-Run` aktiv. LoxEvo sendet dann noch keine echten Loxo
 
 1. In der Web-UI `Dry-Run aktiv` eingeschaltet lassen.
 2. Einen aktiven Befehl testen.
-3. Unter `HTTP-Endpunkte` die erzeugten Befehls- und TTS-Aufrufe pruefen.
+3. Unter `Externe Aufrufe` die erzeugten Befehls- und TTS-Aufrufe pruefen.
 4. TTS-Status kontrollieren.
 5. Wenn TTS bereit ist, eine kurze Testmeldung senden.
 6. Erst danach `Dry-Run` deaktivieren und Loxone live schalten.
@@ -99,12 +100,7 @@ Beim ersten Start ist `Dry-Run` aktiv. LoxEvo sendet dann noch keine echten Loxo
 
 `alexa-remote2 ist nicht installiert`
 
-Der Container wurde nicht gebaut oder die Installation der Node-Abhaengigkeiten ist fehlgeschlagen.
-
-```bash
-docker compose build --no-cache
-docker compose up -d
-```
+In der Web-UI unter `Wartung` eine Version auswaehlen und installieren. Danach LoxEvo ueber den Button in der Web-UI oder mit `docker compose restart loxevo` neu starten.
 
 `Alexa-Cookie konnte nicht gelesen werden`
 

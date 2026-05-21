@@ -30,8 +30,8 @@
       </section>
 
       <nav class="tab-nav wide" aria-label="LoxEvo Bereiche">
-        <button class="tab-button active" type="button" data-tab-target="controlView">Direkttest</button>
-        <button class="tab-button" type="button" data-tab-target="integrationView">HTTP-Endpunkte</button>
+        <button class="tab-button active" type="button" data-tab-target="controlView">Testen</button>
+        <button class="tab-button" type="button" data-tab-target="integrationView">Externe Aufrufe</button>
         <button class="tab-button" type="button" data-tab-target="configView">Konfiguration</button>
         <button class="tab-button" type="button" data-tab-target="maintenanceView">Wartung</button>
         <button class="tab-button" type="button" data-tab-target="eventsView">Protokoll</button>
@@ -52,8 +52,8 @@
       <section class="panel">
         <div class="section-head">
           <div>
-            <h2>Loxone-Befehle testen</h2>
-            <p>Sendet Befehle direkt an Loxone oder simuliert sie im Dry-Run.</p>
+            <h2>Direkt testen</h2>
+            <p>Fuehrt konfigurierte Befehle aus dieser Web-UI aus. Im Dry-Run wird nur protokolliert.</p>
           </div>
         </div>
         <div id="rooms" class="rooms"></div>
@@ -62,8 +62,8 @@
       <section class="panel">
         <div class="section-head">
           <div>
-            <h2>Alexa TTS testen</h2>
-            <p>Sendet einen Testtext direkt an die konfigurierten Echo-Geraete.</p>
+            <h2>Alexa TTS direkt testen</h2>
+            <p>Sendet einen Testtext aus dieser Web-UI an die konfigurierten Echo-Geraete.</p>
           </div>
         </div>
         <textarea id="ttsText" rows="3">Geschirrspueler ist fertig.</textarea>
@@ -78,21 +78,21 @@
       <section class="panel wide">
         <div class="section-head">
           <div>
-            <h2>HTTP-Endpunkte</h2>
-            <p>Aufrufe fuer Alexa-Routinen, Loxone und optionale externe Tools.</p>
+            <h2>Externe Aufrufe</h2>
+            <p>URLs fuer Alexa-Routinen, Loxone oder andere Systeme. Node-RED ist dafuer nicht erforderlich.</p>
           </div>
-          <button id="refreshIntegrationsBtn" type="button" class="secondary">Endpunkte aktualisieren</button>
+          <button id="refreshIntegrationsBtn" type="button" class="secondary">Aufrufe aktualisieren</button>
         </div>
 
         <div class="endpoint-block">
           <h3>Befehle</h3>
-          <p>Externe Systeme rufen diese URLs auf; LoxEvo sendet dann den passenden Loxone-Befehl.</p>
+          <p>Wenn ein externes System diese URL aufruft, sendet LoxEvo den passenden Loxone-Befehl.</p>
           <div id="lightEndpoints" class="endpoint-list"></div>
         </div>
 
         <div class="endpoint-block">
           <h3>TTS</h3>
-          <p>Externe Systeme rufen diese URLs fuer Alexa-Sprachausgabe auf.</p>
+          <p>Diese URLs loesen Alexa-Sprachausgabe aus, zum Beispiel aus Loxone.</p>
           <div id="ttsStatusCard" class="service-status">TTS-Status wird geladen...</div>
           <div id="ttsEndpoints" class="endpoint-list"></div>
         </div>
@@ -163,7 +163,7 @@
         </div>
 
         <fieldset class="wide-fieldset">
-          <legend>Befehle</legend>
+          <legend>Befehle und Sprachnamen</legend>
           <div id="roomEditor" class="room-editor"></div>
           <button id="addRoomBtn" type="button" class="secondary">Befehl hinzufuegen</button>
         </fieldset>
@@ -198,7 +198,8 @@
       </section>
 
       <section class="panel wide">
-        <h2>HTTP Aufruf</h2>
+        <h2>API-Kurzbeispiel</h2>
+        <p>Fertige URLs zum Kopieren stehen im Register Externe Aufrufe.</p>
         <pre><code>POST http://&lt;loxberry&gt;:&lt;port&gt;/api/command
 Content-Type: application/json
 
@@ -224,8 +225,8 @@ Content-Type: application/json
       <section class="panel wide">
         <div class="section-head">
           <div>
-            <h2>Letzte Befehle</h2>
-            <p>Zeigt Dry-Run und gesendete Aktionen.</p>
+            <h2>Letzte Aktionen</h2>
+            <p>Zeigt, was LoxEvo zuletzt simuliert oder gesendet hat.</p>
           </div>
           <button id="refreshEventsBtn">Aktualisieren</button>
         </div>

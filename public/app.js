@@ -58,7 +58,7 @@ dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 addRoomBtn.addEventListener('click', addRoom);
 refreshIntegrationsBtn.addEventListener('click', () => {
   renderIntegrations();
-  showToast('Endpunkte aktualisiert', 'ok');
+  showToast('Aufrufe aktualisiert', 'ok');
 });
 setupConfigBtn.addEventListener('click', () => showView('configView'));
 refreshMaintenanceBtn.addEventListener('click', () => loadDependencyStatus(refreshMaintenanceBtn));
@@ -790,7 +790,7 @@ function createEndpointCard({ title, method, url, body, note, testLabel, testAct
     actions.append(createTestButton(testLabel || 'Testen', testAction));
   }
   actions.append(createCopyButton('URL kopieren', url));
-  actions.append(createCopyButton('PowerShell kopieren', buildPowerShellExample(method, url, body)));
+  actions.append(createCopyButton('PowerShell-Befehl kopieren', buildPowerShellExample(method, url, body)));
 
   const noteEl = document.createElement('p');
   noteEl.textContent = note;

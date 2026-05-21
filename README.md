@@ -47,7 +47,7 @@ Web-UI:
 http://<loxberry>:8080
 ```
 
-In `data/config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie unter "Letzte Befehle", sendet aber noch nichts an Loxone.
+In `data/config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie im Protokoll, sendet aber noch nichts an Loxone.
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
 TTS braucht das Paket `alexa-remote2` und eine gueltige Alexa-Cookie-Datei. Das Paket wird bewusst nicht fest im Docker-Build installiert, damit LoxEvo auch dann startet, wenn npm-Versionen wechseln. Installiere oder aktualisiere es in der Web-UI unter "Wartung"; im Docker/LoxBerry-Betrieb landet es im gemounteten `/config`-Bereich.
@@ -75,11 +75,11 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt w
 
 Die Oberflaeche ist in klare Bereiche gegliedert:
 
-- `Direkttest`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI testen
-- `HTTP-Endpunkte`: fertige URLs fuer Alexa-Routinen, Loxone und optionale externe Tools testen und kopieren
+- `Testen`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI pruefen
+- `Externe Aufrufe`: fertige URLs fuer Alexa-Routinen, Loxone und optionale externe Tools testen und kopieren
 - `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
 - `Wartung`: Paketversionen pruefen und Alexa-TTS-Komponente verwalten
-- `Protokoll`: letzte Befehle und Dry-Run/Live-Aktionen ansehen
+- `Protokoll`: zuletzt simulierte oder gesendete Aktionen ansehen
 
 Die JSON-Ansicht bleibt als Expertenmodus erhalten.
 

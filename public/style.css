@@ -69,29 +69,6 @@ h2 {
   text-transform: uppercase;
 }
 
-.status {
-  min-width: 112px;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #f8fafc;
-  color: var(--muted);
-  text-align: center;
-  font-size: 14px;
-}
-
-.status.ok {
-  border-color: #afd7c2;
-  background: #ecf8f1;
-  color: #247143;
-}
-
-.status.error {
-  border-color: #e8b8b2;
-  background: #fff0ee;
-  color: var(--danger);
-}
-
 .service-status {
   margin: 0 0 12px;
   padding: 10px 12px;

@@ -2,9 +2,10 @@ import http from 'node:http';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { dirname, extname, join, normalize, resolve } from 'node:path';
+import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, saveConfig } from './config.js';
+import { isCommandType, readCommandTarget } from './command-utils.js';
 import { LoxoneClient } from './loxone.js';
 import { TtsService } from './tts.js';
 
@@ -24,7 +25,6 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const pathParts = url.pathname.split('/').filter(Boolean);
-    const body = await readBody(req);
 
     if (req.method === 'GET' && url.pathname === '/') {
       return serveStatic(res, 'index.html');
@@ -43,7 +43,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathParts[0] === 'api') {
-      return await handleApi(req, res, pathParts, body);
+      return await handleApi(req, res, pathParts, () => readBody(req));
     }
 
     // Frei definierbarer Befehl: /command/kueche_licht_hell
@@ -57,6 +57,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathParts[0] === 'tts') {
+      const body = await readBody(req);
       return await handleTts(req, res, pathParts, body);
     }
 
@@ -71,7 +72,7 @@ server.listen(config.server.port, '0.0.0.0', () => {
   console.log(`${config.server.name} lauscht auf Port ${config.server.port}`);
 });
 
-async function handleApi(req, res, pathParts, body) {
+async function handleApi(req, res, pathParts, readRequestBody) {
   if (req.method === 'GET' && pathParts[1] === 'config') {
     return sendJson(res, config);
   }
@@ -93,7 +94,7 @@ async function handleApi(req, res, pathParts, body) {
   }
 
   if (req.method === 'POST' && pathParts[1] === 'dependencies' && pathParts[2] === 'alexa-remote2' && pathParts[3] === 'update') {
-    const payload = parseJson(body);
+    const payload = parseJson(await readRequestBody());
     return await updateDependency(res, 'alexa-remote2', payload.version || 'latest');
   }
 
@@ -104,7 +105,7 @@ async function handleApi(req, res, pathParts, body) {
   }
 
   if (req.method === 'PUT' && pathParts[1] === 'dry-run') {
-    const payload = parseJson(body);
+    const payload = parseJson(await readRequestBody());
     config.loxone.dryRun = payload.enabled !== false;
     config = await saveConfig(config);
     loxone = new LoxoneClient(config);
@@ -113,7 +114,7 @@ async function handleApi(req, res, pathParts, body) {
   }
 
   if (req.method === 'PUT' && pathParts[1] === 'config') {
-    const nextConfig = parseJson(body);
+    const nextConfig = parseJson(await readRequestBody());
     config = await saveConfig(nextConfig);
     loxone = new LoxoneClient(config);
     tts = new TtsService(config);
@@ -122,17 +123,17 @@ async function handleApi(req, res, pathParts, body) {
   }
 
   if (req.method === 'POST' && pathParts[1] === 'light') {
-    const payload = parseJson(body);
+    const payload = parseJson(await readRequestBody());
     return await runLightCommand(res, payload.room, payload.scene);
   }
 
   if (req.method === 'POST' && pathParts[1] === 'command') {
-    const payload = parseJson(body);
+    const payload = parseJson(await readRequestBody());
     return await runConfiguredCommand(res, payload.command || payload.key);
   }
 
   if (pathParts[1] === 'tts') {
-    return await handleTts(req, res, pathParts.slice(1), body);
+    return await handleTts(req, res, pathParts.slice(1), await readRequestBody());
   }
 
   return sendJson(res, { error: 'not found' }, 404);
@@ -485,7 +486,7 @@ function ttsDetail(status) {
 
 function isCommandConfigured(command) {
   const target = readCommandTarget(command);
-  if (!['changeTo', 'direct', 'pulse', 'raw'].includes(target.type)) return false;
+  if (!isCommandType(target.type)) return false;
 
   if (target.type === 'raw') {
     if (!target.path || target.path.includes('replace-with')) return false;
@@ -497,33 +498,6 @@ function isCommandConfigured(command) {
   if (!isConfiguredValue(target.uuid)) return false;
   if (target.type === 'pulse') return true;
   return isConfiguredValue(target.value);
-}
-
-function readCommandTarget(command) {
-  const loxone = command.loxone || {};
-  const type = normalizeCommandType(loxone.type || command.loxoneType || command.type || (loxone.path || command.loxonePath ? 'raw' : 'changeTo'));
-  return {
-    type,
-    uuid: normalizeLoxoneUuid(loxone.uuid || command.loxoneUuid || ''),
-    value: loxone.value ?? loxone.command ?? command.loxoneCommand ?? '',
-    path: loxone.path || command.loxonePath || ''
-  };
-}
-
-function normalizeCommandType(value) {
-  const raw = String(value || '').trim().toLowerCase();
-  if (raw === 'changeto' || raw === 'change_to') return 'changeTo';
-  if (raw === 'command' || raw === 'direct') return 'direct';
-  if (raw === 'pulse') return 'pulse';
-  if (raw === 'raw' || raw === 'path') return 'raw';
-  return raw || 'changeTo';
-}
-
-function normalizeLoxoneUuid(value) {
-  const raw = String(value || '').trim();
-  const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-  if (match) return match[0].toLowerCase();
-  return raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
 }
 
 function isConfiguredValue(value) {
@@ -540,6 +514,7 @@ async function handleAlexa2LoxCompat(req, res, url) {
   const text = params.get('text') || params.get('t') || '';
   const devices = params.get('device') || params.get('devices') || params.get('d') || '';
   const volume = params.get('vol') || '';
+  const targetDevices = resolveTtsDevices(devices);
 
   if (!text) {
     return sendText(res, 'Missing text. Use text=... or t=...', 400);
@@ -550,19 +525,32 @@ async function handleAlexa2LoxCompat(req, res, url) {
   }
 
   if (volume) {
-    await tts.setVolume(volume, resolveTtsDevices(devices));
-    addEvent({ type: 'tts-volume', status: 'sent', volume, devices: resolveTtsDevices(devices) });
+    await tts.setVolume(volume, targetDevices);
+    addEvent({ type: 'tts-volume', status: 'sent', volume, devices: targetDevices });
   }
 
-  await tts.speak(normalizeTtsText(text), resolveTtsDevices(devices));
-  addEvent({ type: 'tts-speak', status: 'sent', text, devices: resolveTtsDevices(devices), compat: 'alexa2lox' });
+  await tts.speak(normalizeTtsText(text), targetDevices);
+  addEvent({ type: 'tts-speak', status: 'sent', text, devices: targetDevices, compat: 'alexa2lox' });
   return sendText(res, `TTS sent: ${text}`);
 }
 
 async function serveStatic(res, relativePath) {
-  const safePath = normalize(relativePath).replace(/^(\.\.[/\\])+/, '');
-  const absolutePath = join(publicDir, safePath);
-  const content = await readFile(absolutePath);
+  const absolutePath = resolve(publicDir, relativePath);
+  const publicRoot = `${resolve(publicDir)}${sep}`;
+  if (absolutePath !== resolve(publicDir) && !absolutePath.startsWith(publicRoot)) {
+    return sendText(res, 'not found', 404);
+  }
+
+  let content;
+  try {
+    content = await readFile(absolutePath);
+  } catch (error) {
+    if (error.code === 'ENOENT' || error.code === 'EISDIR') {
+      return sendText(res, 'not found', 404);
+    }
+    throw error;
+  }
+
   res.writeHead(200, { 'content-type': contentType(absolutePath) });
   res.end(content);
 }
@@ -603,10 +591,15 @@ function sendText(res, payload, statusCode = 200) {
 
 function contentType(path) {
   const ext = extname(path);
-  if (ext === '.css') return 'text/css';
-  if (ext === '.js') return 'text/javascript';
+  if (ext === '.html') return 'text/html; charset=utf-8';
+  if (ext === '.css') return 'text/css; charset=utf-8';
+  if (ext === '.js') return 'text/javascript; charset=utf-8';
   if (ext === '.svg') return 'image/svg+xml';
-  return 'text/html; charset=utf-8';
+  if (ext === '.png') return 'image/png';
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  if (ext === '.webp') return 'image/webp';
+  if (ext === '.ico') return 'image/x-icon';
+  return 'application/octet-stream';
 }
 
 function normalizeKey(value) {

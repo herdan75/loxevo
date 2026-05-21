@@ -3,7 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 LABEL org.opencontainers.image.title="LoxEvo"
-LABEL org.opencontainers.image.description="LoxBerry gateway for Loxone light control and Alexa Echo TTS"
+LABEL org.opencontainers.image.description="LoxBerry gateway for Loxone automation and Alexa Echo TTS"
 LABEL org.opencontainers.image.source="https://github.com/herdan75/loxevo"
 
 COPY package.json ./

@@ -1,3 +1,5 @@
+import { normalizeCommandType, normalizeLoxoneUuid, readCommandTarget } from './command-utils.js';
+
 export class LoxoneClient {
   constructor(config) {
     this.baseUrl = config.loxone.baseUrl.replace(/\/$/, '');
@@ -17,6 +19,7 @@ export class LoxoneClient {
       throw new Error(`Befehl ist deaktiviert: ${commandKey}`);
     }
 
+    const target = readCommandTarget(command);
     return await this.sendLoxoneCommand({
       key: commandKey,
       label: command.label || commandKey,
@@ -25,10 +28,10 @@ export class LoxoneClient {
       room: command.room || '',
       functionName: command.function || '',
       action: command.action || '',
-      type: resolveCommandType(command),
-      uuid: command.loxone?.uuid || command.loxoneUuid,
-      command: command.loxone?.value ?? command.loxone?.command ?? command.loxoneCommand ?? '',
-      path: command.loxone?.path || command.loxonePath || ''
+      type: target.type,
+      uuid: target.uuid,
+      command: target.value,
+      path: target.path
     });
   }
 
@@ -125,28 +128,12 @@ export class LoxoneClient {
 function resolveCommandType(command) {
   const rawType = command.loxone?.type || command.loxoneType || command.type;
   if (rawType) {
-    return normalizeType(rawType);
+    return normalizeCommandType(rawType);
   }
   if (command.loxone?.path || command.loxonePath) {
     return 'raw';
   }
   return 'changeTo';
-}
-
-function normalizeType(value) {
-  const raw = String(value || '').trim().toLowerCase();
-  if (raw === 'changeto' || raw === 'change_to') return 'changeTo';
-  if (raw === 'command' || raw === 'direct') return 'direct';
-  if (raw === 'pulse') return 'pulse';
-  if (raw === 'raw' || raw === 'path') return 'raw';
-  return raw || 'changeTo';
-}
-
-function normalizeLoxoneUuid(value) {
-  const raw = String(value || '').trim();
-  const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-  if (match) return match[0].toLowerCase();
-  return raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
 }
 
 function applyPathTemplate(path, entry) {

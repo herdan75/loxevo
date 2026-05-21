@@ -79,17 +79,17 @@ export class TtsService {
     };
   }
 
-  async speak(text, devices = this.config.defaultDevices || []) {
+  async speak(text, devices = firstNonEmpty(this.config.defaultDevices)) {
     this.assertReady();
     await this.sendSequence('speak', text, devices);
   }
 
-  async alarm(text, devices = this.config.alarmDevices || []) {
+  async alarm(text, devices = firstNonEmpty(this.config.alarmDevices, this.config.allDevices, this.config.defaultDevices)) {
     this.assertReady();
     await this.sendSequence('speakAtVolume', text, devices, Number(this.config.alarmVolume || 100));
   }
 
-  async setVolume(volume, devices = this.config.alarmDevices || this.config.defaultDevices || []) {
+  async setVolume(volume, devices = firstNonEmpty(this.config.alarmDevices, this.config.allDevices, this.config.defaultDevices)) {
     this.assertReady();
     const value = Number(volume);
     if (!Number.isFinite(value) || value < 0 || value > 100) {
@@ -173,4 +173,8 @@ function getDependencyInstallDir() {
     return resolve(dirname(process.env.CONFIG_PATH));
   }
   return process.cwd();
+}
+
+function firstNonEmpty(...lists) {
+  return lists.find((list) => Array.isArray(list) && list.length > 0) || [];
 }

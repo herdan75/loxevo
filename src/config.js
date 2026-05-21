@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { isCommandType, readCommandTarget } from './command-utils.js';
 
 const DEFAULT_CONFIG_PATH = './config.json';
 const EXAMPLE_CONFIG_PATH = './config.example.json';
@@ -41,7 +42,7 @@ function validateConfig(config) {
         continue;
       }
       const target = readCommandTarget(command);
-      if (!['changeTo', 'direct', 'pulse', 'raw'].includes(target.type)) {
+      if (!isCommandType(target.type)) {
         throw new Error(`Unbekannter Loxone-Befehlstyp "${target.type}" für Befehl "${commandName}".`);
       }
 
@@ -102,32 +103,4 @@ function normalizeConfig(config) {
   config.server ||= {};
   config.server.port = Number(process.env.PORT || config.server.port || config.bridge?.port || 8080);
   config.server.name ||= config.bridge?.name || 'LoxEvo';
-}
-
-function readCommandTarget(command) {
-  const loxone = command.loxone || {};
-  const type = normalizeType(loxone.type || command.loxoneType || command.type || (loxone.path || command.loxonePath ? 'raw' : 'changeTo'));
-
-  return {
-    type,
-    uuid: normalizeLoxoneUuid(loxone.uuid || command.loxoneUuid || ''),
-    value: loxone.value ?? loxone.command ?? command.loxoneCommand ?? '',
-    path: loxone.path || command.loxonePath || ''
-  };
-}
-
-function normalizeType(value) {
-  const raw = String(value || '').trim().toLowerCase();
-  if (raw === 'changeto' || raw === 'change_to') return 'changeTo';
-  if (raw === 'command' || raw === 'direct') return 'direct';
-  if (raw === 'pulse') return 'pulse';
-  if (raw === 'raw' || raw === 'path') return 'raw';
-  return raw || 'changeTo';
-}
-
-function normalizeLoxoneUuid(value) {
-  const raw = String(value || '').trim();
-  const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-  if (match) return match[0].toLowerCase();
-  return raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
 }

@@ -1,4 +1,3 @@
-const statusEl = document.querySelector('#status');
 const roomsEl = document.querySelector('#rooms');
 const configEditor = document.querySelector('#configEditor');
 const ttsText = document.querySelector('#ttsText');
@@ -83,9 +82,8 @@ async function load() {
     renderIntegrations();
     syncJsonFromForms();
     await loadEvents();
-    setStatus('Bereit', 'ok');
   } catch (error) {
-    setStatus(error.message, 'error');
+    showToast(error.message, 'error');
   }
 }
 
@@ -122,11 +120,9 @@ async function sendCommand(commandKey, button) {
   try {
     await postJson('/api/command', { command: commandKey });
     await loadEvents();
-    setStatus(commandKey, 'ok');
     setButtonFeedback(button, 'success', 'Ausgeführt');
     showToast(`Befehl ausgeführt: ${commandKey}`, 'ok');
   } catch (error) {
-    setStatus(error.message, 'error');
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
   }
@@ -146,11 +142,9 @@ async function saveConfig(button) {
     await loadTtsStatus();
     await loadSetupStatus();
     renderIntegrations();
-    setStatus('Gespeichert', 'ok');
     setButtonFeedback(button, 'success', 'Gespeichert');
     showToast('Konfiguration gespeichert', 'ok');
   } catch (error) {
-    setStatus(error.message, 'error');
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
   }
@@ -170,11 +164,9 @@ async function saveJsonConfig(button) {
     await loadTtsStatus();
     await loadSetupStatus();
     renderIntegrations();
-    setStatus('JSON gespeichert', 'ok');
     setButtonFeedback(button, 'success', 'Gespeichert');
     showToast('JSON gespeichert', 'ok');
   } catch (error) {
-    setStatus(error.message, 'error');
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
   }
@@ -191,11 +183,9 @@ async function postText(url, text, button, successText = 'TTS gesendet') {
     await ensureOk(response);
     await loadTtsStatus();
     await loadEvents();
-    setStatus(successText, 'ok');
     setButtonFeedback(button, 'success', 'Gesendet');
     showToast(successText, 'ok');
   } catch (error) {
-    setStatus(error.message, 'error');
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
   }
@@ -225,12 +215,6 @@ async function ensureOk(response) {
   if (response.ok) return;
   const payload = await response.json().catch(() => ({}));
   throw new Error(payload.error || `HTTP ${response.status}`);
-}
-
-function setStatus(text, type) {
-  if (!statusEl) return;
-  statusEl.textContent = text;
-  statusEl.className = `status ${type || ''}`.trim();
 }
 
 function setButtonFeedback(button, state, label) {
@@ -510,10 +494,10 @@ async function setDryRun(enabled) {
     updateDryRunUi(result.dryRun);
     await loadSetupStatus();
     await loadEvents();
-    setStatus(result.dryRun ? 'Dry-Run aktiv' : 'Live aktiv', result.dryRun ? 'ok' : 'error');
+    showToast(result.dryRun ? 'Dry-Run aktiv' : 'Live-Modus aktiv', result.dryRun ? 'ok' : 'ok');
   } catch (error) {
     dryRunToggle.checked = Boolean(config.loxone?.dryRun);
-    setStatus(error.message, 'error');
+    showToast(error.message, 'error');
   }
 }
 
@@ -852,11 +836,9 @@ async function testEndpoint({ method, url, body, contentType, successText }, but
     await ensureOk(response);
     await loadTtsStatus();
     await loadEvents();
-    setStatus(`${successText} getestet`, 'ok');
     setButtonFeedback(button, 'success', 'Getestet');
     showToast(`${successText} getestet`, 'ok');
   } catch (error) {
-    setStatus(error.message, 'error');
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
   }
@@ -871,11 +853,9 @@ function createCopyButton(label, value) {
     setButtonFeedback(button, 'pending', 'Kopiert');
     try {
       await copyText(value);
-      setStatus('Kopiert', 'ok');
       setButtonFeedback(button, 'success', 'Kopiert');
       showToast('In Zwischenablage kopiert', 'ok');
     } catch {
-      setStatus('Kopieren nicht erlaubt', 'error');
       setButtonFeedback(button, 'error', 'Fehler');
       showToast('Kopieren nicht erlaubt', 'error');
     }

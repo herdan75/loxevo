@@ -10,7 +10,7 @@ LoxEvo laeuft als eigener Docker-Container auf dem LoxBerry:
 
 ```text
 Loxone -> http://<loxberry>:8080/... -> LoxEvo -> Alexa TTS
-Alexa-Routine/HTTP -> LoxEvo -> Loxone-Befehl
+Alexa-Gerät/HTTP -> LoxEvo -> Loxone-Befehl
 ```
 
 ## Dateien auf dem LoxBerry
@@ -86,15 +86,18 @@ http://<loxberry-ip>:8080
 ```
 
 Beim ersten Start ist `Dry-Run` aktiv. LoxEvo sendet dann noch keine echten Loxone-Befehle, sondern zeigt die erzeugten URLs im Protokoll.
+Für virtuelle Alexa-Geräte muss LoxEvo im gleichen Netzwerk wie die Echo-Geräte laufen. Das Docker-Compose-Setup nutzt deshalb `network_mode: host`, damit die lokale Alexa-Gerätesuche über SSDP/UDP 1900 funktioniert.
 
 ## Erster Test
 
 1. In der Web-UI `Dry-Run aktiv` eingeschaltet lassen.
 2. Einen aktiven Befehl testen.
 3. Unter `Externe Aufrufe` die erzeugten Befehls- und TTS-Aufrufe pruefen.
-4. TTS-Status kontrollieren.
-5. Wenn TTS bereit ist, eine kurze Testmeldung senden.
-6. Erst danach `Dry-Run` deaktivieren und Loxone live schalten.
+4. Optional unter `Konfiguration -> Alexa Geräte` die virtuellen Alexa-Geräte aktivieren und speichern.
+5. In der Alexa-App nach neuen Geräten suchen.
+6. TTS-Status kontrollieren.
+7. Wenn TTS bereit ist, eine kurze Testmeldung senden.
+8. Erst danach `Dry-Run` deaktivieren und Loxone live schalten.
 
 ## Typische Fehlermeldungen
 

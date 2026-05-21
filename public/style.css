@@ -398,6 +398,13 @@ label.is-disabled {
   color: #8a96a3;
 }
 
+.field-hint {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 input,
 select,
 textarea {

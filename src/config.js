@@ -103,4 +103,10 @@ function normalizeConfig(config) {
   config.server ||= {};
   config.server.port = Number(process.env.PORT || config.server.port || config.bridge?.port || 8080);
   config.server.name ||= config.bridge?.name || 'LoxEvo';
+  config.alexaBridge ||= {};
+  config.alexaBridge.enabled = config.alexaBridge.enabled === true;
+  config.alexaBridge.name ||= config.server.name;
+  config.alexaBridge.advertiseIp ||= '';
+  config.alexaBridge.advertisePort = Number(config.alexaBridge.advertisePort || config.server.port);
+  config.alexaBridge.bridgeId ||= '';
 }

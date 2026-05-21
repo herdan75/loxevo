@@ -29,6 +29,7 @@ Loxone
 Der aktuelle Stand ist ein Docker-faehiger Prototyp mit HTTP-API, Web-UI, generischen Loxone-Befehlen und integriertem TTS-Modul.
 Loxone-Befehle laufen standardmaessig im Dry-Run-Modus, damit lokal gefahrlos getestet werden kann.
 Wenn TTS aktiviert wird, aber `alexa-remote2` oder die Cookie-Datei noch fehlt, startet LoxEvo trotzdem weiter und zeigt den TTS-Status in der Web-UI an.
+Optional kann LoxEvo virtuelle Alexa-Geraete im lokalen Netzwerk bereitstellen. Alexa findet diese Geraete ueber die lokale Geraetesuche; ein Einschaltbefehl wie `Alexa, Licht Kueche Hell an` loest dann den passenden LoxEvo-Befehl aus.
 
 ## Setup
 
@@ -69,6 +70,7 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell koennen dort gepflegt w
 
 - Loxone-Miniserver URL, Benutzer und Passwort
 - Dry-Run/Live-Modus
+- virtuelle Alexa-Geraete aus aktiven Befehlen
 - frei definierbare Rubriken und Befehle mit Sprachname, Raum, Funktion, Aktion, Loxone-Typ, UUID, Wert oder Pfad
 - TTS-Aktivierung, Cookie-Datei, Lautstaerken und Alexa-Geraetelisten
 - TTS-Status mit klarer Fehlermeldung, falls Alexa noch nicht bereit ist
@@ -131,6 +133,24 @@ POST http://<loxberry>:8080/command/kueche_licht_hell
 ```
 
 Die alte Kurzform `/light/<raum>/<szene>` bleibt vorerst als Legacy-Einstieg erhalten, wenn eine alte `rooms`-Konfiguration vorhanden ist.
+
+## Virtuelle Alexa-Geraete
+
+Wenn `alexaBridge.enabled` aktiv ist, bietet LoxEvo jeden aktiven Befehl als virtuelles Alexa-Geraet an. In der Web-UI unter `Konfiguration -> Alexa Geraete` kann die lokale Bruecke aktiviert werden.
+
+Typischer Ablauf:
+
+```text
+Alexa-App -> Geraete -> + -> Geraet hinzufuegen -> Andere -> Geraete suchen
+```
+
+Danach kann ein Befehl wie `kueche_licht_hell` ueber den angezeigten Geraetenamen ausgelöst werden:
+
+```text
+Alexa, Licht Kueche Hell an
+```
+
+LoxEvo behandelt diese Geraete als Taster: `an` loest den hinterlegten Befehl aus. `aus` setzt nur den virtuellen Zustand zurueck.
 
 ## TTS-API
 

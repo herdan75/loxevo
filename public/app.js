@@ -13,6 +13,11 @@ const modeText = document.querySelector('#modeText');
 const loxoneBaseUrl = document.querySelector('#loxoneBaseUrl');
 const loxoneUsername = document.querySelector('#loxoneUsername');
 const loxonePassword = document.querySelector('#loxonePassword');
+const alexaBridgeStatus = document.querySelector('#alexaBridgeStatus');
+const alexaBridgeEnabled = document.querySelector('#alexaBridgeEnabled');
+const alexaBridgeName = document.querySelector('#alexaBridgeName');
+const alexaBridgeAdvertiseIp = document.querySelector('#alexaBridgeAdvertiseIp');
+const alexaBridgeAdvertisePort = document.querySelector('#alexaBridgeAdvertisePort');
 const ttsEnabled = document.querySelector('#ttsEnabled');
 const ttsCookieFile = document.querySelector('#ttsCookieFile');
 const ttsAmazonPage = document.querySelector('#ttsAmazonPage');
@@ -30,6 +35,7 @@ const tabButtons = document.querySelectorAll('.tab-button');
 const views = document.querySelectorAll('.view');
 const refreshIntegrationsBtn = document.querySelector('#refreshIntegrationsBtn');
 const lightEndpoints = document.querySelector('#lightEndpoints');
+const alexaDevices = document.querySelector('#alexaDevices');
 const ttsEndpoints = document.querySelector('#ttsEndpoints');
 const ttsStatusCard = document.querySelector('#ttsStatusCard');
 const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
@@ -46,6 +52,7 @@ let config = null;
 let ttsStatus = null;
 let setupStatus = null;
 let dependencyInfo = null;
+let alexaBridgeInfo = null;
 
 load();
 
@@ -59,6 +66,7 @@ dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 addRoomBtn.addEventListener('click', addRoom);
 refreshIntegrationsBtn.addEventListener('click', () => {
   renderIntegrations();
+  loadAlexaBridgeStatus();
   showToast('Aufrufe aktualisiert', 'ok');
 });
 setupConfigBtn.addEventListener('click', () => showView('configView'));
@@ -75,6 +83,7 @@ async function load() {
     populateForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     await loadTtsStatus();
+    await loadAlexaBridgeStatus();
     await loadSetupStatus();
     loadDependencyStatus();
     renderCommands();
@@ -140,6 +149,7 @@ async function saveConfig(button) {
     renderCommands();
     renderCommandEditor();
     await loadTtsStatus();
+    await loadAlexaBridgeStatus();
     await loadSetupStatus();
     renderIntegrations();
     setButtonFeedback(button, 'success', 'Gespeichert');
@@ -162,6 +172,7 @@ async function saveJsonConfig(button) {
     renderCommands();
     renderCommandEditor();
     await loadTtsStatus();
+    await loadAlexaBridgeStatus();
     await loadSetupStatus();
     renderIntegrations();
     setButtonFeedback(button, 'success', 'Gespeichert');
@@ -313,6 +324,43 @@ function renderTtsStatus() {
 function deviceCount(devices) {
   const count = Array.isArray(devices) ? devices.length : 0;
   return `${count} ${count === 1 ? 'Gerät' : 'Geräte'}`;
+}
+
+async function loadAlexaBridgeStatus() {
+  if (!alexaBridgeStatus) return;
+  try {
+    const response = await fetch('/api/alexa-bridge/status');
+    await ensureOk(response);
+    alexaBridgeInfo = await response.json();
+    renderAlexaBridgeStatus();
+  } catch (error) {
+    alexaBridgeInfo = { enabled: false, ready: false, error: error.message, devices: [] };
+    renderAlexaBridgeStatus();
+  }
+}
+
+function renderAlexaBridgeStatus() {
+  if (!alexaBridgeStatus) return;
+  const status = alexaBridgeInfo || { enabled: false, ready: false, devices: [] };
+  const devices = Array.isArray(status.devices) ? status.devices : [];
+
+  if (!status.enabled) {
+    alexaBridgeStatus.textContent = 'Virtuelle Alexa-Geräte sind deaktiviert.';
+    alexaBridgeStatus.className = 'service-status disabled';
+    renderAlexaDevices();
+    return;
+  }
+
+  if (!status.ready) {
+    alexaBridgeStatus.textContent = `Alexa-Geräte sind aktiviert, aber noch nicht bereit: ${status.error || 'Status unbekannt'}`;
+    alexaBridgeStatus.className = 'service-status error';
+    renderAlexaDevices();
+    return;
+  }
+
+  alexaBridgeStatus.textContent = `Bereit: ${devices.length} virtuelle Geräte auf ${status.ip}:${status.port}.`;
+  alexaBridgeStatus.className = 'service-status ready';
+  renderAlexaDevices();
 }
 
 function humanizeTtsStatusError(errorText = '') {
@@ -557,6 +605,11 @@ function populateForms() {
   loxoneUsername.value = config.loxone?.username || '';
   loxonePassword.value = config.loxone?.password || '';
 
+  alexaBridgeEnabled.checked = config.alexaBridge?.enabled === true;
+  alexaBridgeName.value = config.alexaBridge?.name || 'LoxEvo';
+  alexaBridgeAdvertiseIp.value = config.alexaBridge?.advertiseIp || '';
+  alexaBridgeAdvertisePort.value = config.alexaBridge?.advertisePort || config.server?.port || 8080;
+
   ttsEnabled.checked = Boolean(config.tts?.enabled);
   ttsCookieFile.value = config.tts?.cookieFile || '';
   ttsAmazonPage.value = config.tts?.amazonPage || '';
@@ -725,6 +778,8 @@ function renderIntegrations() {
     });
     lightEndpoints.append(group);
   });
+
+  renderAlexaDevices();
 
   ttsEndpoints.innerHTML = '';
   ttsEndpoints.append(createEndpointCard({
@@ -927,6 +982,13 @@ function collectConfigFromForms() {
   nextConfig.loxone.username = loxoneUsername.value.trim();
   nextConfig.loxone.password = loxonePassword.value;
   nextConfig.loxone.dryRun = dryRunToggle.checked;
+
+  nextConfig.alexaBridge ||= {};
+  nextConfig.alexaBridge.enabled = alexaBridgeEnabled.checked;
+  nextConfig.alexaBridge.name = alexaBridgeName.value.trim() || 'LoxEvo';
+  nextConfig.alexaBridge.advertiseIp = alexaBridgeAdvertiseIp.value.trim();
+  nextConfig.alexaBridge.advertisePort = numberInRange(alexaBridgeAdvertisePort.value, nextConfig.server?.port || 8080, 1, 65535);
+  nextConfig.alexaBridge.bridgeId ||= '';
 
   nextConfig.commands = collectCommands();
   delete nextConfig.rooms;
@@ -1190,10 +1252,38 @@ function linesToList(value) {
     .filter(Boolean);
 }
 
-function numberInRange(value, fallback) {
+function numberInRange(value, fallback, min = 0, max = 100) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
-  return Math.min(100, Math.max(0, number));
+  return Math.min(max, Math.max(min, number));
+}
+
+function renderAlexaDevices() {
+  if (!alexaDevices) return;
+  const status = alexaBridgeInfo || {};
+  const devices = Array.isArray(status.devices) ? status.devices : [];
+
+  if (!status.enabled) {
+    alexaDevices.innerHTML = '<p class="empty">Virtuelle Alexa-Geräte sind deaktiviert.</p>';
+    return;
+  }
+
+  if (!devices.length) {
+    alexaDevices.innerHTML = '<p class="empty">Noch keine aktiven Befehle für Alexa vorhanden.</p>';
+    return;
+  }
+
+  alexaDevices.innerHTML = '';
+  devices.forEach((device) => {
+    const card = document.createElement('div');
+    card.className = 'endpoint-card';
+    const title = document.createElement('strong');
+    title.textContent = device.name;
+    const note = document.createElement('p');
+    note.textContent = `Sprachbeispiel: Alexa, ${device.name} an | Befehl: ${device.command}`;
+    card.append(title, note);
+    alexaDevices.append(card);
+  });
 }
 
 function normalizeInputKey(value) {

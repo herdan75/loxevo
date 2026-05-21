@@ -1,0 +1,393 @@
+import dgram from 'node:dgram';
+import { createHash } from 'node:crypto';
+import { networkInterfaces } from 'node:os';
+
+const SSDP_ADDRESS = '239.255.255.250';
+const SSDP_PORT = 1900;
+
+export class AlexaBridgeService {
+  constructor(config, handlers) {
+    this.config = config;
+    this.handlers = handlers;
+    this.socket = null;
+    this.ready = false;
+    this.lastError = null;
+  }
+
+  async start() {
+    if (!this.isEnabled()) {
+      this.ready = false;
+      this.lastError = null;
+      return;
+    }
+
+    try {
+      await this.startSsdp();
+      this.ready = true;
+      this.lastError = null;
+      this.handlers.addEvent?.({
+        type: 'alexa-bridge',
+        status: 'ready',
+        text: `Alexa-Geräte bereit: ${this.getDevices().length}`
+      });
+    } catch (error) {
+      this.ready = false;
+      this.lastError = error.message;
+      this.handlers.addEvent?.({
+        type: 'alexa-bridge',
+        status: 'error',
+        text: error.message
+      });
+    }
+  }
+
+  async stop() {
+    if (!this.socket) return;
+    await new Promise((resolve) => {
+      this.socket.close(() => resolve());
+    });
+    this.socket = null;
+    this.ready = false;
+  }
+
+  getStatus() {
+    const devices = this.getDevices();
+    return {
+      enabled: this.isEnabled(),
+      ready: this.ready,
+      error: this.lastError,
+      ip: this.getAdvertiseIp(),
+      port: this.getAdvertisePort(),
+      bridgeId: this.getBridgeId(),
+      deviceCount: devices.length,
+      devices: devices.map((device) => ({
+        id: device.id,
+        name: device.name,
+        command: device.commandKey
+      }))
+    };
+  }
+
+  canHandleHttp(req, url, pathParts) {
+    if (!this.isEnabled()) return false;
+    if (req.method === 'GET' && url.pathname === '/description.xml') return true;
+    if (pathParts[0] !== 'api') return false;
+    const reservedApiRoots = new Set([
+      'alexa-bridge',
+      'command',
+      'config',
+      'dependencies',
+      'dry-run',
+      'events',
+      'light',
+      'setup-status',
+      'system',
+      'tts'
+    ]);
+    return pathParts.length === 1 || !reservedApiRoots.has(pathParts[1]);
+  }
+
+  async handleHttp(req, res, url, pathParts, readBody, helpers) {
+    if (req.method === 'GET' && url.pathname === '/description.xml') {
+      return helpers.sendXml(res, this.buildDescriptionXml());
+    }
+
+    if (req.method === 'POST' && pathParts.length === 1) {
+      return helpers.sendJson(res, [{ success: { username: this.getHueUsername() } }]);
+    }
+
+    if (req.method === 'GET' && pathParts.length === 2) {
+      return helpers.sendJson(res, { lights: this.getHueLights(), config: this.getHueConfig() });
+    }
+
+    if (req.method === 'GET' && pathParts.length === 3 && pathParts[2] === 'config') {
+      return helpers.sendJson(res, this.getHueConfig());
+    }
+
+    if (req.method === 'GET' && pathParts.length === 3 && pathParts[2] === 'lights') {
+      return helpers.sendJson(res, this.getHueLights());
+    }
+
+    if (req.method === 'GET' && pathParts.length === 4 && pathParts[2] === 'lights') {
+      const light = this.getHueLights()[pathParts[3]];
+      if (!light) return helpers.sendJson(res, [{ error: { type: 3, description: 'resource not available' } }], 404);
+      return helpers.sendJson(res, light);
+    }
+
+    if (req.method === 'PUT' && pathParts.length === 5 && pathParts[2] === 'lights' && pathParts[4] === 'state') {
+      const body = parseJson(await readBody());
+      return await this.handleLightState(res, pathParts[3], body, helpers);
+    }
+
+    return helpers.sendJson(res, [{ error: { type: 3, description: 'resource not available' } }], 404);
+  }
+
+  async handleLightState(res, id, body, helpers) {
+    const device = this.getDevices().find((item) => item.id === id);
+    if (!device) {
+      return helpers.sendJson(res, [{ error: { type: 3, description: 'resource not available' } }], 404);
+    }
+
+    if (body.on === true) {
+      await this.handlers.executeCommand(device.commandKey);
+    }
+
+    return helpers.sendJson(res, [
+      { success: { [`/lights/${id}/state/on`]: Boolean(body.on) } }
+    ]);
+  }
+
+  startSsdp() {
+    return new Promise((resolve, reject) => {
+      const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+      let settled = false;
+
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        if (error) reject(error);
+        else resolve();
+      };
+
+      socket.on('message', (message, remote) => this.respondToSearch(socket, message, remote));
+      socket.on('error', (error) => {
+        this.lastError = error.message;
+        if (!settled) finish(error);
+      });
+
+      socket.bind(SSDP_PORT, () => {
+        try {
+          socket.addMembership(SSDP_ADDRESS);
+          socket.setMulticastTTL(2);
+        this.socket = socket;
+        finish();
+      } catch (error) {
+        socket.close();
+        finish(error);
+      }
+    });
+    });
+  }
+
+  respondToSearch(socket, message, remote) {
+    const text = message.toString();
+    const lower = text.toLowerCase();
+    if (!lower.startsWith('m-search') || !lower.includes('ssdp:discover')) return;
+    if (!lower.includes('ssdp:all') && !lower.includes('upnp:rootdevice') && !lower.includes('basic:1')) return;
+
+    const response = this.buildSsdpResponse();
+    socket.send(response, remote.port, remote.address);
+  }
+
+  buildSsdpResponse() {
+    const uuid = this.getUuid();
+    return [
+      'HTTP/1.1 200 OK',
+      'CACHE-CONTROL: max-age=100',
+      'EXT:',
+      `LOCATION: http://${this.getAdvertiseIp()}:${this.getAdvertisePort()}/description.xml`,
+      'SERVER: Linux/3.14.0 UPnP/1.0 IpBridge/1.50.0',
+      `hue-bridgeid: ${this.getBridgeId()}`,
+      'ST: upnp:rootdevice',
+      `USN: uuid:${uuid}::upnp:rootdevice`,
+      '',
+      ''
+    ].join('\r\n');
+  }
+
+  buildDescriptionXml() {
+    const ip = this.getAdvertiseIp();
+    const port = this.getAdvertisePort();
+    const bridgeId = this.getBridgeId();
+    const uuid = this.getUuid();
+    const name = escapeXml(this.config.alexaBridge?.name || 'LoxEvo');
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+  <specVersion><major>1</major><minor>0</minor></specVersion>
+  <URLBase>http://${ip}:${port}/</URLBase>
+  <device>
+    <deviceType>urn:schemas-upnp-org:device:Basic:1</deviceType>
+    <friendlyName>${name} (${ip})</friendlyName>
+    <manufacturer>Royal Philips Electronics</manufacturer>
+    <manufacturerURL>http://www.philips.com</manufacturerURL>
+    <modelDescription>Philips hue Personal Wireless Lighting</modelDescription>
+    <modelName>Philips hue bridge 2015</modelName>
+    <modelNumber>BSB002</modelNumber>
+    <serialNumber>${bridgeId}</serialNumber>
+    <UDN>uuid:${uuid}</UDN>
+  </device>
+</root>`;
+  }
+
+  getHueConfig() {
+    return {
+      name: this.config.alexaBridge?.name || 'LoxEvo',
+      bridgeid: this.getBridgeId(),
+      mac: bridgeIdToMac(this.getBridgeId()),
+      dhcp: true,
+      ipaddress: this.getAdvertiseIp(),
+      netmask: '255.255.255.0',
+      gateway: this.getAdvertiseIp(),
+      swversion: '1941132080',
+      apiversion: '1.50.0',
+      linkbutton: true,
+      portalservices: false
+    };
+  }
+
+  getHueLights() {
+    return Object.fromEntries(
+      this.getDevices().map((device) => [device.id, this.toHueLight(device)])
+    );
+  }
+
+  toHueLight(device) {
+    return {
+      state: {
+        on: false,
+        bri: 254,
+        alert: 'none',
+        mode: 'homeautomation',
+        reachable: true
+      },
+      type: 'Dimmable light',
+      name: device.name,
+      modelid: 'LWB010',
+      manufacturername: 'LoxEvo',
+      productname: 'LoxEvo command',
+      uniqueid: device.uniqueId,
+      swversion: '1.0'
+    };
+  }
+
+  getDevices() {
+    const commands = this.handlers.getCommands?.() || {};
+    return Object.entries(commands)
+      .filter(([, command]) => command.enabled !== false)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([commandKey, command], index) => ({
+        id: String(index + 1),
+        commandKey,
+        name: getAlexaDeviceName(command, commandKey),
+        uniqueId: makeLightUniqueId(this.getBridgeId(), index)
+      }));
+  }
+
+  isEnabled() {
+    return this.config.alexaBridge?.enabled === true;
+  }
+
+  getAdvertiseIp() {
+    return String(this.config.alexaBridge?.advertiseIp || '').trim() || firstLanAddress();
+  }
+
+  getAdvertisePort() {
+    return Number(this.config.alexaBridge?.advertisePort || this.config.server?.port || process.env.PORT || 8080);
+  }
+
+  getBridgeId() {
+    const configured = String(this.config.alexaBridge?.bridgeId || '').replace(/[^0-9a-f]/gi, '').toUpperCase();
+    if (configured.length >= 12) return configured.slice(0, 16).padEnd(16, '0');
+    const hash = createHash('sha1')
+      .update(`${this.config.server?.name || 'LoxEvo'}:${this.getAdvertiseIp()}`)
+      .digest('hex')
+      .toUpperCase();
+    return `001788FFFE${hash.slice(0, 6)}`;
+  }
+
+  getUuid() {
+    const suffix = this.getBridgeId().slice(-12).toLowerCase();
+    return `2f402f80-da50-11e1-9b23-${suffix}`;
+  }
+
+  getHueUsername() {
+    return 'loxevo';
+  }
+}
+
+function getAlexaDeviceName(command, commandKey) {
+  const raw = String(command.alexaName || buildCommandDisplayName(command) || command.voiceName || command.label || commandKey).trim();
+  return raw.replace(/\s+(an|ein|einschalten)$/i, '') || commandKey;
+}
+
+function buildCommandDisplayName(command) {
+  const functionName = displayPart(command.function || command.category);
+  const roomName = displayPart(command.room);
+  const actionName = displayPart(command.action);
+  return [functionName, roomName, actionName].filter(Boolean).join(' ');
+}
+
+function displayPart(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const mapped = {
+    licht: 'Licht',
+    lueftung: 'Lüftung',
+    rolladen: 'Rollladen',
+    rollladen: 'Rollladen',
+    kueche: 'Küche',
+    buero: 'Büro',
+    tv: 'TV',
+    up: 'Auf',
+    down: 'Ab',
+    on: 'An',
+    off: 'Aus',
+    ein: 'Ein',
+    aus: 'Aus',
+    hell: 'Hell',
+    ambient: 'Ambient',
+    nacht: 'Nacht'
+  }[raw.toLowerCase()];
+  if (mapped) return mapped;
+  return raw
+    .replaceAll('_', ' ')
+    .replaceAll('-', ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.toUpperCase() === word ? word : word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function firstLanAddress() {
+  for (const addresses of Object.values(networkInterfaces())) {
+    for (const address of addresses || []) {
+      if (address.family === 'IPv4' && !address.internal) {
+        return address.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
+
+function makeLightUniqueId(bridgeId, index) {
+  const suffix = bridgeId.slice(-6).match(/.{1,2}/g) || ['00', '00', '00'];
+  const lightPart = (index + 1).toString(16).padStart(2, '0');
+  return `00:17:88:${suffix.join(':')}:00:${lightPart}-0b`;
+}
+
+function bridgeIdToMac(bridgeId) {
+  return bridgeId
+    .slice(0, 12)
+    .padEnd(12, '0')
+    .match(/.{1,2}/g)
+    .join(':')
+    .toLowerCase();
+}
+
+function parseJson(body) {
+  try {
+    return JSON.parse(body || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function escapeXml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}

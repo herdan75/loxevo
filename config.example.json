@@ -9,6 +9,13 @@
     "password": "loxone-pass",
     "dryRun": true
   },
+  "alexaBridge": {
+    "enabled": false,
+    "name": "LoxEvo",
+    "advertiseIp": "",
+    "advertisePort": 8080,
+    "bridgeId": ""
+  },
   "commands": {
     "kueche_licht_hell": {
       "label": "Küche Licht Hell",

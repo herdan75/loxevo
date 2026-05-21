@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, saveConfig } from './config.js';
+import { AlexaBridgeService } from './alexa-bridge.js';
 import { isCommandType, readCommandTarget } from './command-utils.js';
 import { LoxoneClient } from './loxone.js';
 import { TtsService } from './tts.js';
@@ -17,9 +18,11 @@ let dependencyUpdate = null;
 let config = await loadConfig();
 let loxone = new LoxoneClient(config);
 let tts = new TtsService(config);
+let alexaBridge = createAlexaBridge();
 const events = [];
 
 await initTts();
+await initAlexaBridge();
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -35,11 +38,19 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/health') {
-      return sendJson(res, { ok: true, name: config.server.name, tts: tts.getStatus() });
+      return sendJson(res, { ok: true, name: config.server.name, tts: tts.getStatus(), alexaBridge: alexaBridge.getStatus() });
     }
 
     if (url.pathname === '/admin/plugins/alexa2lox/tts.php') {
       return await handleAlexa2LoxCompat(req, res, url);
+    }
+
+    if (alexaBridge.canHandleHttp(req, url, pathParts)) {
+      return await alexaBridge.handleHttp(req, res, url, pathParts, () => readBody(req), {
+        sendJson,
+        sendText,
+        sendXml
+      });
     }
 
     if (pathParts[0] === 'api') {
@@ -89,6 +100,10 @@ async function handleApi(req, res, pathParts, readRequestBody) {
     return sendJson(res, tts.getStatus());
   }
 
+  if (req.method === 'GET' && pathParts[1] === 'alexa-bridge' && pathParts[2] === 'status') {
+    return sendJson(res, alexaBridge.getStatus());
+  }
+
   if (req.method === 'GET' && pathParts[1] === 'dependencies') {
     return sendJson(res, { dependencies: [await getDependencyStatus('alexa-remote2')] });
   }
@@ -119,6 +134,7 @@ async function handleApi(req, res, pathParts, readRequestBody) {
     loxone = new LoxoneClient(config);
     tts = new TtsService(config);
     await initTts();
+    await restartAlexaBridge();
     return sendJson(res, { ok: true, config });
   }
 
@@ -144,9 +160,14 @@ async function runConfiguredCommand(res, commandKey) {
     return sendJson(res, { error: 'command ist erforderlich' }, 400);
   }
 
+  const result = await executeConfiguredCommand(commandKey, 'command');
+  return sendJson(res, { ok: true, result });
+}
+
+async function executeConfiguredCommand(commandKey, source) {
   const result = await loxone.runCommand(normalizeKey(commandKey));
   addEvent({
-    type: 'command',
+    type: source,
     status: result.dryRun ? 'dry-run' : 'sent',
     key: result.key,
     label: result.label,
@@ -157,7 +178,7 @@ async function runConfiguredCommand(res, commandKey) {
     commandType: result.type,
     url: result.url
   });
-  return sendJson(res, { ok: true, result });
+  return result;
 }
 
 async function runLightCommand(res, room, scene) {
@@ -214,6 +235,7 @@ async function initTts() {
 
 function getSetupStatus() {
   const ttsStatus = tts.getStatus();
+  const alexaBridgeStatus = alexaBridge.getStatus();
   const ttsReady = !config.tts?.enabled || (ttsStatus.ready && ttsDevicesConfigured(ttsStatus));
   const checks = [
     {
@@ -246,6 +268,13 @@ function getSetupStatus() {
       ok: ttsReady,
       optional: true,
       detail: ttsDetail(ttsStatus)
+    },
+    {
+      id: 'alexa-bridge',
+      label: 'Optional: Alexa Geräte aktivieren',
+      ok: !config.alexaBridge?.enabled || alexaBridgeStatus.ready,
+      optional: true,
+      detail: alexaBridgeDetail(alexaBridgeStatus)
     }
   ];
 
@@ -484,6 +513,16 @@ function ttsDetail(status) {
   return 'Alexa TTS ist bereit.';
 }
 
+function alexaBridgeDetail(status) {
+  if (!status.enabled) {
+    return 'Virtuelle Alexa-Geräte sind deaktiviert und können später eingerichtet werden.';
+  }
+  if (status.error) {
+    return status.error;
+  }
+  return `${status.deviceCount} virtuelle Geräte für Alexa bereit.`;
+}
+
 function isCommandConfigured(command) {
   const target = readCommandTarget(command);
   if (!isCommandType(target.type)) return false;
@@ -532,6 +571,24 @@ async function handleAlexa2LoxCompat(req, res, url) {
   await tts.speak(normalizeTtsText(text), targetDevices);
   addEvent({ type: 'tts-speak', status: 'sent', text, devices: targetDevices, compat: 'alexa2lox' });
   return sendText(res, `TTS sent: ${text}`);
+}
+
+function createAlexaBridge() {
+  return new AlexaBridgeService(config, {
+    getCommands: () => config.commands || {},
+    executeCommand: (commandKey) => executeConfiguredCommand(commandKey, 'alexa-command'),
+    addEvent
+  });
+}
+
+async function initAlexaBridge() {
+  await alexaBridge.start();
+}
+
+async function restartAlexaBridge() {
+  await alexaBridge.stop();
+  alexaBridge = createAlexaBridge();
+  await initAlexaBridge();
 }
 
 async function serveStatic(res, relativePath) {
@@ -586,6 +643,11 @@ function sendJson(res, payload, statusCode = 200) {
 
 function sendText(res, payload, statusCode = 200) {
   res.writeHead(statusCode, { 'content-type': 'text/plain; charset=utf-8' });
+  res.end(payload);
+}
+
+function sendXml(res, payload, statusCode = 200) {
+  res.writeHead(statusCode, { 'content-type': 'application/xml; charset=utf-8' });
   res.end(payload);
 }
 

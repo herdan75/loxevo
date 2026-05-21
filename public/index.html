@@ -91,6 +91,12 @@
         </div>
 
         <div class="endpoint-block">
+          <h3>Alexa Geräte</h3>
+          <p>Diese Namen werden Alexa als virtuelle Geräte angeboten. Gesprochen wird typischerweise: „Alexa, &lt;Gerätename&gt; an”.</p>
+          <div id="alexaDevices" class="endpoint-list"></div>
+        </div>
+
+        <div class="endpoint-block">
           <h3>TTS</h3>
           <p>Diese URLs lösen Alexa-Sprachausgabe aus, zum Beispiel aus Loxone.</p>
           <div id="ttsStatusCard" class="service-status">TTS-Status wird geladen...</div>
@@ -126,6 +132,30 @@
                 <input id="loxonePassword" type="password" autocomplete="current-password">
               </label>
             </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Alexa Geräte</legend>
+            <div id="alexaBridgeStatus" class="service-status">Alexa-Geräte-Status wird geladen...</div>
+            <label class="checkbox-row">
+              <input id="alexaBridgeEnabled" type="checkbox">
+              <span>Virtuelle Alexa-Geräte aktivieren</span>
+            </label>
+            <label>
+              Bridge-Name
+              <input id="alexaBridgeName" type="text" placeholder="LoxEvo">
+            </label>
+            <div class="form-row">
+              <label>
+                LoxBerry IP
+                <input id="alexaBridgeAdvertiseIp" type="text" placeholder="Automatisch">
+              </label>
+              <label>
+                Port
+                <input id="alexaBridgeAdvertisePort" type="number" min="1" max="65535" placeholder="8080">
+              </label>
+            </div>
+            <p class="field-hint">Nach dem Speichern in der Alexa-App nach neuen Geräten suchen. Jeder aktive Befehl wird als virtuelles Gerät angeboten.</p>
           </fieldset>
 
           <fieldset>

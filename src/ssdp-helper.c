@@ -109,16 +109,15 @@ static void read_header(const char *message, const char *header_name, char *out,
   }
 }
 
-static const char *normalize_st(const char *st) {
-  if (contains_ci(st, "upnp:rootdevice")) return "upnp:rootdevice";
-  if (contains_ci(st, "ssdp:all")) return "urn:schemas-upnp-org:device:Basic:1";
-  if (contains_ci(st, "basic:1")) return "urn:schemas-upnp-org:device:Basic:1";
-  if (contains_ci(st, "uuid:")) return "urn:schemas-upnp-org:device:Basic:1";
-  return "";
-}
-
 static void build_response(char *out, size_t out_size, const char *ip, const char *port,
                            const char *bridge_id, const char *uuid, const char *st) {
+  char usn[256];
+  if (strncmp(st, "uuid:", 5) == 0) {
+    snprintf(usn, sizeof(usn), "%s", st);
+  } else {
+    snprintf(usn, sizeof(usn), "uuid:%s::%s", uuid, st);
+  }
+
   snprintf(out, out_size,
            "HTTP/1.1 200 OK\r\n"
            "CACHE-CONTROL: max-age=100\r\n"
@@ -126,10 +125,10 @@ static void build_response(char *out, size_t out_size, const char *ip, const cha
            "LOCATION: http://%s:%s/description.xml\r\n"
            "SERVER: Linux/3.14.0 UPnP/1.0 IpBridge/1.50.0\r\n"
            "ST: %s\r\n"
-           "USN: uuid:%s::%s\r\n"
+           "USN: %s\r\n"
            "hue-bridgeid: %s\r\n"
            "\r\n",
-           ip, port, st, uuid, st, bridge_id);
+           ip, port, st, usn, bridge_id);
 }
 
 static void build_notify(char *out, size_t out_size, const char *ip, const char *port,
@@ -241,18 +240,36 @@ static void respond_if_search(int sock, char *message, ssize_t length, struct so
   inet_ntop(AF_INET, &remote->sin_addr, address, sizeof(address));
   log_line("INFO", "SSDP search received from %s:%d ST=%s", address, ntohs(remote->sin_port), st_header);
 
-  const char *st = normalize_st(st_header);
-  if (is_empty(st)) return;
+  char uuid_st[256];
+  snprintf(uuid_st, sizeof(uuid_st), "uuid:%s", uuid);
+
+  const char *targets[3];
+  size_t target_count = 0;
+  if (contains_ci(st_header, "ssdp:all")) {
+    targets[target_count++] = "upnp:rootdevice";
+    targets[target_count++] = uuid_st;
+    targets[target_count++] = "urn:schemas-upnp-org:device:Basic:1";
+  } else if (contains_ci(st_header, "upnp:rootdevice")) {
+    targets[target_count++] = "upnp:rootdevice";
+  } else if (contains_ci(st_header, "basic:1")) {
+    targets[target_count++] = "urn:schemas-upnp-org:device:Basic:1";
+  } else if (contains_ci(st_header, "uuid:")) {
+    targets[target_count++] = uuid_st;
+  }
+  if (target_count == 0) return;
 
   char response[RESPONSE_SIZE];
-  build_response(response, sizeof(response), ip, port, bridge_id, uuid, st);
-  ssize_t sent = sendto(sock, response, strlen(response), 0, (struct sockaddr *)remote, sizeof(*remote));
-  if (sent < 0) {
-    log_line("ERROR", "SSDP response failed to %s:%d: %s", address, ntohs(remote->sin_port), strerror(errno));
-    return;
-  }
+  for (size_t index = 0; index < target_count; index += 1) {
+    const char *target = targets[index];
+    build_response(response, sizeof(response), ip, port, bridge_id, uuid, target);
+    ssize_t sent = sendto(sock, response, strlen(response), 0, (struct sockaddr *)remote, sizeof(*remote));
+    if (sent < 0) {
+      log_line("ERROR", "SSDP response failed to %s:%d: %s", address, ntohs(remote->sin_port), strerror(errno));
+      continue;
+    }
 
-  log_line("INFO", "SSDP response sent to %s:%d ST=%s", address, ntohs(remote->sin_port), st);
+    log_line("INFO", "SSDP response sent to %s:%d ST=%s", address, ntohs(remote->sin_port), target);
+  }
 }
 
 int main(int argc, char **argv) {

@@ -104,6 +104,8 @@ export class AlexaBridgeService {
   }
 
   async handleHttp(req, res, url, pathParts, readBody, helpers) {
+    this.logHueHttp(req, url);
+
     if (req.method === 'GET' && url.pathname === '/description.xml') {
       return helpers.sendXml(res, this.buildDescriptionXml());
     }
@@ -304,15 +306,18 @@ export class AlexaBridgeService {
     const lower = text.toLowerCase();
     if (!lower.startsWith('m-search') || !lower.includes('ssdp:discover')) return;
 
-    const searchTarget = normalizeSsdpSearchTarget(readSsdpHeader(text, 'st'));
-    if (!searchTarget) return;
+    const searchTargets = normalizeSsdpSearchTargets(readSsdpHeader(text, 'st'), this.getUuid());
+    if (searchTargets.length === 0) return;
 
-    const response = this.buildSsdpResponse(searchTarget);
-    socket.send(response, remote.port, remote.address);
+    for (const searchTarget of searchTargets) {
+      const response = this.buildSsdpResponse(searchTarget);
+      socket.send(response, remote.port, remote.address);
+    }
   }
 
   buildSsdpResponse(searchTarget = 'upnp:rootdevice') {
     const uuid = this.getUuid();
+    const usn = searchTarget.startsWith('uuid:') ? searchTarget : `uuid:${uuid}::${searchTarget}`;
     return [
       'HTTP/1.1 200 OK',
       'CACHE-CONTROL: max-age=100',
@@ -321,7 +326,7 @@ export class AlexaBridgeService {
       'SERVER: Linux/3.14.0 UPnP/1.0 IpBridge/1.50.0',
       `hue-bridgeid: ${this.getBridgeId()}`,
       `ST: ${searchTarget}`,
-      `USN: uuid:${uuid}::${searchTarget}`,
+      `USN: ${usn}`,
       '',
       ''
     ].join('\r\n');
@@ -346,8 +351,10 @@ export class AlexaBridgeService {
     <modelDescription>Philips hue Personal Wireless Lighting</modelDescription>
     <modelName>Philips hue bridge 2015</modelName>
     <modelNumber>BSB002</modelNumber>
+    <modelURL>https://www.philips-hue.com/</modelURL>
     <serialNumber>${bridgeId}</serialNumber>
     <UDN>uuid:${uuid}</UDN>
+    <presentationURL>index.html</presentationURL>
   </device>
 </root>`;
   }
@@ -451,6 +458,11 @@ export class AlexaBridgeService {
   getSsdpHelperPath() {
     return process.env.SSDP_HELPER_PATH || '/app/bin/loxevo-ssdp-helper';
   }
+
+  logHueHttp(req, url) {
+    const remote = String(req.socket?.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+    console.log(`Alexa-Bridge HTTP ${req.method} ${url.pathname} from ${remote}`);
+  }
 }
 
 function getAlexaDeviceName(command, commandKey) {
@@ -541,11 +553,15 @@ function readSsdpHeader(message, headerName) {
   return String(message).match(pattern)?.[1]?.trim() || '';
 }
 
-function normalizeSsdpSearchTarget(value) {
+function normalizeSsdpSearchTargets(value, uuid) {
   const raw = String(value || '').toLowerCase();
-  if (raw.includes('ssdp:all') || raw.includes('upnp:rootdevice')) return 'upnp:rootdevice';
-  if (raw.includes('basic:1')) return 'urn:schemas-upnp-org:device:Basic:1';
-  return '';
+  if (raw.includes('ssdp:all')) {
+    return ['upnp:rootdevice', `uuid:${uuid}`, 'urn:schemas-upnp-org:device:Basic:1'];
+  }
+  if (raw.includes('upnp:rootdevice')) return ['upnp:rootdevice'];
+  if (raw.includes('basic:1')) return ['urn:schemas-upnp-org:device:Basic:1'];
+  if (raw.includes('uuid:')) return [`uuid:${uuid}`];
+  return [];
 }
 
 function isUsableLanAddress(value) {

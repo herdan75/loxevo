@@ -93,6 +93,7 @@
     "cookieFile": "/config/Node.txt",
     "amazonPage": "amazon.de",
     "alexaServiceHost": "layla.amazon.de",
+    "acceptLanguage": "de-DE",
     "defaultVolume": 40,
     "alarmVolume": 100,
     "ignoreZeroText": true,

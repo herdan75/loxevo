@@ -52,7 +52,7 @@ In `data/config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt L
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
 TTS braucht das Paket `alexa-remote2` und eine gueltige Alexa-Cookie-Datei. Das Paket wird bewusst nicht fest im Docker-Build installiert, damit LoxEvo auch dann startet, wenn npm-Versionen wechseln. Installiere oder aktualisiere es in der Web-UI unter "Wartung"; im Docker/LoxBerry-Betrieb landet es im gemounteten `/config`-Bereich.
-Als Cookie-Datei kann eine reine Cookie-Zeile oder die von Node-RED/applestrudel erzeugte JSON-Datei mit `localCookie` verwendet werden.
+Als Cookie-Datei kann eine reine Cookie-Zeile oder die von Node-RED/applestrudel erzeugte JSON-Datei verwendet werden. Bei JSON-Dateien nutzt LoxEvo `localCookie`, `csrf` und die gespeicherten Registrierungsdaten wie `macDms` und `refreshToken`.
 Fuer den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
 Die Web-UI zeigt unter "Wartung" die installierte `alexa-remote2`-Version, verfuegbare npm-Versionen und kann Installation oder Update im laufenden Container anstossen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.

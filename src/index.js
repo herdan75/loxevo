@@ -608,7 +608,10 @@ async function serveStatic(res, relativePath) {
     throw error;
   }
 
-  res.writeHead(200, { 'content-type': contentType(absolutePath) });
+  res.writeHead(200, {
+    'content-type': contentType(absolutePath),
+    'cache-control': 'no-store'
+  });
   res.end(content);
 }
 

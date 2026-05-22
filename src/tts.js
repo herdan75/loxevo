@@ -41,16 +41,7 @@ export class TtsService {
 
     try {
       await new Promise((resolve, reject) => {
-        this.remote.init(
-          {
-            cookie: auth.cookie,
-            csrf: auth.csrf,
-            amazonPage: this.config.amazonPage || 'amazon.de',
-            alexaServiceHost: this.config.alexaServiceHost || 'layla.amazon.de',
-            usePushConnection: true
-          },
-          (error) => (error ? reject(error) : resolve())
-        );
+        this.remote.init(this.buildInitOptions(auth), (error) => (error ? reject(error) : resolve()));
       });
     } catch (error) {
       this.markUnavailable('Alexa-Verbindung konnte nicht initialisiert werden.', error);
@@ -60,6 +51,29 @@ export class TtsService {
     this.ready = true;
     this.lastError = null;
     console.log('TTS ist mit alexa-remote2 verbunden.');
+  }
+
+  buildInitOptions(auth) {
+    const options = {
+      cookie: auth.cookie,
+      csrf: auth.csrf,
+      amazonPage: this.config.amazonPage || auth.amazonPage || 'amazon.de',
+      alexaServiceHost: this.config.alexaServiceHost || 'layla.amazon.de',
+      acceptLanguage: this.config.acceptLanguage || defaultAcceptLanguage(this.config.amazonPage || auth.amazonPage),
+      usePushConnection: true
+    };
+
+    if (auth.formerRegistrationData) {
+      options.formerRegistrationData = auth.formerRegistrationData;
+    }
+    if (auth.macDms) {
+      options.macDms = auth.macDms;
+    }
+    if (auth.deviceAppName) {
+      options.deviceAppName = auth.deviceAppName;
+    }
+
+    return options;
   }
 
   markUnavailable(message, error) {
@@ -177,15 +191,58 @@ export function parseAlexaCookieFile(content) {
   }
 
   const parsed = JSON.parse(raw);
-  const cookie = parsed.localCookie || parsed.loginCookie || parsed.cookie;
+  const cookie = parsed.localCookie || parsed.cookie || parsed.loginCookie;
   if (!cookie || typeof cookie !== 'string') {
     throw new Error('Cookie-Datei ist JSON, enthaelt aber keinen localCookie oder loginCookie.');
   }
 
   return {
     cookie,
-    csrf: typeof parsed.csrf === 'string' ? parsed.csrf : undefined
+    csrf: typeof parsed.csrf === 'string' ? parsed.csrf : undefined,
+    amazonPage: typeof parsed.amazonPage === 'string' ? parsed.amazonPage : undefined,
+    deviceAppName: typeof parsed.deviceAppName === 'string' ? parsed.deviceAppName : undefined,
+    macDms: isPlainObject(parsed.macDms) ? parsed.macDms : undefined,
+    formerRegistrationData: buildFormerRegistrationData(parsed)
   };
+}
+
+function buildFormerRegistrationData(parsed) {
+  if (!isPlainObject(parsed)) return undefined;
+  const keys = [
+    'localCookie',
+    'frc',
+    'map-md',
+    'deviceId',
+    'deviceSerial',
+    'refreshToken',
+    'tokenDate',
+    'amazonPage',
+    'csrf',
+    'deviceAppName',
+    'dataVersion',
+    'macDms'
+  ];
+  const data = {};
+  for (const key of keys) {
+    if (parsed[key] !== undefined) {
+      data[key] = parsed[key];
+    }
+  }
+  return Object.keys(data).length ? data : undefined;
+}
+
+function defaultAcceptLanguage(amazonPage) {
+  const page = String(amazonPage || '').toLowerCase();
+  if (page.endsWith('.de')) return 'de-DE';
+  if (page.endsWith('.fr')) return 'fr-FR';
+  if (page.endsWith('.it')) return 'it-IT';
+  if (page.endsWith('.es')) return 'es-ES';
+  if (page.endsWith('.co.uk')) return 'en-GB';
+  return 'en-US';
+}
+
+function isPlainObject(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
 function getDependencyInstallDir() {

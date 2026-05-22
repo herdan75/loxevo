@@ -17,6 +17,8 @@ export class AlexaBridgeService {
     this.lastError = null;
     this.ssdpBindAddress = '';
     this.ssdpMode = '';
+    this.lastCommandAt = new Map();
+    this.commandCooldownMs = 1500;
   }
 
   async start() {
@@ -60,6 +62,7 @@ export class AlexaBridgeService {
     }
     this.ready = false;
     this.ssdpMode = '';
+    this.lastCommandAt.clear();
   }
 
   getStatus() {
@@ -147,12 +150,24 @@ export class AlexaBridgeService {
     }
 
     if (body.on === true) {
-      await this.handlers.executeCommand(device.commandKey);
+      if (this.shouldExecuteCommand(device.commandKey)) {
+        await this.handlers.executeCommand(device.commandKey);
+      } else {
+        console.log(`Alexa-Bridge duplicate command ignored: ${device.commandKey}`);
+      }
     }
 
     return helpers.sendJson(res, [
       { success: { [`/lights/${id}/state/on`]: Boolean(body.on) } }
     ]);
+  }
+
+  shouldExecuteCommand(commandKey) {
+    const now = Date.now();
+    const lastRun = this.lastCommandAt.get(commandKey) || 0;
+    if (now - lastRun < this.commandCooldownMs) return false;
+    this.lastCommandAt.set(commandKey, now);
+    return true;
   }
 
   async startSsdp() {

@@ -151,11 +151,11 @@
                 <input id="alexaBridgeAdvertiseIp" type="text" placeholder="Automatisch">
               </label>
               <label>
-                Port
-                <input id="alexaBridgeAdvertisePort" type="number" min="1" max="65535" placeholder="8080">
+                Alexa/Hue-Port
+                <input id="alexaBridgeAdvertisePort" type="number" min="1" max="65535" placeholder="80">
               </label>
             </div>
-            <p class="field-hint">Nach dem Speichern in der Alexa-App nach neuen Geräten suchen. Jeder aktive Befehl wird als virtuelles Gerät angeboten. Bei mehreren Netzwerkschnittstellen hier die echte LAN-IP eintragen. Für neuere Echo-Geräte Port 80 verwenden; LoxEvo startet dafür zusätzlich einen Alexa-HTTP-Listener, wenn die Web-UI weiter auf 8080 läuft.</p>
+            <p class="field-hint">Nach dem Speichern in der Alexa-App nach neuen Geräten suchen. Jeder aktive Befehl wird als virtuelles Gerät angeboten. Alexa/Hue sollte Port 80 verwenden; die Web-UI kann weiter auf Port 8080 laufen. Bei mehreren Netzwerkschnittstellen hier die echte LAN-IP eintragen.</p>
           </fieldset>
 
           <fieldset>
@@ -234,7 +234,7 @@
 
         <details class="expert-json">
           <summary>Expertenansicht JSON</summary>
-          <p>Nur nutzen, wenn du direkt in die komplette Konfiguration eingreifen willst.</p>
+          <p>Nur nutzen, wenn du direkt in die komplette Konfiguration eingreifen willst. <code>server.port</code> ist die Web-UI/API, <code>alexaBridge.advertisePort</code> ist der Alexa/Hue-Port.</p>
           <div class="actions">
             <button id="reloadJsonBtn" type="button" class="secondary">Aus Formular neu erzeugen</button>
             <button id="saveJsonBtn" type="button">JSON speichern</button>

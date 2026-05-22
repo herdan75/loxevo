@@ -60,10 +60,10 @@ load();
 
 saveBtn.addEventListener('click', () => saveConfig(saveBtn));
 saveJsonBtn.addEventListener('click', () => saveJsonConfig(saveJsonBtn));
-reloadJsonBtn.addEventListener('click', syncJsonFromForms);
+reloadJsonBtn.addEventListener('click', () => regenerateJsonFromForms(reloadJsonBtn));
 speakBtn.addEventListener('click', () => postText('/tts/speak', ttsText.value, speakBtn, 'TTS gesendet'));
 alarmBtn.addEventListener('click', () => postText('/tts/alarm', ttsText.value, alarmBtn, 'Alarm gesendet'));
-refreshEventsBtn.addEventListener('click', loadEvents);
+refreshEventsBtn.addEventListener('click', () => loadEvents(refreshEventsBtn));
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 addRoomBtn.addEventListener('click', addRoom);
 refreshIntegrationsBtn.addEventListener('click', () => {
@@ -636,7 +636,7 @@ function populateForms() {
   alexaBridgeEnabled.checked = config.alexaBridge?.enabled === true;
   alexaBridgeName.value = config.alexaBridge?.name || 'LoxEvo';
   alexaBridgeAdvertiseIp.value = config.alexaBridge?.advertiseIp || '';
-  alexaBridgeAdvertisePort.value = config.alexaBridge?.advertisePort || config.server?.port || 8080;
+  alexaBridgeAdvertisePort.value = config.alexaBridge?.advertisePort ?? 80;
 
   ttsEnabled.checked = Boolean(config.tts?.enabled);
   ttsCookieFile.value = config.tts?.cookieFile || '';
@@ -1017,7 +1017,7 @@ function collectConfigFromForms() {
   nextConfig.alexaBridge.enabled = alexaBridgeEnabled.checked;
   nextConfig.alexaBridge.name = alexaBridgeName.value.trim() || 'LoxEvo';
   nextConfig.alexaBridge.advertiseIp = alexaBridgeAdvertiseIp.value.trim();
-  nextConfig.alexaBridge.advertisePort = numberInRange(alexaBridgeAdvertisePort.value, nextConfig.server?.port || 8080, 1, 65535);
+  nextConfig.alexaBridge.advertisePort = numberInRange(alexaBridgeAdvertisePort.value, 80, 1, 65535);
   nextConfig.alexaBridge.bridgeId ||= '';
 
   nextConfig.commands = collectCommands();
@@ -1076,6 +1076,12 @@ function syncJsonFromForms() {
   } catch {
     configEditor.value = JSON.stringify(config, null, 2);
   }
+}
+
+function regenerateJsonFromForms(button) {
+  syncJsonFromForms();
+  setButtonFeedback(button, 'success', 'Neu erzeugt');
+  showToast('JSON wurde aus dem Formular neu erzeugt', 'ok');
 }
 
 function uniqueCommandName(baseName) {
@@ -1285,6 +1291,7 @@ function linesToList(value) {
 }
 
 function numberInRange(value, fallback, min = 0, max = 100) {
+  if (String(value ?? '').trim() === '') return fallback;
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.min(max, Math.max(min, number));
@@ -1339,10 +1346,21 @@ function updateDryRunUi(enabled) {
     : 'Aktiv: Loxone-Befehle werden wirklich an den Miniserver gesendet.';
 }
 
-async function loadEvents() {
-  const response = await fetch('/api/events');
-  const events = await response.json();
-  renderEvents(events);
+async function loadEvents(button) {
+  if (button) setButtonFeedback(button, 'pending', 'Lädt');
+  try {
+    const response = await fetch(`/api/events?ts=${Date.now()}`, { cache: 'no-store' });
+    await ensureOk(response);
+    const events = await response.json();
+    renderEvents(events);
+    if (button) {
+      setButtonFeedback(button, 'success', 'Aktualisiert');
+      showToast('Protokoll aktualisiert', 'ok');
+    }
+  } catch (error) {
+    if (button) setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
 }
 
 function renderEvents(events) {

@@ -238,7 +238,6 @@ static void respond_if_search(int sock, char *message, ssize_t length, struct so
   read_header(message, "st", st_header, sizeof(st_header));
   char address[INET_ADDRSTRLEN];
   inet_ntop(AF_INET, &remote->sin_addr, address, sizeof(address));
-  log_line("INFO", "SSDP search received from %s:%d ST=%s", address, ntohs(remote->sin_port), st_header);
 
   char uuid_st[256];
   snprintf(uuid_st, sizeof(uuid_st), "uuid:%s", uuid);
@@ -257,6 +256,8 @@ static void respond_if_search(int sock, char *message, ssize_t length, struct so
     targets[target_count++] = uuid_st;
   }
   if (target_count == 0) return;
+
+  log_line("INFO", "SSDP search received from %s:%d ST=%s", address, ntohs(remote->sin_port), st_header);
 
   char response[RESPONSE_SIZE];
   for (size_t index = 0; index < target_count; index += 1) {

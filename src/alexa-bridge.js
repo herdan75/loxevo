@@ -395,15 +395,20 @@ export class AlexaBridgeService {
 
   getDevices() {
     const commands = this.handlers.getCommands?.() || {};
+    const bridgeId = this.getBridgeId();
+    const usedIds = new Set();
     return Object.entries(commands)
       .filter(([, command]) => command.enabled !== false)
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([commandKey, command], index) => ({
-        id: String(index + 1),
-        commandKey,
-        name: getAlexaDeviceName(command, commandKey),
-        uniqueId: makeLightUniqueId(this.getBridgeId(), index)
-      }));
+      .map(([commandKey, command]) => {
+        const id = makeStableDeviceId(commandKey, usedIds);
+        return {
+          id,
+          commandKey,
+          name: getAlexaDeviceName(command, commandKey),
+          uniqueId: makeLightUniqueId(bridgeId, id)
+        };
+      });
   }
 
   isEnabled() {
@@ -411,7 +416,8 @@ export class AlexaBridgeService {
   }
 
   getAdvertiseIp() {
-    return String(this.config.alexaBridge?.advertiseIp || '').trim() || firstLanAddress();
+    const configured = String(this.config.alexaBridge?.advertiseIp || '').trim();
+    return isUsableLanAddress(configured) ? configured : firstLanAddress();
   }
 
   getAdvertisePort() {
@@ -501,10 +507,24 @@ function firstLanAddress() {
   return '127.0.0.1';
 }
 
-function makeLightUniqueId(bridgeId, index) {
+function makeStableDeviceId(commandKey, usedIds) {
+  const seed = parseInt(createHash('sha1').update(String(commandKey)).digest('hex').slice(0, 8), 16);
+  const min = 1000;
+  const range = 64000;
+  for (let offset = 0; offset < range; offset += 1) {
+    const id = String(min + ((seed + offset) % range));
+    if (!usedIds.has(id)) {
+      usedIds.add(id);
+      return id;
+    }
+  }
+  return String(min + usedIds.size);
+}
+
+function makeLightUniqueId(bridgeId, deviceId) {
   const suffix = bridgeId.slice(-6).match(/.{1,2}/g) || ['00', '00', '00'];
-  const lightPart = (index + 1).toString(16).padStart(2, '0');
-  return `00:17:88:${suffix.join(':')}:00:${lightPart}-0b`;
+  const lightPart = Number(deviceId).toString(16).padStart(4, '0').slice(-4).match(/.{1,2}/g) || ['00', '00'];
+  return `00:17:88:${suffix.join(':')}:${lightPart.join(':')}-0b`;
 }
 
 function bridgeIdToMac(bridgeId) {
@@ -534,11 +554,13 @@ function isUsableLanAddress(value) {
 }
 
 function friendlySsdpError(error, lanAddress) {
-  if (error?.code === 'EADDRINUSE' || String(error?.message || '').includes('EADDRINUSE')) {
+  const message = String(error?.message || '');
+  const lower = message.toLowerCase();
+  if (error?.code === 'EADDRINUSE' || message.includes('EADDRINUSE') || lower.includes('bind udp 1900 failed')) {
     return new Error(
-      `SSDP/UDP-Port 1900 ist bereits belegt. ` +
-      `Beende den anderen UPnP/Hue-Bridge-Dienst auf dem LoxBerry oder gib LoxEvo eine eigene Netzwerk-IP. ` +
-      `Gepruefte Adresse: ${lanAddress || '0.0.0.0'}. Originalfehler: ${error.message}`
+      `SSDP/UDP-Port 1900 konnte nicht geoeffnet werden. ` +
+      `Der Linux-SSDP-Helper kann normalerweise neben LoxBerry-ssdpd laufen; pruefe Docker-Host-Netzwerk, Berechtigungen und Logs. ` +
+      `Gepruefte Adresse: ${lanAddress || '0.0.0.0'}. Originalfehler: ${message}`
     );
   }
   return error;

@@ -158,6 +158,7 @@ Alexa, Licht Kueche Hell an
 ```
 
 LoxEvo behandelt diese Geraete als Taster: `an` loest den hinterlegten Befehl aus. `aus` setzt nur den virtuellen Zustand zurueck.
+Wenn waehrend der Entwicklung Geraete mehrfach gefunden wurden, alte LoxEvo-Testgeraete in der Alexa-App loeschen und danach erneut suchen. Die aktuellen Geraete-IDs sind pro Befehl stabil, damit spaetere Konfigurationsaenderungen weniger Durcheinander erzeugen.
 
 ## TTS-API
 

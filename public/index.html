@@ -155,7 +155,7 @@
                 <input id="alexaBridgeAdvertisePort" type="number" min="1" max="65535" placeholder="8080">
               </label>
             </div>
-            <p class="field-hint">Nach dem Speichern in der Alexa-App nach neuen Geräten suchen. Jeder aktive Befehl wird als virtuelles Gerät angeboten. Wenn der LoxBerry mehrere Netzwerkschnittstellen hat, hier die echte LAN-IP eintragen. Auf dem LoxBerry sollte Docker dafür im Host-Netzwerk laufen, damit SSDP/UDP 1900 im LAN sichtbar ist.</p>
+            <p class="field-hint">Nach dem Speichern in der Alexa-App nach neuen Geräten suchen. Jeder aktive Befehl wird als virtuelles Gerät angeboten. Bei mehreren Netzwerkschnittstellen hier die echte LAN-IP eintragen. Docker sollte im Host-Netzwerk laufen; den SSDP-Port teilt sich LoxEvo über den Linux-Helper mit LoxBerry.</p>
           </fieldset>
 
           <fieldset>

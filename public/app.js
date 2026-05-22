@@ -360,9 +360,17 @@ function renderAlexaBridgeStatus() {
     return;
   }
 
+  if (status.bridgeHttp?.error) {
+    alexaBridgeStatus.textContent = status.bridgeHttp.error;
+    alexaBridgeStatus.className = 'service-status error';
+    renderAlexaDevices();
+    return;
+  }
+
   const ssdpText = status.ssdpPort ? `, SSDP/UDP ${status.ssdpPort}` : '';
   const modeText = status.ssdpMode === 'linux-helper' ? ' per Linux-SSDP-Helper' : '';
-  alexaBridgeStatus.textContent = `Bereit: ${devices.length} virtuelle Geräte auf ${status.ip}:${status.port}${ssdpText}${modeText}.`;
+  const bridgeHttpText = status.bridgeHttp?.ready ? `, Alexa-HTTP ${status.bridgeHttp.port}` : '';
+  alexaBridgeStatus.textContent = `Bereit: ${devices.length} virtuelle Geräte auf ${status.ip}:${status.port}${ssdpText}${bridgeHttpText}${modeText}.`;
   alexaBridgeStatus.className = 'service-status ready';
   renderAlexaDevices();
 }

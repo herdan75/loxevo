@@ -13,7 +13,7 @@
     "enabled": false,
     "name": "LoxEvo",
     "advertiseIp": "",
-    "advertisePort": 8080,
+    "advertisePort": 80,
     "bridgeId": ""
   },
   "commands": {

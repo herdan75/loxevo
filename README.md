@@ -144,6 +144,7 @@ Technisch ist das ein lokaler Hue-kompatibler V1-Bridge-Eingang nur fuer Alexa-D
 
 Fuer die Geraetesuche muss LoxEvo im gleichen LAN wie die Echo-Geraete erreichbar sein. Im Docker/LoxBerry-Betrieb ist `network_mode: host` deshalb der empfohlene Modus, weil SSDP/UDP 1900 sonst oft nicht sauber bis in den Container gelangt.
 Das Docker-Image enthaelt dafuer einen kleinen Linux-SSDP-Helper. Er nutzt wie EchoLox die Linux-Socket-Optionen fuer gemeinsam nutzbare UDP-Ports und kann dadurch neben dem LoxBerry-`ssdpd` laufen, ohne dessen Dienst abschalten zu muessen.
+Fuer neuere Echo-Geraete sollte die Alexa-Bridge ueber Port 80 erreichbar sein. Die Web-UI kann weiter auf Port 8080 laufen; LoxEvo startet bei abweichendem `alexaBridge.advertisePort` einen zusaetzlichen Alexa/Hue-HTTP-Listener.
 
 Typischer Ablauf:
 

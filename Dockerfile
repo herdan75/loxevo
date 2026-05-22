@@ -26,6 +26,7 @@ ENV CONFIG_PATH=/config/config.json
 ENV PORT=8080
 ENV SSDP_HELPER_PATH=/app/bin/loxevo-ssdp-helper
 EXPOSE 8080/tcp
+EXPOSE 80/tcp
 EXPOSE 1900/udp
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

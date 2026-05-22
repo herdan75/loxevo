@@ -19,15 +19,35 @@ let config = await loadConfig();
 let loxone = new LoxoneClient(config);
 let tts = new TtsService(config);
 let alexaBridge = createAlexaBridge();
+let bridgeHttpServer = null;
+let bridgeHttpStatus = { enabled: false, ready: false, error: null, port: null };
 const events = [];
 
 await initTts();
 await initAlexaBridge();
+await restartBridgeHttpServer();
 
-const server = http.createServer(async (req, res) => {
+const server = http.createServer((req, res) => handleRequest(req, res, { bridgeOnly: false }));
+
+server.listen(config.server.port, '0.0.0.0', () => {
+  console.log(`${config.server.name} lauscht auf Port ${config.server.port}`);
+});
+
+async function handleRequest(req, res, { bridgeOnly = false } = {}) {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const pathParts = url.pathname.split('/').filter(Boolean);
+
+    if (bridgeOnly) {
+      if (alexaBridge.canHandleHttp(req, url, pathParts)) {
+        return await alexaBridge.handleHttp(req, res, url, pathParts, () => readBody(req), {
+          sendJson,
+          sendText,
+          sendXml
+        });
+      }
+      return sendJson(res, { error: 'not found' }, 404);
+    }
 
     if (req.method === 'GET' && url.pathname === '/') {
       return serveStatic(res, 'index.html');
@@ -38,7 +58,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/health') {
-      return sendJson(res, { ok: true, name: config.server.name, tts: tts.getStatus(), alexaBridge: alexaBridge.getStatus() });
+      return sendJson(res, { ok: true, name: config.server.name, tts: tts.getStatus(), alexaBridge: getAlexaBridgeStatus() });
     }
 
     if (url.pathname === '/admin/plugins/alexa2lox/tts.php') {
@@ -77,11 +97,7 @@ const server = http.createServer(async (req, res) => {
     console.error(error);
     sendJson(res, { error: error.message }, 500);
   }
-});
-
-server.listen(config.server.port, '0.0.0.0', () => {
-  console.log(`${config.server.name} lauscht auf Port ${config.server.port}`);
-});
+}
 
 async function handleApi(req, res, pathParts, readRequestBody) {
   if (req.method === 'GET' && pathParts[1] === 'config') {
@@ -101,7 +117,7 @@ async function handleApi(req, res, pathParts, readRequestBody) {
   }
 
   if (req.method === 'GET' && pathParts[1] === 'alexa-bridge' && pathParts[2] === 'status') {
-    return sendJson(res, alexaBridge.getStatus());
+    return sendJson(res, getAlexaBridgeStatus());
   }
 
   if (req.method === 'GET' && pathParts[1] === 'dependencies') {
@@ -135,6 +151,7 @@ async function handleApi(req, res, pathParts, readRequestBody) {
     tts = new TtsService(config);
     await initTts();
     await restartAlexaBridge();
+    await restartBridgeHttpServer();
     return sendJson(res, { ok: true, config });
   }
 
@@ -235,7 +252,7 @@ async function initTts() {
 
 function getSetupStatus() {
   const ttsStatus = tts.getStatus();
-  const alexaBridgeStatus = alexaBridge.getStatus();
+  const alexaBridgeStatus = getAlexaBridgeStatus();
   const ttsReady = !config.tts?.enabled || (ttsStatus.ready && ttsDevicesConfigured(ttsStatus));
   const checks = [
     {
@@ -517,6 +534,9 @@ function alexaBridgeDetail(status) {
   if (!status.enabled) {
     return 'Virtuelle Alexa-Geräte sind deaktiviert und können später eingerichtet werden.';
   }
+  if (status.bridgeHttp?.error) {
+    return status.bridgeHttp.error;
+  }
   if (status.error) {
     return status.error;
   }
@@ -589,6 +609,52 @@ async function restartAlexaBridge() {
   await alexaBridge.stop();
   alexaBridge = createAlexaBridge();
   await initAlexaBridge();
+}
+
+function getAlexaBridgeStatus() {
+  return {
+    ...alexaBridge.getStatus(),
+    bridgeHttp: bridgeHttpStatus
+  };
+}
+
+async function restartBridgeHttpServer() {
+  await stopBridgeHttpServer();
+
+  const bridgeStatus = alexaBridge.getStatus();
+  const port = Number(bridgeStatus.port);
+  bridgeHttpStatus = {
+    enabled: bridgeStatus.enabled && port !== Number(config.server.port),
+    ready: false,
+    error: null,
+    port
+  };
+
+  if (!bridgeHttpStatus.enabled) {
+    return;
+  }
+
+  bridgeHttpServer = http.createServer((req, res) => handleRequest(req, res, { bridgeOnly: true }));
+  try {
+    await new Promise((resolve, reject) => {
+      bridgeHttpServer.once('error', reject);
+      bridgeHttpServer.listen(port, '0.0.0.0', resolve);
+    });
+    bridgeHttpStatus.ready = true;
+    console.log(`Alexa-Bridge HTTP lauscht auf Port ${port}`);
+  } catch (error) {
+    bridgeHttpStatus.error = `Alexa-Bridge HTTP Port ${port} konnte nicht geoeffnet werden: ${error.message}`;
+    console.warn(bridgeHttpStatus.error);
+    addEvent({ type: 'alexa-bridge-http', status: 'error', text: bridgeHttpStatus.error });
+    await stopBridgeHttpServer();
+  }
+}
+
+async function stopBridgeHttpServer() {
+  if (!bridgeHttpServer) return;
+  const currentServer = bridgeHttpServer;
+  bridgeHttpServer = null;
+  await new Promise((resolve) => currentServer.close(resolve));
 }
 
 async function serveStatic(res, relativePath) {

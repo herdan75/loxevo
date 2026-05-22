@@ -219,6 +219,7 @@ export class AlexaBridgeService {
         output = `${output}${text}`.slice(-1000);
         for (const line of text.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)) {
           if (line.startsWith('READY ')) {
+            console.log(`SSDP-Helper: ${line}`);
             finish();
           } else if (isError || line.startsWith('ERROR ')) {
             console.warn(`SSDP-Helper: ${line}`);

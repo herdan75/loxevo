@@ -77,7 +77,7 @@ export class TtsService {
 
   buildInitOptions(auth) {
     const options = {
-      cookie: auth.cookie,
+      cookie: auth.remoteCookie || auth.cookie,
       csrf: auth.csrf,
       amazonPage: this.config.amazonPage || auth.amazonPage || 'amazon.de',
       alexaServiceHost: this.config.alexaServiceHost || 'layla.amazon.de',
@@ -123,6 +123,7 @@ export class TtsService {
     const localCookie = cookieData.localCookie || cookie;
 
     if (!localCookie || typeof localCookie !== 'string') return;
+    if (!isFreshRegistrationData(cookieData)) return;
 
     if (!this.auth?.isJson && !Object.keys(cookieData).length) {
       await writeFile(this.config.cookieFile, localCookie, 'utf8');
@@ -136,7 +137,7 @@ export class TtsService {
       csrf: cookieData.csrf || csrf || sourceData.csrf,
       macDms: cookieData.macDms || macDms || sourceData.macDms,
       dataVersion: cookieData.dataVersion || sourceData.dataVersion || 2,
-      tokenDate: cookieData.tokenDate || sourceData.tokenDate || Date.now()
+      tokenDate: cookieData.tokenDate || Date.now()
     };
 
     await writeFile(this.config.cookieFile, `${JSON.stringify(nextData, null, 2)}\n`, 'utf8');
@@ -282,6 +283,10 @@ export function parseAlexaCookieFile(content) {
     cookie,
     isJson: true,
     originalData: parsed,
+    remoteCookie: {
+      ...parsed,
+      localCookie: parsed.localCookie || cookie
+    },
     csrf: typeof parsed.csrf === 'string' ? parsed.csrf : undefined,
     amazonPage: typeof parsed.amazonPage === 'string' ? parsed.amazonPage : undefined,
     deviceAppName: typeof parsed.deviceAppName === 'string' ? parsed.deviceAppName : undefined,
@@ -294,6 +299,7 @@ function buildFormerRegistrationData(parsed) {
   if (!isPlainObject(parsed)) return undefined;
   const keys = [
     'localCookie',
+    'loginCookie',
     'frc',
     'map-md',
     'deviceId',
@@ -327,6 +333,15 @@ function defaultAcceptLanguage(amazonPage) {
 
 function isProxyLoginPrompt(error) {
   return /please open https?:\/\//i.test(error?.message || String(error || ''));
+}
+
+function isFreshRegistrationData(value) {
+  return Boolean(
+    isPlainObject(value) &&
+    typeof value.localCookie === 'string' &&
+    typeof value.refreshToken === 'string' &&
+    typeof value.deviceSerial === 'string'
+  );
 }
 
 function isPlainObject(value) {

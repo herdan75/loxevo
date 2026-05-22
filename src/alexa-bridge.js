@@ -223,7 +223,7 @@ export class AlexaBridgeService {
             finish();
           } else if (isError || line.startsWith('ERROR ')) {
             console.warn(`SSDP-Helper: ${line}`);
-          } else if (!line.includes('SSDP response sent')) {
+          } else {
             console.log(`SSDP-Helper: ${line}`);
           }
         }

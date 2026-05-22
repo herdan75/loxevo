@@ -246,7 +246,11 @@ static void respond_if_search(int sock, char *message, ssize_t length, struct so
 
   char response[RESPONSE_SIZE];
   build_response(response, sizeof(response), ip, port, bridge_id, uuid, st);
-  sendto(sock, response, strlen(response), 0, (struct sockaddr *)remote, sizeof(*remote));
+  ssize_t sent = sendto(sock, response, strlen(response), 0, (struct sockaddr *)remote, sizeof(*remote));
+  if (sent < 0) {
+    log_line("ERROR", "SSDP response failed to %s:%d: %s", address, ntohs(remote->sin_port), strerror(errno));
+    return;
+  }
 
   log_line("INFO", "SSDP response sent to %s:%d ST=%s", address, ntohs(remote->sin_port), st);
 }

@@ -354,7 +354,7 @@ function renderAlexaBridgeStatus() {
   }
 
   if (!status.ready) {
-    alexaBridgeStatus.textContent = `Alexa-Geräte sind aktiviert, aber noch nicht bereit: ${status.error || 'Status unbekannt'}`;
+    alexaBridgeStatus.textContent = humanizeAlexaBridgeError(status.error);
     alexaBridgeStatus.className = 'service-status error';
     renderAlexaDevices();
     return;
@@ -385,6 +385,15 @@ function humanizeTtsStatusError(errorText = '') {
     return `TTS ist aktiviert, aber das Alexa-Cookie ist noch nicht nutzbar: ${errorText}`;
   }
   return `TTS ist aktiviert, aber noch nicht bereit: ${errorText || 'Status unbekannt'}`;
+}
+
+function humanizeAlexaBridgeError(errorText = '') {
+  const text = String(errorText || '');
+  const lower = text.toLowerCase();
+  if (lower.includes('eaddrinuse') && lower.includes('1900')) {
+    return 'Virtuelle Alexa-Geräte sind aktiviert, aber SSDP/UDP 1900 ist bereits belegt. Auf dem LoxBerry läuft vermutlich schon ein UPnP-, Hue-Bridge- oder anderer Alexa-Emulator.';
+  }
+  return `Alexa-Geräte sind aktiviert, aber noch nicht bereit: ${text || 'Status unbekannt'}`;
 }
 
 function toggleTtsHelp() {

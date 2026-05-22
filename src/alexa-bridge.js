@@ -12,6 +12,7 @@ export class AlexaBridgeService {
     this.socket = null;
     this.ready = false;
     this.lastError = null;
+    this.ssdpBindAddress = '';
   }
 
   async start() {
@@ -59,6 +60,7 @@ export class AlexaBridgeService {
       ip: this.getAdvertiseIp(),
       port: this.getAdvertisePort(),
       ssdpPort: SSDP_PORT,
+      ssdpBindAddress: this.ssdpBindAddress,
       descriptionUrl: `http://${this.getAdvertiseIp()}:${this.getAdvertisePort()}/description.xml`,
       bridgeId: this.getBridgeId(),
       deviceCount: devices.length,
@@ -139,7 +141,26 @@ export class AlexaBridgeService {
     ]);
   }
 
-  startSsdp() {
+  async startSsdp() {
+    const lanAddress = this.getMulticastInterface();
+    const bindAddresses = ['', lanAddress].filter((address, index, list) => (
+      address === '' ? index === 0 : list.indexOf(address) === index
+    ));
+    let lastError;
+
+    for (const address of bindAddresses) {
+      try {
+        this.socket = await this.bindSsdpSocket(address);
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw friendlySsdpError(lastError, lanAddress);
+  }
+
+  bindSsdpSocket(address) {
     return new Promise((resolve, reject) => {
       const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
       let settled = false;
@@ -147,8 +168,16 @@ export class AlexaBridgeService {
       const finish = (error) => {
         if (settled) return;
         settled = true;
-        if (error) reject(error);
-        else resolve();
+        if (error) {
+          try {
+            socket.close();
+          } catch {
+            // Socket may already be closed after a bind error.
+          }
+          reject(error);
+        } else {
+          resolve(socket);
+        }
       };
 
       socket.on('message', (message, remote) => this.respondToSearch(socket, message, remote));
@@ -157,7 +186,8 @@ export class AlexaBridgeService {
         if (!settled) finish(error);
       });
 
-      socket.bind(SSDP_PORT, () => {
+      const bindOptions = address ? { port: SSDP_PORT, address } : { port: SSDP_PORT };
+      socket.bind(bindOptions, () => {
         try {
           const multicastInterface = this.getMulticastInterface();
           if (multicastInterface) {
@@ -166,10 +196,9 @@ export class AlexaBridgeService {
             socket.addMembership(SSDP_ADDRESS);
           }
           socket.setMulticastTTL(2);
-          this.socket = socket;
+          this.ssdpBindAddress = address || '0.0.0.0';
           finish();
         } catch (error) {
-          socket.close();
           finish(error);
         }
       });
@@ -404,6 +433,17 @@ function normalizeSsdpSearchTarget(value) {
 function isUsableLanAddress(value) {
   const ip = String(value || '').trim();
   return Boolean(ip && ip !== '127.0.0.1' && ip !== '0.0.0.0' && !ip.startsWith('169.254.'));
+}
+
+function friendlySsdpError(error, lanAddress) {
+  if (error?.code === 'EADDRINUSE' || String(error?.message || '').includes('EADDRINUSE')) {
+    return new Error(
+      `SSDP/UDP-Port 1900 ist bereits belegt. ` +
+      `Beende den anderen UPnP/Hue-Bridge-Dienst auf dem LoxBerry oder gib LoxEvo eine eigene Netzwerk-IP. ` +
+      `Gepruefte Adresse: ${lanAddress || '0.0.0.0'}. Originalfehler: ${error.message}`
+    );
+  }
+  return error;
 }
 
 function parseJson(body) {

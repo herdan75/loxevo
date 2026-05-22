@@ -1,12 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
 const appRequire = createRequire(import.meta.url);
 
 export class TtsService {
   constructor(config) {
-    this.config = config.tts || {};
+    this.rootConfig = config || {};
+    this.config = this.rootConfig.tts || {};
     this.remote = null;
     this.ready = false;
     this.lastError = null;
@@ -60,8 +62,14 @@ export class TtsService {
       amazonPage: this.config.amazonPage || auth.amazonPage || 'amazon.de',
       alexaServiceHost: this.config.alexaServiceHost || 'layla.amazon.de',
       acceptLanguage: this.config.acceptLanguage || defaultAcceptLanguage(this.config.amazonPage || auth.amazonPage),
+      proxyOwnIp: this.getProxyOwnIp(),
       usePushConnection: true
     };
+
+    const proxyPort = Number(this.config.proxyPort || 0);
+    if (proxyPort > 0) {
+      options.proxyPort = proxyPort;
+    }
 
     if (auth.formerRegistrationData) {
       options.formerRegistrationData = auth.formerRegistrationData;
@@ -74,6 +82,14 @@ export class TtsService {
     }
 
     return options;
+  }
+
+  getProxyOwnIp() {
+    return String(
+      this.config.proxyOwnIp ||
+      this.rootConfig.alexaBridge?.advertiseIp ||
+      firstLanAddress()
+    ).trim();
   }
 
   markUnavailable(message, error) {
@@ -243,6 +259,17 @@ function defaultAcceptLanguage(amazonPage) {
 
 function isPlainObject(value) {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function firstLanAddress() {
+  for (const addresses of Object.values(networkInterfaces())) {
+    for (const address of addresses || []) {
+      if (address.family === 'IPv4' && !address.internal) {
+        return address.address;
+      }
+    }
+  }
+  return '';
 }
 
 function getDependencyInstallDir() {

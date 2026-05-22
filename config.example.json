@@ -94,6 +94,8 @@
     "amazonPage": "amazon.de",
     "alexaServiceHost": "layla.amazon.de",
     "acceptLanguage": "de-DE",
+    "proxyOwnIp": "",
+    "proxyPort": 0,
     "defaultVolume": 40,
     "alarmVolume": 100,
     "ignoreZeroText": true,

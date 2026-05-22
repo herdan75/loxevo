@@ -37,6 +37,7 @@ public/
 `data/Node.txt` ist die Alexa-Cookie-Datei, die bisher in Node-RED fuer `alexa-remote2` genutzt wurde.
 Node-RED muss fuer LoxEvo nicht laufen; die Cookie-Datei kann nur als bestehende Grundlage uebernommen werden.
 LoxEvo akzeptiert sowohl eine reine Cookie-Zeile als auch das JSON-Format aus Node-RED/applestrudel. Bei JSON-Dateien werden `localCookie`, `csrf` und die gespeicherten Registrierungsdaten wie `macDms` und `refreshToken` verwendet.
+Wenn Amazon eine neue Anmeldung verlangt, zeigt das Log eine lokale Proxy-URL. Diese URL muss die LAN-IP des LoxBerry enthalten. Falls dort `undefined` oder eine falsche IP steht, in der Web-UI unter `Konfiguration -> Alexa TTS` die Proxy-IP eintragen.
 Der komplette Ordner `data/` ist fuer private lokale Daten gedacht und wird nicht ins GitHub-Repository uebernommen.
 
 Vor dem ersten Start:

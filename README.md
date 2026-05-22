@@ -53,6 +53,7 @@ Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
 TTS braucht das Paket `alexa-remote2` und eine gueltige Alexa-Cookie-Datei. Das Paket wird bewusst nicht fest im Docker-Build installiert, damit LoxEvo auch dann startet, wenn npm-Versionen wechseln. Installiere oder aktualisiere es in der Web-UI unter "Wartung"; im Docker/LoxBerry-Betrieb landet es im gemounteten `/config`-Bereich.
 Als Cookie-Datei kann eine reine Cookie-Zeile oder die von Node-RED/applestrudel erzeugte JSON-Datei verwendet werden. Bei JSON-Dateien nutzt LoxEvo `localCookie`, `csrf` und die gespeicherten Registrierungsdaten wie `macDms` und `refreshToken`.
+Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen lokalen Login-Proxy. LoxEvo setzt dafuer automatisch die LAN-IP des LoxBerry; bei Bedarf kann `tts.proxyOwnIp` und `tts.proxyPort` in der Web-UI angepasst werden.
 Fuer den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
 Die Web-UI zeigt unter "Wartung" die installierte `alexa-remote2`-Version, verfuegbare npm-Versionen und kann Installation oder Update im laufenden Container anstossen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.

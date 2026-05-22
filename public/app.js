@@ -22,6 +22,8 @@ const ttsEnabled = document.querySelector('#ttsEnabled');
 const ttsCookieFile = document.querySelector('#ttsCookieFile');
 const ttsAmazonPage = document.querySelector('#ttsAmazonPage');
 const ttsAlexaHost = document.querySelector('#ttsAlexaHost');
+const ttsProxyOwnIp = document.querySelector('#ttsProxyOwnIp');
+const ttsProxyPort = document.querySelector('#ttsProxyPort');
 const ttsDefaultVolume = document.querySelector('#ttsDefaultVolume');
 const ttsAlarmVolume = document.querySelector('#ttsAlarmVolume');
 const ttsDefaultDevices = document.querySelector('#ttsDefaultDevices');
@@ -618,6 +620,8 @@ function populateForms() {
   ttsCookieFile.value = config.tts?.cookieFile || '';
   ttsAmazonPage.value = config.tts?.amazonPage || '';
   ttsAlexaHost.value = config.tts?.alexaServiceHost || '';
+  ttsProxyOwnIp.value = config.tts?.proxyOwnIp || '';
+  ttsProxyPort.value = config.tts?.proxyPort || '';
   ttsDefaultVolume.value = config.tts?.defaultVolume ?? 40;
   ttsAlarmVolume.value = config.tts?.alarmVolume ?? 100;
   ttsDefaultDevices.value = listToLines(config.tts?.defaultDevices);
@@ -1002,6 +1006,8 @@ function collectConfigFromForms() {
   nextConfig.tts.cookieFile = ttsCookieFile.value.trim();
   nextConfig.tts.amazonPage = ttsAmazonPage.value.trim() || 'amazon.de';
   nextConfig.tts.alexaServiceHost = ttsAlexaHost.value.trim() || 'layla.amazon.de';
+  nextConfig.tts.proxyOwnIp = ttsProxyOwnIp.value.trim();
+  nextConfig.tts.proxyPort = ttsProxyPort.value ? numberInRange(ttsProxyPort.value, 0, 0, 65535) : 0;
   nextConfig.tts.defaultVolume = numberInRange(ttsDefaultVolume.value, 40);
   nextConfig.tts.alarmVolume = numberInRange(ttsAlarmVolume.value, 100);
   nextConfig.tts.defaultDevices = linesToList(ttsDefaultDevices.value);

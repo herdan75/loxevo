@@ -182,23 +182,13 @@ static int create_socket(const char *ip) {
   struct ip_mreq mreq;
   memset(&mreq, 0, sizeof(mreq));
   mreq.imr_multiaddr.s_addr = inet_addr(SSDP_GROUP);
-  mreq.imr_interface.s_addr = is_empty(ip) ? htonl(INADDR_ANY) : inet_addr(ip);
+  mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 
   if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
-    if (!is_empty(ip)) {
-      mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-      if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
-        int saved_errno = errno;
-        close(sock);
-        errno = saved_errno;
-        return -1;
-      }
-    } else {
-      int saved_errno = errno;
-      close(sock);
-      errno = saved_errno;
-      return -1;
-    }
+    int saved_errno = errno;
+    close(sock);
+    errno = saved_errno;
+    return -1;
   }
 
   if (!is_empty(ip)) {
@@ -247,6 +237,10 @@ static void respond_if_search(int sock, char *message, ssize_t length, struct so
 
   char st_header[256];
   read_header(message, "st", st_header, sizeof(st_header));
+  char address[INET_ADDRSTRLEN];
+  inet_ntop(AF_INET, &remote->sin_addr, address, sizeof(address));
+  log_line("INFO", "SSDP search received from %s:%d ST=%s", address, ntohs(remote->sin_port), st_header);
+
   const char *st = normalize_st(st_header);
   if (is_empty(st)) return;
 
@@ -254,8 +248,6 @@ static void respond_if_search(int sock, char *message, ssize_t length, struct so
   build_response(response, sizeof(response), ip, port, bridge_id, uuid, st);
   sendto(sock, response, strlen(response), 0, (struct sockaddr *)remote, sizeof(*remote));
 
-  char address[INET_ADDRSTRLEN];
-  inet_ntop(AF_INET, &remote->sin_addr, address, sizeof(address));
   log_line("INFO", "SSDP response sent to %s:%d ST=%s", address, ntohs(remote->sin_port), st);
 }
 

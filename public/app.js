@@ -369,6 +369,9 @@ function humanizeTtsStatusError(errorText = '') {
   if (text.includes('cookie') && (text.includes('enoent') || text.includes('no such file'))) {
     return 'TTS ist aktiviert, aber die Cookie-Datei wurde nicht gefunden. Der Info-Button in der Konfiguration erklärt die nächsten Schritte.';
   }
+  if (text.includes('no json')) {
+    return 'TTS ist aktiviert, aber Amazon hat keine gültige JSON-Antwort geliefert. Häufig passt das Cookie-Format oder die Alexa-Session nicht. Der Info-Button erklärt die nächsten Schritte.';
+  }
   if (text.includes('alexa-remote2') && text.includes('nicht installiert')) {
     return 'TTS ist aktiviert, aber alexa-remote2 ist noch nicht installiert. Installiere es im Register Wartung.';
   }

@@ -29,9 +29,9 @@ export class TtsService {
       return;
     }
 
-    let cookie;
+    let auth;
     try {
-      cookie = await readFile(this.config.cookieFile, 'utf8');
+      auth = parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
     } catch (error) {
       this.markUnavailable(`Alexa-Cookie konnte nicht gelesen werden: ${this.config.cookieFile}`, error);
       return;
@@ -43,7 +43,8 @@ export class TtsService {
       await new Promise((resolve, reject) => {
         this.remote.init(
           {
-            cookie,
+            cookie: auth.cookie,
+            csrf: auth.csrf,
             amazonPage: this.config.amazonPage || 'amazon.de',
             alexaServiceHost: this.config.alexaServiceHost || 'layla.amazon.de',
             usePushConnection: true
@@ -163,6 +164,28 @@ function loadAlexaRemote2() {
     }
   }
   throw lastError;
+}
+
+export function parseAlexaCookieFile(content) {
+  const raw = String(content || '').trim();
+  if (!raw) {
+    throw new Error('Cookie-Datei ist leer.');
+  }
+
+  if (!raw.startsWith('{')) {
+    return { cookie: raw };
+  }
+
+  const parsed = JSON.parse(raw);
+  const cookie = parsed.localCookie || parsed.loginCookie || parsed.cookie;
+  if (!cookie || typeof cookie !== 'string') {
+    throw new Error('Cookie-Datei ist JSON, enthaelt aber keinen localCookie oder loginCookie.');
+  }
+
+  return {
+    cookie,
+    csrf: typeof parsed.csrf === 'string' ? parsed.csrf : undefined
+  };
 }
 
 function getDependencyInstallDir() {

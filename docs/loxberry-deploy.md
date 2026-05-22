@@ -36,6 +36,7 @@ public/
 `data/config.json` enthaelt deine Loxone- und LoxEvo-Konfiguration.
 `data/Node.txt` ist die Alexa-Cookie-Datei, die bisher in Node-RED fuer `alexa-remote2` genutzt wurde.
 Node-RED muss fuer LoxEvo nicht laufen; die Cookie-Datei kann nur als bestehende Grundlage uebernommen werden.
+LoxEvo akzeptiert sowohl eine reine Cookie-Zeile als auch das JSON-Format aus Node-RED/applestrudel. Bei JSON-Dateien wird `localCookie` verwendet, ersatzweise `loginCookie`.
 Der komplette Ordner `data/` ist fuer private lokale Daten gedacht und wird nicht ins GitHub-Repository uebernommen.
 
 Vor dem ersten Start:

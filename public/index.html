@@ -165,7 +165,7 @@
               <button id="ttsHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="ttsHelpText" aria-label="TTS-Hilfe anzeigen">i</button>
             </div>
             <div id="ttsHelpText" class="help-box" hidden>
-              Die rote Meldung bedeutet: TTS ist eingeschaltet, aber LoxEvo kann noch nicht über Alexa sprechen. Häufig fehlt die Cookie-Datei <code>Node.txt</code>. Im Docker/LoxBerry-Betrieb muss sie im lokalen Ordner <code>data/Node.txt</code> liegen; im Formular bleibt der Pfad <code>/config/Node.txt</code>. Wenn <code>alexa-remote2</code> fehlt, installiere es im Register <strong>Wartung</strong> und starte LoxEvo danach neu.
+              Die rote Meldung bedeutet: TTS ist eingeschaltet, aber LoxEvo kann noch nicht über Alexa sprechen. Häufig fehlt die Cookie-Datei <code>Node.txt</code> oder sie passt nicht zum Amazon-Konto. LoxEvo akzeptiert reine Cookie-Dateien und das JSON-Format aus Node-RED/applestrudel mit <code>localCookie</code>. Im Docker/LoxBerry-Betrieb muss die Datei im lokalen Ordner <code>data/Node.txt</code> liegen; im Formular bleibt der Pfad <code>/config/Node.txt</code>. Wenn <code>alexa-remote2</code> fehlt, installiere es im Register <strong>Wartung</strong> und starte LoxEvo danach neu.
             </div>
             <label class="checkbox-row">
               <input id="ttsEnabled" type="checkbox">

@@ -1,5 +1,7 @@
 import dgram from 'node:dgram';
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 
 const SSDP_ADDRESS = '239.255.255.250';
@@ -10,9 +12,11 @@ export class AlexaBridgeService {
     this.config = config;
     this.handlers = handlers;
     this.socket = null;
+    this.helper = null;
     this.ready = false;
     this.lastError = null;
     this.ssdpBindAddress = '';
+    this.ssdpMode = '';
   }
 
   async start() {
@@ -43,12 +47,19 @@ export class AlexaBridgeService {
   }
 
   async stop() {
-    if (!this.socket) return;
-    await new Promise((resolve) => {
-      this.socket.close(() => resolve());
-    });
-    this.socket = null;
+    if (this.helper) {
+      const helper = this.helper;
+      this.helper = null;
+      helper.kill('SIGTERM');
+    }
+    if (this.socket) {
+      await new Promise((resolve) => {
+        this.socket.close(() => resolve());
+      });
+      this.socket = null;
+    }
     this.ready = false;
+    this.ssdpMode = '';
   }
 
   getStatus() {
@@ -61,6 +72,7 @@ export class AlexaBridgeService {
       port: this.getAdvertisePort(),
       ssdpPort: SSDP_PORT,
       ssdpBindAddress: this.ssdpBindAddress,
+      ssdpMode: this.ssdpMode,
       descriptionUrl: `http://${this.getAdvertiseIp()}:${this.getAdvertisePort()}/description.xml`,
       bridgeId: this.getBridgeId(),
       deviceCount: devices.length,
@@ -142,6 +154,17 @@ export class AlexaBridgeService {
   }
 
   async startSsdp() {
+    const helperPath = this.getSsdpHelperPath();
+    if (process.platform === 'linux' && existsSync(helperPath)) {
+      try {
+        await this.startSsdpHelper(helperPath);
+        return;
+      } catch (error) {
+        this.lastError = friendlySsdpError(error, this.getMulticastInterface()).message;
+        throw friendlySsdpError(error, this.getMulticastInterface());
+      }
+    }
+
     const lanAddress = this.getMulticastInterface();
     const bindAddresses = ['', lanAddress].filter((address, index, list) => (
       address === '' ? index === 0 : list.indexOf(address) === index
@@ -158,6 +181,75 @@ export class AlexaBridgeService {
     }
 
     throw friendlySsdpError(lastError, lanAddress);
+  }
+
+  startSsdpHelper(helperPath) {
+    return new Promise((resolve, reject) => {
+      const args = [
+        '--ip', this.getAdvertiseIp(),
+        '--port', String(this.getAdvertisePort()),
+        '--bridge-id', this.getBridgeId(),
+        '--uuid', this.getUuid()
+      ];
+      const helper = spawn(helperPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      let settled = false;
+      let output = '';
+      const timeout = setTimeout(() => {
+        finish(new Error(`SSDP-Helper antwortet nicht: ${output || helperPath}`));
+      }, 5000);
+
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        if (error) {
+          this.helper = null;
+          helper.kill('SIGTERM');
+          reject(error);
+          return;
+        }
+        this.helper = helper;
+        this.ssdpMode = 'linux-helper';
+        this.ssdpBindAddress = '0.0.0.0';
+        resolve();
+      };
+
+      const rememberOutput = (chunk, isError = false) => {
+        const text = chunk.toString();
+        output = `${output}${text}`.slice(-1000);
+        for (const line of text.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)) {
+          if (line.startsWith('READY ')) {
+            finish();
+          } else if (isError || line.startsWith('ERROR ')) {
+            console.warn(`SSDP-Helper: ${line}`);
+          } else if (!line.includes('SSDP response sent')) {
+            console.log(`SSDP-Helper: ${line}`);
+          }
+        }
+      };
+
+      helper.stdout.on('data', (chunk) => rememberOutput(chunk));
+      helper.stderr.on('data', (chunk) => rememberOutput(chunk, true));
+      helper.on('error', (error) => finish(error));
+      helper.on('exit', (code, signal) => {
+        const exitReason = signal || (code ?? 'unbekannt');
+        const message = `SSDP-Helper beendet (${exitReason}). ${output}`.trim();
+        if (!settled) {
+          finish(new Error(message));
+          return;
+        }
+        if (this.helper === helper) {
+          this.helper = null;
+          this.ready = false;
+          this.lastError = message;
+          this.handlers.addEvent?.({
+            type: 'alexa-bridge',
+            status: 'error',
+            text: message
+          });
+        }
+      });
+    });
   }
 
   bindSsdpSocket(address) {
@@ -197,6 +289,7 @@ export class AlexaBridgeService {
           }
           socket.setMulticastTTL(2);
           this.ssdpBindAddress = address || '0.0.0.0';
+          this.ssdpMode = 'node-udp';
           finish();
         } catch (error) {
           finish(error);
@@ -346,6 +439,10 @@ export class AlexaBridgeService {
 
   getHueUsername() {
     return 'loxevo';
+  }
+
+  getSsdpHelperPath() {
+    return process.env.SSDP_HELPER_PATH || '/app/bin/loxevo-ssdp-helper';
   }
 }
 

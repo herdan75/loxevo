@@ -361,7 +361,8 @@ function renderAlexaBridgeStatus() {
   }
 
   const ssdpText = status.ssdpPort ? `, SSDP/UDP ${status.ssdpPort}` : '';
-  alexaBridgeStatus.textContent = `Bereit: ${devices.length} virtuelle Geräte auf ${status.ip}:${status.port}${ssdpText}.`;
+  const modeText = status.ssdpMode === 'linux-helper' ? ' per Linux-SSDP-Helper' : '';
+  alexaBridgeStatus.textContent = `Bereit: ${devices.length} virtuelle Geräte auf ${status.ip}:${status.port}${ssdpText}${modeText}.`;
   alexaBridgeStatus.className = 'service-status ready';
   renderAlexaDevices();
 }
@@ -390,8 +391,8 @@ function humanizeTtsStatusError(errorText = '') {
 function humanizeAlexaBridgeError(errorText = '') {
   const text = String(errorText || '');
   const lower = text.toLowerCase();
-  if (lower.includes('eaddrinuse') && lower.includes('1900')) {
-    return 'Virtuelle Alexa-Geräte sind aktiviert, aber SSDP/UDP 1900 ist bereits belegt. Auf dem LoxBerry läuft vermutlich schon ein UPnP-, Hue-Bridge- oder anderer Alexa-Emulator.';
+  if ((lower.includes('eaddrinuse') || lower.includes('bind udp 1900 failed')) && lower.includes('1900')) {
+    return 'Virtuelle Alexa-Geräte sind aktiviert, aber SSDP/UDP 1900 konnte nicht geöffnet werden. Der Linux-SSDP-Helper versucht normalerweise die gemeinsame Nutzung mit LoxBerry-ssdpd; bitte Docker-Host-Netzwerk und Logs prüfen.';
   }
   return `Alexa-Geräte sind aktiviert, aber noch nicht bereit: ${text || 'Status unbekannt'}`;
 }

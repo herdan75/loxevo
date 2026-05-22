@@ -143,6 +143,7 @@ Wenn `alexaBridge.enabled` aktiv ist, bietet LoxEvo jeden aktiven Befehl als vir
 Technisch ist das ein lokaler Hue-kompatibler V1-Bridge-Eingang nur fuer Alexa-Discovery und Ein/Aus-Befehle. Es wird keine Hue-Bridge und keine Hue-Lampe benoetigt; LoxEvo nutzt nur das lokale Discovery/API-Verhalten, damit Alexa ohne eigene Cloud-Skill-Entwicklung virtuelle Geraete finden kann.
 
 Fuer die Geraetesuche muss LoxEvo im gleichen LAN wie die Echo-Geraete erreichbar sein. Im Docker/LoxBerry-Betrieb ist `network_mode: host` deshalb der empfohlene Modus, weil SSDP/UDP 1900 sonst oft nicht sauber bis in den Container gelangt.
+Das Docker-Image enthaelt dafuer einen kleinen Linux-SSDP-Helper. Er nutzt wie EchoLox die Linux-Socket-Optionen fuer gemeinsam nutzbare UDP-Ports und kann dadurch neben dem LoxBerry-`ssdpd` laufen, ohne dessen Dienst abschalten zu muessen.
 
 Typischer Ablauf:
 

@@ -12,6 +12,7 @@ export class TtsService {
     this.remote = null;
     this.ready = false;
     this.lastError = null;
+    this.auth = null;
   }
 
   async init() {
@@ -125,20 +126,22 @@ export class TtsService {
     if (!localCookie || typeof localCookie !== 'string') return;
     if (!isFreshRegistrationData(cookieData)) return;
 
-    if (!this.auth?.isJson && !Object.keys(cookieData).length) {
-      await writeFile(this.config.cookieFile, localCookie, 'utf8');
-      return;
-    }
-
     const nextData = {
       ...sourceData,
       ...cookieData,
       localCookie,
       csrf: cookieData.csrf || csrf || sourceData.csrf,
-      macDms: cookieData.macDms || macDms || sourceData.macDms,
       dataVersion: cookieData.dataVersion || sourceData.dataVersion || 2,
       tokenDate: cookieData.tokenDate || Date.now()
     };
+    const macDmsValue = firstNonEmptyObject(cookieData.macDms, macDms, sourceData.macDms);
+    if (macDmsValue) {
+      nextData.macDms = macDmsValue;
+    } else {
+      delete nextData.macDms;
+    }
+
+    if (isSameJsonData(sourceData, nextData)) return;
 
     await writeFile(this.config.cookieFile, `${JSON.stringify(nextData, null, 2)}\n`, 'utf8');
     this.auth = parseAlexaCookieFile(JSON.stringify(nextData));
@@ -342,6 +345,28 @@ function isFreshRegistrationData(value) {
     typeof value.refreshToken === 'string' &&
     typeof value.deviceSerial === 'string'
   );
+}
+
+function isSameJsonData(left, right) {
+  return stableStringify(left || {}) === stableStringify(right || {});
+}
+
+function firstNonEmptyObject(...values) {
+  return values.find((value) => isPlainObject(value) && Object.keys(value).length > 0);
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  if (isPlainObject(value)) {
+    return `{${Object.keys(value)
+      .filter((key) => value[key] !== undefined)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function isPlainObject(value) {

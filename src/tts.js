@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -40,19 +40,39 @@ export class TtsService {
     }
 
     this.remote = new AlexaRemote();
+    this.attachCookiePersistence(auth);
 
-    try {
-      await new Promise((resolve, reject) => {
-        this.remote.init(this.buildInitOptions(auth), (error) => (error ? reject(error) : resolve()));
+    await this.initAlexaRemote();
+  }
+
+  async initAlexaRemote() {
+    await new Promise((resolve) => {
+      let firstCallbackHandled = false;
+      const finishFirstCallback = () => {
+        if (firstCallbackHandled) return;
+        firstCallbackHandled = true;
+        resolve();
+      };
+
+      this.remote.init(this.buildInitOptions(this.auth), (error) => {
+        if (error) {
+          if (isProxyLoginPrompt(error)) {
+            this.markWaitingForLogin(error);
+            finishFirstCallback();
+            return;
+          }
+
+          this.markUnavailable('Alexa-Verbindung konnte nicht initialisiert werden.', error);
+          finishFirstCallback();
+          return;
+        }
+
+        this.ready = true;
+        this.lastError = null;
+        console.log('TTS ist mit alexa-remote2 verbunden.');
+        finishFirstCallback();
       });
-    } catch (error) {
-      this.markUnavailable('Alexa-Verbindung konnte nicht initialisiert werden.', error);
-      return;
-    }
-
-    this.ready = true;
-    this.lastError = null;
-    console.log('TTS ist mit alexa-remote2 verbunden.');
+    });
   }
 
   buildInitOptions(auth) {
@@ -84,6 +104,46 @@ export class TtsService {
     return options;
   }
 
+  attachCookiePersistence(auth) {
+    this.auth = auth;
+    if (!this.remote || typeof this.remote.on !== 'function') return;
+
+    this.remote.on('cookie', (cookie, csrf, macDms) => {
+      this.persistCookie(cookie, csrf, macDms).catch((error) => {
+        console.warn(`Alexa-Cookie konnte nicht gespeichert werden: ${error.message}`);
+      });
+    });
+  }
+
+  async persistCookie(cookie, csrf, macDms) {
+    if (!this.config.cookieFile) return;
+
+    const cookieData = isPlainObject(this.remote?.cookieData) ? this.remote.cookieData : {};
+    const sourceData = isPlainObject(this.auth?.originalData) ? this.auth.originalData : {};
+    const localCookie = cookieData.localCookie || cookie;
+
+    if (!localCookie || typeof localCookie !== 'string') return;
+
+    if (!this.auth?.isJson && !Object.keys(cookieData).length) {
+      await writeFile(this.config.cookieFile, localCookie, 'utf8');
+      return;
+    }
+
+    const nextData = {
+      ...sourceData,
+      ...cookieData,
+      localCookie,
+      csrf: cookieData.csrf || csrf || sourceData.csrf,
+      macDms: cookieData.macDms || macDms || sourceData.macDms,
+      dataVersion: cookieData.dataVersion || sourceData.dataVersion || 2,
+      tokenDate: cookieData.tokenDate || sourceData.tokenDate || Date.now()
+    };
+
+    await writeFile(this.config.cookieFile, `${JSON.stringify(nextData, null, 2)}\n`, 'utf8');
+    this.auth = parseAlexaCookieFile(JSON.stringify(nextData));
+    console.log(`Alexa-Cookie wurde aktualisiert: ${this.config.cookieFile}`);
+  }
+
   getProxyOwnIp() {
     return String(
       this.config.proxyOwnIp ||
@@ -97,6 +157,12 @@ export class TtsService {
     this.remote = null;
     this.lastError = error?.message ? `${message} (${error.message})` : message;
     console.warn(`TTS nicht bereit: ${this.lastError}`);
+  }
+
+  markWaitingForLogin(error) {
+    this.ready = false;
+    this.lastError = `Amazon-Login erforderlich. ${error.message}`;
+    console.warn(`TTS wartet auf Amazon-Login: ${error.message}`);
   }
 
   getStatus() {
@@ -203,7 +269,7 @@ export function parseAlexaCookieFile(content) {
   }
 
   if (!raw.startsWith('{')) {
-    return { cookie: raw };
+    return { cookie: raw, isJson: false, originalData: null };
   }
 
   const parsed = JSON.parse(raw);
@@ -214,6 +280,8 @@ export function parseAlexaCookieFile(content) {
 
   return {
     cookie,
+    isJson: true,
+    originalData: parsed,
     csrf: typeof parsed.csrf === 'string' ? parsed.csrf : undefined,
     amazonPage: typeof parsed.amazonPage === 'string' ? parsed.amazonPage : undefined,
     deviceAppName: typeof parsed.deviceAppName === 'string' ? parsed.deviceAppName : undefined,
@@ -255,6 +323,10 @@ function defaultAcceptLanguage(amazonPage) {
   if (page.endsWith('.es')) return 'es-ES';
   if (page.endsWith('.co.uk')) return 'en-GB';
   return 'en-US';
+}
+
+function isProxyLoginPrompt(error) {
+  return /please open https?:\/\//i.test(error?.message || String(error || ''));
 }
 
 function isPlainObject(value) {

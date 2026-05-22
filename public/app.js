@@ -368,6 +368,10 @@ function renderAlexaBridgeStatus() {
 
 function humanizeTtsStatusError(errorText = '') {
   const text = String(errorText || '').toLowerCase();
+  if (text.includes('please open http://') || text.includes('please open https://')) {
+    const loginUrl = String(errorText || '').match(/https?:\/\/[^\s)]+/)?.[0] || '';
+    return `Amazon-Login ist erforderlich. Öffne ${loginUrl || 'die Login-Adresse aus dem Docker-Log'} im Browser, melde dich an und starte LoxEvo danach neu.`;
+  }
   if (text.includes('cookie') && (text.includes('enoent') || text.includes('no such file'))) {
     return 'TTS ist aktiviert, aber die Cookie-Datei wurde nicht gefunden. Der Info-Button in der Konfiguration erklärt die nächsten Schritte.';
   }

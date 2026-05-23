@@ -116,6 +116,10 @@ async function handleApi(req, res, pathParts, readRequestBody) {
     return sendJson(res, tts.getStatus());
   }
 
+  if (req.method === 'GET' && pathParts[1] === 'tts' && pathParts[2] === 'devices') {
+    return await handleTtsDevices(res);
+  }
+
   if (req.method === 'GET' && pathParts[1] === 'alexa-bridge' && pathParts[2] === 'status') {
     return sendJson(res, getAlexaBridgeStatus());
   }
@@ -234,6 +238,11 @@ async function handleTts(req, res, pathParts, body) {
   await tts.speak(body);
   addEvent({ type: 'tts-speak', status: 'sent', text: body });
   return sendJson(res, { ok: true, command: 'speak' });
+}
+
+async function handleTtsDevices(res) {
+  const devices = await tts.getDeviceInventory();
+  return sendJson(res, { devices });
 }
 
 async function initTts() {
@@ -514,7 +523,7 @@ function roomsConfigured(rooms) {
 
 function ttsDevicesConfigured(status) {
   return [status.defaultDevices, status.allDevices, status.alarmDevices]
-    .some((devices) => Array.isArray(devices) && devices.length > 0);
+    .some((devices) => Array.isArray(devices) && devices.some(isConfiguredValue));
 }
 
 function ttsDetail(status) {
@@ -584,8 +593,9 @@ async function handleAlexa2LoxCompat(req, res, url) {
   }
 
   if (volume) {
-    await tts.setVolume(volume, targetDevices);
-    addEvent({ type: 'tts-volume', status: 'sent', volume, devices: targetDevices });
+    await tts.speakAtVolume(normalizeTtsText(text), volume, targetDevices);
+    addEvent({ type: 'tts-speak', status: 'sent', text, volume, devices: targetDevices, compat: 'alexa2lox' });
+    return sendText(res, `TTS sent: ${text}`);
   }
 
   await tts.speak(normalizeTtsText(text), targetDevices);

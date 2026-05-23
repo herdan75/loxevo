@@ -99,14 +99,8 @@
     "defaultVolume": 40,
     "alarmVolume": 100,
     "ignoreZeroText": true,
-    "defaultDevices": [
-      "replace-with-echo-device-serial"
-    ],
-    "allDevices": [
-      "replace-with-echo-device-serial"
-    ],
-    "alarmDevices": [
-      "replace-with-echo-device-serial"
-    ]
+    "defaultDevices": [],
+    "allDevices": [],
+    "alarmDevices": []
   }
 }

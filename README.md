@@ -163,6 +163,8 @@ Wenn waehrend der Entwicklung Geraete mehrfach gefunden wurden, alte LoxEvo-Test
 
 ## TTS-API
 
+Echo-Geraete muessen nicht manuell geraten werden: In der Web-UI unter `Konfiguration -> TTS-Geraete` kann LoxEvo die Geraeteliste aus dem verbundenen Alexa-Konto laden. Dabei werden Name, Seriennummer und - falls von Alexa geliefert - die aktuelle Lautstaerke angezeigt.
+
 Normale Sprachausgabe:
 
 ```text
@@ -183,6 +185,8 @@ Lautstaerke:
 POST http://<loxberry>:8080/tts/lautstaerke
 Body: 70
 ```
+
+`/tts/speak` nutzt die konfigurierte Standard-Lautstaerke. `/tts/alarm` nutzt immer die Alarm-Lautstaerke und uebersteuert damit die aktuelle Echo-Lautstaerke fuer diese Ausgabe.
 
 ## Alexa2Lox-kompatibler TTS-Aufruf
 

@@ -174,25 +174,32 @@ export class TtsService {
       enabled: Boolean(this.config.enabled),
       ready: this.ready,
       error: this.lastError,
-      defaultDevices: this.config.defaultDevices || [],
-      allDevices: this.config.allDevices || [],
-      alarmDevices: this.config.alarmDevices || []
+      defaultDevices: configuredDeviceList(this.config.defaultDevices),
+      allDevices: configuredDeviceList(this.config.allDevices),
+      alarmDevices: configuredDeviceList(this.config.alarmDevices),
+      defaultVolume: normalizeVolume(this.config.defaultVolume, 40),
+      alarmVolume: normalizeVolume(this.config.alarmVolume, 100)
     };
   }
 
   async speak(text, devices = firstNonEmpty(this.config.defaultDevices)) {
     this.assertReady();
-    await this.sendSequence('speak', text, devices);
+    await this.speakAtVolume(text, normalizeVolume(this.config.defaultVolume, 40), devices);
   }
 
   async alarm(text, devices = firstNonEmpty(this.config.alarmDevices, this.config.allDevices, this.config.defaultDevices)) {
     this.assertReady();
-    await this.sendSequence('speakAtVolume', text, devices, Number(this.config.alarmVolume || 100));
+    await this.speakAtVolume(text, normalizeVolume(this.config.alarmVolume, 100), devices);
   }
 
-  async setVolume(volume, devices = firstNonEmpty(this.config.alarmDevices, this.config.allDevices, this.config.defaultDevices)) {
+  async speakAtVolume(text, volume, devices = firstNonEmpty(this.config.defaultDevices)) {
     this.assertReady();
-    const value = Number(volume);
+    await this.sendSequence('speakAtVolume', text, devices, normalizeVolume(volume, 40));
+  }
+
+  async setVolume(volume, devices = firstNonEmpty(this.config.allDevices, this.config.defaultDevices)) {
+    this.assertReady();
+    const value = normalizeVolume(volume, NaN);
     if (!Number.isFinite(value) || value < 0 || value > 100) {
       throw new Error(`Ungültige Alexa-Lautstärke: ${volume}`);
     }
@@ -200,6 +207,48 @@ export class TtsService {
     const targets = this.normalizeDevices(devices);
     this.assertDevices(targets);
     await Promise.all(targets.map((device) => this.exec(device, 'volume', value)));
+  }
+
+  async getDeviceInventory() {
+    this.assertReady();
+    const devices = await this.readRemoteDevices();
+    return normalizeDeviceList(devices);
+  }
+
+  async readRemoteDevices() {
+    if (typeof this.remote?.getDevices !== 'function') {
+      return serialNumberMapToDevices(this.remote?.serialNumbers);
+    }
+
+    return await new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (error, devices) => {
+        if (settled) return;
+        settled = true;
+        if (error) reject(error);
+        else resolve(devices || []);
+      };
+      const finishFromCallback = (error, devices) => {
+        if (devices === undefined && (Array.isArray(error) || isPlainObject(error))) {
+          finish(null, error);
+          return;
+        }
+        finish(error, devices);
+      };
+
+      try {
+        const result = this.remote.getDevices((error, devices) => finishFromCallback(error, devices));
+        if (Array.isArray(result)) finish(null, result);
+        else if (isPlainObject(result)) finish(null, Object.values(result));
+        else if (result && typeof result.then === 'function') {
+          result.then((devices) => finish(null, devices)).catch((error) => finish(error));
+        }
+      } catch (error) {
+        finish(error);
+      }
+
+      setTimeout(() => finish(null, serialNumberMapToDevices(this.remote?.serialNumbers)), 5000);
+    });
   }
 
   async sendSequence(type, text, devices, volume) {
@@ -235,10 +284,10 @@ export class TtsService {
 
   normalizeDevices(devices) {
     if (Array.isArray(devices)) {
-      return devices.map((device) => String(device).trim()).filter(Boolean);
+      return devices.map((device) => String(device).trim()).filter(isConfiguredDevice);
     }
     const device = String(devices || '').trim();
-    return device ? [device] : [];
+    return isConfiguredDevice(device) ? [device] : [];
   }
 
   assertDevices(devices) {
@@ -264,6 +313,74 @@ function loadAlexaRemote2() {
     }
   }
   throw lastError;
+}
+
+function normalizeVolume(value, fallback) {
+  const volume = Number(value);
+  if (!Number.isFinite(volume)) {
+    if (Number.isFinite(fallback)) return fallback;
+    throw new Error(`Ungültige Alexa-Lautstärke: ${value}`);
+  }
+  return Math.min(100, Math.max(0, Math.round(volume)));
+}
+
+function serialNumberMapToDevices(value) {
+  if (!isPlainObject(value)) return [];
+  return Object.entries(value).map(([serialNumber, device]) => ({
+    ...(isPlainObject(device) ? device : {}),
+    serialNumber
+  }));
+}
+
+function normalizeDeviceList(value) {
+  const rawDevices = Array.isArray(value) ? value : serialNumberMapToDevices(value);
+  const devices = new Map();
+  rawDevices.forEach((device) => {
+    if (!isPlainObject(device)) return;
+    const serial = firstText(
+      device.serialNumber,
+      device.deviceSerialNumber,
+      device.deviceSerial,
+      device.serial,
+      device.id
+    );
+    if (!serial) return;
+
+    devices.set(serial, {
+      serial,
+      name: firstText(
+        device.accountName,
+        device.deviceAccountName,
+        device.name,
+        device.friendlyName,
+        device.deviceName,
+        serial
+      ),
+      type: firstText(device.deviceTypeFriendlyName, device.deviceFamily, device.deviceType, device.productName),
+      volume: firstNumber(device.speakerVolume, device.volume, device.volumeLevel, device?.media?.volume),
+      online: device.online !== false && device.available !== false && device.isConnected !== false
+    });
+  });
+
+  return Array.from(devices.values()).sort((left, right) => (
+    left.name.localeCompare(right.name, 'de', { sensitivity: 'base' })
+  ));
+}
+
+function firstText(...values) {
+  for (const value of values) {
+    const text = String(value || '').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+function firstNumber(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number)) return Math.round(number);
+  }
+  return null;
 }
 
 export function parseAlexaCookieFile(content) {
@@ -395,5 +512,19 @@ function getDependencyInstallDir() {
 }
 
 function firstNonEmpty(...lists) {
-  return lists.find((list) => Array.isArray(list) && list.length > 0) || [];
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    const devices = list.map((device) => String(device).trim()).filter(isConfiguredDevice);
+    if (devices.length) return devices;
+  }
+  return [];
+}
+
+function isConfiguredDevice(device) {
+  const value = String(device || '').trim();
+  return Boolean(value && !value.includes('replace-with'));
+}
+
+function configuredDeviceList(value) {
+  return Array.isArray(value) ? value.map((device) => String(device).trim()).filter(isConfiguredDevice) : [];
 }

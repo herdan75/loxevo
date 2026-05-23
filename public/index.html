@@ -198,11 +198,13 @@
             <div class="form-row">
               <label>
                 Standard-Lautstärke
-                <input id="ttsDefaultVolume" type="number" min="0" max="100">
+                <span id="ttsDefaultVolumeValue" class="range-value">40%</span>
+                <input id="ttsDefaultVolume" type="range" min="0" max="100" step="1">
               </label>
               <label>
                 Alarm-Lautstärke
-                <input id="ttsAlarmVolume" type="number" min="0" max="100">
+                <span id="ttsAlarmVolumeValue" class="range-value">100%</span>
+                <input id="ttsAlarmVolume" type="range" min="0" max="100" step="1">
               </label>
             </div>
           </fieldset>
@@ -216,6 +218,11 @@
 
         <fieldset class="wide-fieldset">
           <legend>TTS-Geräte</legend>
+          <div class="section-head compact">
+            <p>Echo-Geräte aus Alexa laden und pro Zweck auswählen. Die Seriennummern werden automatisch in die Felder übernommen.</p>
+            <button id="refreshTtsDevicesBtn" type="button" class="secondary">Alexa-Geräte suchen</button>
+          </div>
+          <div id="ttsDeviceList" class="device-picker"></div>
           <div class="form-row three">
             <label>
               Standard-Geräte

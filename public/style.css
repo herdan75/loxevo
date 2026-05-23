@@ -405,6 +405,16 @@ label.is-disabled {
   line-height: 1.45;
 }
 
+.range-value {
+  justify-self: start;
+  min-width: 48px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e8f2f3;
+  color: var(--accent-strong);
+  font-size: 12px;
+}
+
 input,
 select,
 textarea {
@@ -432,6 +442,12 @@ textarea:disabled {
   cursor: not-allowed;
 }
 
+input[type='range'] {
+  padding-left: 0;
+  padding-right: 0;
+  accent-color: var(--accent);
+}
+
 .form-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -445,6 +461,59 @@ textarea:disabled {
 
 .form-row.four {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.section-head.compact {
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-head.compact p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.device-picker {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.device-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, auto) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.device-title {
+  display: grid;
+  gap: 3px;
+}
+
+.device-title span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.device-card code {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #f1f4f7;
+  color: var(--text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.device-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .checkbox-row {
@@ -918,6 +987,7 @@ pre {
   .form-row,
   .form-row.three,
   .form-row.four,
+  .device-card,
   .view,
   .scene-row {
     grid-template-columns: 1fr;

@@ -100,8 +100,8 @@ Eine echte Hue-Bridge ist dafür nicht nötig. LoxEvo stellt nur die lokale Disc
 3. Unter `Externe Aufrufe` die erzeugten Befehls- und TTS-Aufrufe pruefen.
 4. Optional unter `Konfiguration -> Alexa Geräte` die virtuellen Alexa-Geräte aktivieren und speichern.
 5. In der Alexa-App nach neuen Geräten suchen.
-6. TTS-Status kontrollieren.
-7. Wenn TTS bereit ist, eine kurze Testmeldung senden.
+6. TTS-Status kontrollieren und unter `Konfiguration -> TTS-Geräte` die Echo-Geräte aus Alexa laden.
+7. Standard- und Alarm-Geräte auswählen, Lautstärke-Schieber setzen und eine kurze Testmeldung senden.
 8. Erst danach `Dry-Run` deaktivieren und Loxone live schalten.
 
 ## Typische Fehlermeldungen

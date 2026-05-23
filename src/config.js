@@ -107,6 +107,6 @@ function normalizeConfig(config) {
   config.alexaBridge.enabled = config.alexaBridge.enabled === true;
   config.alexaBridge.name ||= config.server.name;
   config.alexaBridge.advertiseIp ||= '';
-  config.alexaBridge.advertisePort = Number(config.alexaBridge.advertisePort || config.server.port);
+  config.alexaBridge.advertisePort = Number(config.alexaBridge.advertisePort || 80);
   config.alexaBridge.bridgeId ||= '';
 }

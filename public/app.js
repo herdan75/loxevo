@@ -26,9 +26,13 @@ const ttsProxyOwnIp = document.querySelector('#ttsProxyOwnIp');
 const ttsProxyPort = document.querySelector('#ttsProxyPort');
 const ttsDefaultVolume = document.querySelector('#ttsDefaultVolume');
 const ttsAlarmVolume = document.querySelector('#ttsAlarmVolume');
+const ttsDefaultVolumeValue = document.querySelector('#ttsDefaultVolumeValue');
+const ttsAlarmVolumeValue = document.querySelector('#ttsAlarmVolumeValue');
 const ttsDefaultDevices = document.querySelector('#ttsDefaultDevices');
 const ttsAllDevices = document.querySelector('#ttsAllDevices');
 const ttsAlarmDevices = document.querySelector('#ttsAlarmDevices');
+const refreshTtsDevicesBtn = document.querySelector('#refreshTtsDevicesBtn');
+const ttsDeviceList = document.querySelector('#ttsDeviceList');
 const roomEditor = document.querySelector('#roomEditor');
 const addRoomBtn = document.querySelector('#addRoomBtn');
 const reloadJsonBtn = document.querySelector('#reloadJsonBtn');
@@ -55,6 +59,7 @@ let ttsStatus = null;
 let setupStatus = null;
 let dependencyInfo = null;
 let alexaBridgeInfo = null;
+let ttsDevices = [];
 
 load();
 
@@ -74,6 +79,21 @@ refreshIntegrationsBtn.addEventListener('click', () => {
 setupConfigBtn.addEventListener('click', () => showView('configView'));
 refreshMaintenanceBtn.addEventListener('click', () => loadDependencyStatus(refreshMaintenanceBtn));
 ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
+refreshTtsDevicesBtn?.addEventListener('click', () => loadTtsDevices(refreshTtsDevicesBtn));
+ttsDefaultVolume?.addEventListener('input', () => {
+  updateTtsVolumeLabels();
+  syncJsonFromForms();
+});
+ttsAlarmVolume?.addEventListener('input', () => {
+  updateTtsVolumeLabels();
+  syncJsonFromForms();
+});
+[ttsDefaultDevices, ttsAllDevices, ttsAlarmDevices].forEach((textarea) => {
+  textarea?.addEventListener('input', () => {
+    renderTtsDevices();
+    syncJsonFromForms();
+  });
+});
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => showView(button.dataset.tabTarget));
 });
@@ -85,6 +105,7 @@ async function load() {
     populateForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     await loadTtsStatus();
+    await loadTtsDevices();
     await loadAlexaBridgeStatus();
     await loadSetupStatus();
     loadDependencyStatus();
@@ -151,6 +172,7 @@ async function saveConfig(button) {
     renderCommands();
     renderCommandEditor();
     await loadTtsStatus();
+    await loadTtsDevices();
     await loadAlexaBridgeStatus();
     await loadSetupStatus();
     renderIntegrations();
@@ -174,6 +196,7 @@ async function saveJsonConfig(button) {
     renderCommands();
     renderCommandEditor();
     await loadTtsStatus();
+    await loadTtsDevices();
     await loadAlexaBridgeStatus();
     await loadSetupStatus();
     renderIntegrations();
@@ -321,6 +344,112 @@ function renderTtsStatus() {
     target.textContent = text;
     target.className = className;
   });
+}
+
+async function loadTtsDevices(button) {
+  if (!ttsDeviceList) return;
+  if (!ttsStatus?.ready) {
+    ttsDevices = [];
+    renderTtsDevices();
+    return;
+  }
+
+  if (button) setButtonFeedback(button, 'pending', 'Sucht');
+  try {
+    const response = await fetch(`/api/tts/devices?ts=${Date.now()}`, { cache: 'no-store' });
+    await ensureOk(response);
+    const payload = await response.json();
+    ttsDevices = Array.isArray(payload.devices) ? payload.devices : [];
+    renderTtsDevices();
+    if (button) {
+      setButtonFeedback(button, 'success', 'Gefunden');
+      showToast(`${ttsDevices.length} Alexa-Geräte geladen`, 'ok');
+    }
+  } catch (error) {
+    ttsDevices = [];
+    renderTtsDevices(error.message);
+    if (button) setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
+}
+
+function renderTtsDevices(errorText = '') {
+  if (!ttsDeviceList) return;
+
+  if (errorText) {
+    ttsDeviceList.innerHTML = `<div class="service-status error">${escapeHtml(errorText)}</div>`;
+    return;
+  }
+
+  if (!ttsStatus?.ready) {
+    ttsDeviceList.innerHTML = '<p class="empty">TTS muss bereit sein, bevor Alexa-Geräte geladen werden können.</p>';
+    return;
+  }
+
+  if (!ttsDevices.length) {
+    ttsDeviceList.innerHTML = '<p class="empty">Noch keine Alexa-Geräte geladen. Mit "Alexa-Geräte suchen" wird die Liste aus dem Amazon-Konto abgefragt.</p>';
+    return;
+  }
+
+  const selected = {
+    default: new Set(linesToList(ttsDefaultDevices.value)),
+    all: new Set(linesToList(ttsAllDevices.value)),
+    alarm: new Set(linesToList(ttsAlarmDevices.value))
+  };
+
+  ttsDeviceList.innerHTML = '';
+  ttsDevices.forEach((device) => {
+    const card = document.createElement('div');
+    card.className = 'device-card';
+
+    const title = document.createElement('div');
+    title.className = 'device-title';
+    const name = document.createElement('strong');
+    name.textContent = device.name || device.serial;
+    const meta = document.createElement('span');
+    const volume = Number.isFinite(Number(device.volume)) ? `${device.volume}%` : 'unbekannt';
+    meta.textContent = `${device.type || 'Echo-Gerät'} · Lautstärke: ${volume}`;
+    title.append(name, meta);
+
+    const serial = document.createElement('code');
+    serial.textContent = device.serial;
+
+    const choices = document.createElement('div');
+    choices.className = 'device-choices';
+    [
+      ['default', 'Standard'],
+      ['all', 'Alle'],
+      ['alarm', 'Alarm']
+    ].forEach(([group, label]) => {
+      const row = document.createElement('label');
+      row.className = 'checkbox-row inline';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = selected[group].has(device.serial);
+      checkbox.addEventListener('change', () => updateTtsDeviceSelection(group, device.serial, checkbox.checked));
+      const text = document.createElement('span');
+      text.textContent = label;
+      row.append(checkbox, text);
+      choices.append(row);
+    });
+
+    card.append(title, serial, choices);
+    ttsDeviceList.append(card);
+  });
+}
+
+function updateTtsDeviceSelection(group, serial, enabled) {
+  const textarea = {
+    default: ttsDefaultDevices,
+    all: ttsAllDevices,
+    alarm: ttsAlarmDevices
+  }[group];
+  if (!textarea) return;
+
+  const values = linesToList(textarea.value).filter((value) => value !== serial && !value.includes('replace-with'));
+  if (enabled) values.push(serial);
+  textarea.value = listToLines([...new Set(values)]);
+  syncConfigFromForms();
 }
 
 function deviceCount(devices) {
@@ -646,9 +775,20 @@ function populateForms() {
   ttsProxyPort.value = config.tts?.proxyPort || '';
   ttsDefaultVolume.value = config.tts?.defaultVolume ?? 40;
   ttsAlarmVolume.value = config.tts?.alarmVolume ?? 100;
+  updateTtsVolumeLabels();
   ttsDefaultDevices.value = listToLines(config.tts?.defaultDevices);
   ttsAllDevices.value = listToLines(config.tts?.allDevices);
   ttsAlarmDevices.value = listToLines(config.tts?.alarmDevices);
+  renderTtsDevices();
+}
+
+function updateTtsVolumeLabels() {
+  if (ttsDefaultVolumeValue && ttsDefaultVolume) {
+    ttsDefaultVolumeValue.textContent = `${ttsDefaultVolume.value || 0}%`;
+  }
+  if (ttsAlarmVolumeValue && ttsAlarmVolume) {
+    ttsAlarmVolumeValue.textContent = `${ttsAlarmVolume.value || 0}%`;
+  }
 }
 
 function renderCommandEditor() {
@@ -1032,9 +1172,9 @@ function collectConfigFromForms() {
   nextConfig.tts.proxyPort = ttsProxyPort.value ? numberInRange(ttsProxyPort.value, 0, 0, 65535) : 0;
   nextConfig.tts.defaultVolume = numberInRange(ttsDefaultVolume.value, 40);
   nextConfig.tts.alarmVolume = numberInRange(ttsAlarmVolume.value, 100);
-  nextConfig.tts.defaultDevices = linesToList(ttsDefaultDevices.value);
-  nextConfig.tts.allDevices = linesToList(ttsAllDevices.value);
-  nextConfig.tts.alarmDevices = linesToList(ttsAlarmDevices.value);
+  nextConfig.tts.defaultDevices = linesToDeviceList(ttsDefaultDevices.value);
+  nextConfig.tts.allDevices = linesToDeviceList(ttsAllDevices.value);
+  nextConfig.tts.alarmDevices = linesToDeviceList(ttsAlarmDevices.value);
 
   return nextConfig;
 }
@@ -1288,6 +1428,10 @@ function linesToList(value) {
     .split(/\r?\n|,/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function linesToDeviceList(value) {
+  return linesToList(value).filter((item) => !item.includes('replace-with'));
 }
 
 function numberInRange(value, fallback, min = 0, max = 100) {

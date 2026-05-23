@@ -238,8 +238,8 @@ async function handleTts(req, res, pathParts, body) {
   }
 
   const targetDevices = payload.devices || firstNonEmpty(config.tts?.defaultDevices);
-  await tts.speak(payload.text, targetDevices, payload.volume);
-  addEvent({ type: 'tts-speak', status: 'sent', text: payload.text, volume: payload.volume, devices: targetDevices });
+  await tts.speak(payload.text, targetDevices);
+  addEvent({ type: 'tts-speak', status: 'sent', text: payload.text, devices: targetDevices });
   return sendJson(res, { ok: true, command: 'speak', devices: targetDevices });
 }
 

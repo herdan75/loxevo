@@ -232,12 +232,15 @@ async function postTtsTest(kind, button) {
   const devices = isAlarm
     ? firstDeviceList(ttsAlarmDevices.value, ttsAllDevices.value, ttsDefaultDevices.value)
     : firstDeviceList(ttsDefaultDevices.value);
-  const volume = Number(isAlarm ? ttsAlarmVolume.value : ttsDefaultVolume.value);
-
   const payload = {
-    text: ttsText.value,
-    volume: Number.isFinite(volume) ? volume : undefined
+    text: ttsText.value
   };
+  if (isAlarm) {
+    const volume = Number(ttsAlarmVolume.value);
+    if (Number.isFinite(volume)) {
+      payload.volume = volume;
+    }
+  }
   if (devices.length) {
     payload.devices = devices;
   }

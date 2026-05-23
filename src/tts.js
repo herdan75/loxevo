@@ -183,11 +183,10 @@ export class TtsService {
     };
   }
 
-  async speak(text, devices = firstNonEmpty(this.config.defaultDevices), volume = this.config.defaultVolume) {
+  async speak(text, devices = firstNonEmpty(this.config.defaultDevices)) {
     this.assertReady();
     const targets = this.normalizeDevices(devices);
     this.assertDevices(targets);
-    await this.sendCommandToTargets('volume', normalizeVolume(volume, 40), targets);
     await this.sendSequenceToTargets('speak', text, targets);
   }
 

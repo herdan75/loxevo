@@ -365,10 +365,11 @@ main {
   display: grid;
 }
 
-.config-grid {
+.config-sections {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
+  align-items: start;
 }
 
 fieldset {
@@ -384,6 +385,43 @@ legend {
   padding: 0 6px;
   color: var(--accent-strong);
   font-weight: 700;
+}
+
+.config-section {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.config-section summary {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 14px;
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.config-section summary::marker {
+  color: var(--muted);
+}
+
+.config-section[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.config-section-body {
+  padding: 16px;
+}
+
+.config-section-body > :first-child {
+  margin-top: 0;
+}
+
+.config-section.wide-fieldset {
+  margin-top: 12px;
 }
 
 label {
@@ -534,7 +572,7 @@ input[type='range'] {
 }
 
 .wide-fieldset {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .room-editor {
@@ -663,20 +701,9 @@ input[type='range'] {
 
 .expert-json {
   margin-top: 16px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fbfcfd;
-}
-
-.expert-json summary {
-  cursor: pointer;
-  color: var(--accent-strong);
-  font-weight: 700;
 }
 
 .expert-json p {
-  margin-top: 8px;
   color: var(--muted);
   font-size: 14px;
 }
@@ -983,7 +1010,7 @@ pre {
     grid-template-columns: 1fr;
   }
 
-  .config-grid,
+  .config-sections,
   .form-row,
   .form-row.three,
   .form-row.four,

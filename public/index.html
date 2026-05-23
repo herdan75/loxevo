@@ -115,9 +115,10 @@
           <button id="saveBtn">Konfiguration speichern</button>
         </div>
 
-        <div class="config-grid">
-          <fieldset>
-            <legend>Loxone</legend>
+        <div class="config-sections">
+          <details class="config-section" open>
+            <summary>Loxone</summary>
+            <div class="config-section-body">
             <label>
               Miniserver URL
               <input id="loxoneBaseUrl" type="url" placeholder="http://192.168.1.100">
@@ -132,10 +133,12 @@
                 <input id="loxonePassword" type="password" autocomplete="current-password">
               </label>
             </div>
-          </fieldset>
+            </div>
+          </details>
 
-          <fieldset>
-            <legend>Alexa Geräte</legend>
+          <details class="config-section">
+            <summary>Alexa Geräte</summary>
+            <div class="config-section-body">
             <div id="alexaBridgeStatus" class="service-status">Alexa-Geräte-Status wird geladen...</div>
             <label class="checkbox-row">
               <input id="alexaBridgeEnabled" type="checkbox">
@@ -156,10 +159,12 @@
               </label>
             </div>
             <p class="field-hint">Nach dem Speichern in der Alexa-App nach neuen Geräten suchen. Jeder aktive Befehl wird als virtuelles Gerät angeboten. Alexa/Hue sollte Port 80 verwenden; die Web-UI kann weiter auf Port 8080 laufen. Bei mehreren Netzwerkschnittstellen hier die echte LAN-IP eintragen.</p>
-          </fieldset>
+            </div>
+          </details>
 
-          <fieldset>
-            <legend>Alexa TTS</legend>
+          <details class="config-section">
+            <summary>Alexa TTS</summary>
+            <div class="config-section-body">
             <div class="status-help-row">
               <div id="ttsConfigStatus" class="service-status">TTS-Status wird geladen...</div>
               <button id="ttsHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="ttsHelpText" aria-label="TTS-Hilfe anzeigen">i</button>
@@ -207,17 +212,21 @@
                 <input id="ttsAlarmVolume" type="range" min="0" max="100" step="1">
               </label>
             </div>
-          </fieldset>
+            </div>
+          </details>
         </div>
 
-        <fieldset class="wide-fieldset">
-          <legend>Befehle und Sprachnamen</legend>
+        <details class="config-section wide-fieldset">
+          <summary>Befehle und Sprachnamen</summary>
+          <div class="config-section-body">
           <div id="roomEditor" class="room-editor"></div>
           <button id="addRoomBtn" type="button" class="secondary">Befehl hinzufügen</button>
-        </fieldset>
+          </div>
+        </details>
 
-        <fieldset class="wide-fieldset">
-          <legend>TTS-Geräte</legend>
+        <details class="config-section wide-fieldset">
+          <summary>TTS-Geräte</summary>
+          <div class="config-section-body">
           <div class="section-head compact">
             <p>Echo-Geräte aus Alexa laden und bei Standard, Alle oder Alarm anhaken. Die Seriennummern werden automatisch in die Felder übernommen.</p>
             <button id="refreshTtsDevicesBtn" type="button" class="secondary">Alexa-Geräte suchen</button>
@@ -237,16 +246,19 @@
               <textarea id="ttsAlarmDevices" rows="4" placeholder="Ein Gerät pro Zeile"></textarea>
             </label>
           </div>
-        </fieldset>
+          </div>
+        </details>
 
-        <details class="expert-json">
+        <details class="config-section expert-json">
           <summary>Expertenansicht JSON</summary>
+          <div class="config-section-body">
           <p>Nur nutzen, wenn du direkt in die komplette Konfiguration eingreifen willst. <code>server.port</code> ist die Web-UI/API, <code>alexaBridge.advertisePort</code> ist der Alexa/Hue-Port.</p>
           <div class="actions">
             <button id="reloadJsonBtn" type="button" class="secondary">Aus Formular neu erzeugen</button>
             <button id="saveJsonBtn" type="button">JSON speichern</button>
           </div>
           <textarea id="configEditor" spellcheck="false"></textarea>
+          </div>
         </details>
       </section>
 

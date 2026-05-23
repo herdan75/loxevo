@@ -407,8 +407,7 @@ function renderTtsDevices(errorText = '') {
     const name = document.createElement('strong');
     name.textContent = device.name || device.serial;
     const meta = document.createElement('span');
-    const volume = Number.isFinite(Number(device.volume)) ? `${device.volume}%` : 'unbekannt';
-    meta.textContent = `${device.type || 'Echo-Gerät'} · Lautstärke: ${volume}`;
+    meta.textContent = device.type || 'Echo-Gerät';
     title.append(name, meta);
 
     const serial = document.createElement('code');

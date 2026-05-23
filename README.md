@@ -163,7 +163,7 @@ Wenn waehrend der Entwicklung Geraete mehrfach gefunden wurden, alte LoxEvo-Test
 
 ## TTS-API
 
-Echo-Geraete muessen nicht manuell geraten werden: In der Web-UI unter `Konfiguration -> TTS-Geraete` kann LoxEvo die Geraeteliste aus dem verbundenen Alexa-Konto laden. Dabei werden Name, Seriennummer und - falls von Alexa geliefert - die aktuelle Lautstaerke angezeigt.
+Echo-Geraete muessen nicht manuell geraten werden: In der Web-UI unter `Konfiguration -> TTS-Geraete` kann LoxEvo die Geraeteliste aus dem verbundenen Alexa-Konto laden. Dabei werden Name und Seriennummer angezeigt und per Checkbox in Standard-, Alle- oder Alarm-Geraete uebernommen.
 
 Normale Sprachausgabe:
 

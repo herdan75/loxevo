@@ -239,7 +239,7 @@ export class TtsService {
       try {
         const result = this.remote.getDevices((error, devices) => finishFromCallback(error, devices));
         if (Array.isArray(result)) finish(null, result);
-        else if (isPlainObject(result)) finish(null, Object.values(result));
+        else if (isPlainObject(result)) finish(null, result);
         else if (result && typeof result.then === 'function') {
           result.then((devices) => finish(null, devices)).catch((error) => finish(error));
         }
@@ -333,7 +333,7 @@ function serialNumberMapToDevices(value) {
 }
 
 function normalizeDeviceList(value) {
-  const rawDevices = Array.isArray(value) ? value : serialNumberMapToDevices(value);
+  const rawDevices = extractDeviceCandidates(value);
   const devices = new Map();
   rawDevices.forEach((device) => {
     if (!isPlainObject(device)) return;
@@ -357,7 +357,6 @@ function normalizeDeviceList(value) {
         serial
       ),
       type: firstText(device.deviceTypeFriendlyName, device.deviceFamily, device.deviceType, device.productName),
-      volume: firstNumber(device.speakerVolume, device.volume, device.volumeLevel, device?.media?.volume),
       online: device.online !== false && device.available !== false && device.isConnected !== false
     });
   });
@@ -367,20 +366,74 @@ function normalizeDeviceList(value) {
   ));
 }
 
+function extractDeviceCandidates(value) {
+  const candidates = [];
+  const seen = new Set();
+
+  const visit = (item, mapKey = '') => {
+    if (Array.isArray(item)) {
+      item.forEach((entry) => visit(entry));
+      return;
+    }
+    if (!isPlainObject(item)) return;
+    if (seen.has(item)) return;
+    seen.add(item);
+
+    const nestedKeys = ['devices', 'deviceList', 'deviceStates', 'alexaDevices'];
+    let usedNestedList = false;
+    for (const key of nestedKeys) {
+      if (Array.isArray(item[key])) {
+        usedNestedList = true;
+        visit(item[key]);
+      }
+    }
+
+    if (looksLikeAlexaDevice(item)) {
+      candidates.push(withFallbackSerial(item, mapKey));
+      return;
+    }
+
+    if (usedNestedList) return;
+
+    for (const [key, entry] of Object.entries(item)) {
+      if (isPlainObject(entry) || Array.isArray(entry)) {
+        visit(entry, key);
+      }
+    }
+  };
+
+  visit(value);
+  return candidates;
+}
+
+function looksLikeAlexaDevice(value) {
+  return Boolean(
+    isPlainObject(value) &&
+    firstText(
+      value.serialNumber,
+      value.deviceSerialNumber,
+      value.deviceSerial,
+      value.accountName,
+      value.deviceAccountName,
+      value.deviceType,
+      value.deviceFamily
+    )
+  );
+}
+
+function withFallbackSerial(device, fallbackSerial) {
+  if (!fallbackSerial || firstText(device.serialNumber, device.deviceSerialNumber, device.deviceSerial, device.serial, device.id)) {
+    return device;
+  }
+  return { ...device, serialNumber: fallbackSerial };
+}
+
 function firstText(...values) {
   for (const value of values) {
     const text = String(value || '').trim();
     if (text) return text;
   }
   return '';
-}
-
-function firstNumber(...values) {
-  for (const value of values) {
-    const number = Number(value);
-    if (Number.isFinite(number)) return Math.round(number);
-  }
-  return null;
 }
 
 export function parseAlexaCookieFile(content) {

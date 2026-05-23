@@ -33,7 +33,7 @@ Loxone
 Der aktuelle Stand ist eine Docker-faehige Basis mit HTTP-API, Web-UI, generischen Loxone-Befehlen und integriertem TTS-Modul.
 Loxone-Befehle laufen standardmaessig im Dry-Run-Modus, damit lokal gefahrlos getestet werden kann.
 Wenn TTS aktiviert wird, aber `alexa-remote2` oder die Cookie-Datei noch fehlt, startet LoxEvo trotzdem weiter und zeigt den TTS-Status in der Web-UI an.
-Optional kann LoxEvo virtuelle Alexa-Geraete im lokalen Netzwerk bereitstellen. Alexa findet diese Geraete ueber die lokale Geraetesuche; ein Einschaltbefehl wie `Alexa, Licht Kueche Hell an` loest dann den passenden LoxEvo-Befehl aus.
+Optional kann LoxEvo virtuelle Alexa-Geraete im lokalen Netzwerk bereitstellen. Alexa findet diese Geraete ueber die lokale Geraetesuche; ein Einschaltbefehl wie `Alexa, <Geraetename> an` loest dann den passenden LoxEvo-Befehl aus.
 
 ## Setup
 
@@ -105,14 +105,14 @@ Echte Loxone-Requests aktivieren:
 POST http://<loxberry>:8080/api/command
 Content-Type: application/json
 
-{"command":"kueche_licht_hell"}
+{"command":"beispiel_befehl"}
 ```
 
-Die Befehle werden in der Web-UI frei angelegt. Beispiel: `kueche_licht_hell` kann als Sprachname `Kueche Licht Hell`, als Raum `kueche`, als Funktion `licht` und als Aktion `hell` bekommen.
+Die Befehle werden in der Web-UI frei angelegt. Der Name `beispiel_befehl` steht hier nur als Platzhalter; in deiner Installation kann jeder aktive Befehl einen eigenen Schluessel, Anzeigenamen, Sprachnamen, Raum, Funktion und Aktion bekommen.
 
 Unterstuetzte Loxone-Befehlstypen:
 
-- `changeTo`: `/jdev/sps/io/<uuid>/changeTo/<wert>` fuer Lichtstimmungen und Szenen
+- `changeTo`: `/jdev/sps/io/<uuid>/changeTo/<wert>` fuer Szenen, Werte oder Zustaende
 - `direct`: `/jdev/sps/io/<uuid>/<wert>` fuer Befehle wie `FullUp`, `FullDown`, `on`, `off` oder Nummernwerte
 - `pulse`: `/jdev/sps/io/<uuid>/pulse` fuer Taster
 - `raw`: frei definierter Pfad, optional mit `{uuid}`, `{value}` oder `{command}`
@@ -135,7 +135,7 @@ Content-Type: application/json
 Kurzform:
 
 ```text
-POST http://<loxberry>:8080/command/kueche_licht_hell
+POST http://<loxberry>:8080/command/beispiel_befehl
 ```
 
 Die alte Kurzform `/light/<raum>/<szene>` bleibt vorerst als Legacy-Einstieg erhalten, wenn eine alte `rooms`-Konfiguration vorhanden ist.
@@ -156,10 +156,10 @@ Typischer Ablauf:
 Alexa-App -> Geraete -> + -> Geraet hinzufuegen -> Andere -> Geraete suchen
 ```
 
-Danach kann ein Befehl wie `kueche_licht_hell` ueber den angezeigten Geraetenamen ausgelöst werden:
+Danach kann ein Befehl ueber den angezeigten Geraetenamen ausgeloest werden:
 
 ```text
-Alexa, Licht Kueche Hell an
+Alexa, <Geraetename> an
 ```
 
 LoxEvo behandelt diese Geraete als Taster: `an` loest den hinterlegten Befehl aus. `aus` setzt nur den virtuellen Zustand zurueck.
@@ -173,7 +173,7 @@ Normale Sprachausgabe:
 
 ```text
 POST http://<loxberry>:8080/tts/speak
-Body: Geschirrspueler ist fertig.
+Body: Dies ist eine Beispielmeldung.
 ```
 
 Alarm:
@@ -195,8 +195,8 @@ Body: 70
 Loxone-Kurzpfade fuer virtuelle Ausgangsbefehle:
 
 ```text
-POST http://<loxberry>:8080/geschirrspueler
-Body: Geschirrspueler ist fertig.
+POST http://<loxberry>:8080/meldung
+Body: Dies ist eine Beispielmeldung.
 
 POST http://<loxberry>:8080/alarm
 Body: Achtung, Alarm wurde ausgeloest.
@@ -238,7 +238,7 @@ Fuer jede Meldung einen virtuellen Ausgangsbefehl unter dem LoxEvo-Ausgang anleg
 
 ```text
 Befehl bei EIN:
-/geschirrspueler
+/hinweis
 
 HTTP header bei EIN:
 leer lassen
@@ -247,16 +247,16 @@ HTTP Methode bei EIN:
 POST
 
 HTTP body bei EIN:
-Geschirrspueler ist fertig. Bitte Tuere oeffnen, damit das Geschirr trocknen kann.
+Dies ist eine Beispielmeldung aus Loxone.
 
 Befehl bei AUS:
 leer lassen
 ```
 
 Der Pfad nach dem Slash ist frei waehlbar. LoxEvo nutzt ihn als Namen im Protokoll. Gesprochen wird der Text aus `HTTP body bei EIN`.
-Alternativ kann in `Befehl bei EIN` auch die komplette URL stehen, zum Beispiel `http://192.168.178.5:8080/geschirrspueler`. Uebersichtlicher ist aber der zentrale virtuelle Ausgang mit kurzer Pfadangabe.
+Alternativ kann in `Befehl bei EIN` auch die komplette URL stehen, zum Beispiel `http://192.168.178.5:8080/hinweis`. Uebersichtlicher ist aber der zentrale virtuelle Ausgang mit kurzer Pfadangabe.
 
-Weitere Beispiele:
+Weitere rein beispielhafte Meldungen:
 
 ```text
 Befehl bei EIN: /luefter_dusche_manuell_aus
@@ -381,8 +381,8 @@ Dadurch bleiben Loxone-Ausgaenge einfach: Loxone sendet nur Pfad und Text, LoxEv
 Zusaetzlich gibt es einen Alexa2Lox-aehnlichen Einstieg fuer Systeme, die TTS lieber mit Query-Parametern ausloesen:
 
 ```text
-GET http://<loxberry>:8080/admin/plugins/alexa2lox/tts.php?device=Kueche&text=Hallo&vol=50
-GET http://<loxberry>:8080/admin/plugins/alexa2lox/tts.php?d=Kueche&t=Hallo&vol=50
+GET http://<loxberry>:8080/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50
+GET http://<loxberry>:8080/admin/plugins/alexa2lox/tts.php?d=ALL&t=Hallo&vol=50
 ```
 
 Unterstuetzt:

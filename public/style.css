@@ -626,6 +626,7 @@ input[type='range'] {
 }
 
 .category-group > .scene-grid,
+.category-group > .service-status,
 .category-group > .endpoint-card,
 .category-group > .room-card {
   margin: 0 14px 14px;

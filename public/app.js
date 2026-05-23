@@ -42,7 +42,6 @@ const views = document.querySelectorAll('.view');
 const refreshIntegrationsBtn = document.querySelector('#refreshIntegrationsBtn');
 const lightEndpoints = document.querySelector('#lightEndpoints');
 const alexaDevices = document.querySelector('#alexaDevices');
-const ttsEndpoints = document.querySelector('#ttsEndpoints');
 const ttsStatusCard = document.querySelector('#ttsStatusCard');
 const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
 const ttsHelpBtn = document.querySelector('#ttsHelpBtn');
@@ -66,8 +65,8 @@ load();
 saveBtn.addEventListener('click', () => saveConfig(saveBtn));
 saveJsonBtn.addEventListener('click', () => saveJsonConfig(saveJsonBtn));
 reloadJsonBtn.addEventListener('click', () => regenerateJsonFromForms(reloadJsonBtn));
-speakBtn.addEventListener('click', () => postText('/tts/speak', ttsText.value, speakBtn, 'TTS gesendet'));
-alarmBtn.addEventListener('click', () => postText('/tts/alarm', ttsText.value, alarmBtn, 'Alarm gesendet'));
+speakBtn.addEventListener('click', () => postTtsTest('speak', speakBtn));
+alarmBtn.addEventListener('click', () => postTtsTest('alarm', alarmBtn));
 refreshEventsBtn.addEventListener('click', () => loadEvents(refreshEventsBtn));
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 addRoomBtn.addEventListener('click', addRoom);
@@ -227,6 +226,40 @@ async function postText(url, text, button, successText = 'TTS gesendet') {
   }
 }
 
+async function postTtsTest(kind, button) {
+  const isAlarm = kind === 'alarm';
+  const endpoint = isAlarm ? '/tts/alarm' : '/tts/speak';
+  const devices = isAlarm
+    ? firstDeviceList(ttsAlarmDevices.value, ttsAllDevices.value, ttsDefaultDevices.value)
+    : firstDeviceList(ttsDefaultDevices.value);
+  const volume = Number(isAlarm ? ttsAlarmVolume.value : ttsDefaultVolume.value);
+
+  const payload = {
+    text: ttsText.value,
+    volume: Number.isFinite(volume) ? volume : undefined
+  };
+  if (devices.length) {
+    payload.devices = devices;
+  }
+
+  setButtonFeedback(button, 'pending', 'Sendet');
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    await ensureOk(response);
+    await loadTtsStatus();
+    await loadEvents();
+    setButtonFeedback(button, 'success', 'Gesendet');
+    showToast(isAlarm ? 'Alarm gesendet' : 'TTS gesendet', 'ok');
+  } catch (error) {
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
+}
+
 async function postJson(url, payload) {
   const response = await fetch(url, {
     method: 'POST',
@@ -328,22 +361,32 @@ function renderTtsStatus() {
   const targets = [ttsStatusCard, ttsConfigStatus].filter(Boolean);
   if (!targets.length) return;
 
-  const status = ttsStatus || { enabled: false, ready: false };
-  let text = 'TTS ist deaktiviert.';
-  let className = 'service-status disabled';
-
-  if (status.enabled && status.ready) {
-    text = `TTS ist bereit. Standard: ${deviceCount(status.defaultDevices)}, Alarm: ${deviceCount(status.alarmDevices)}.`;
-    className = 'service-status ready';
-  } else if (status.enabled) {
-    text = humanizeTtsStatusError(status.error);
-    className = 'service-status error';
-  }
+  const { text, className } = ttsStatusView();
 
   targets.forEach((target) => {
     target.textContent = text;
     target.className = className;
   });
+}
+
+function ttsStatusView() {
+  const status = ttsStatus || { enabled: false, ready: false };
+  if (status.enabled && status.ready) {
+    return {
+      text: `TTS ist bereit. Standard: ${deviceCount(status.defaultDevices)}, Alarm: ${deviceCount(status.alarmDevices)}.`,
+      className: 'service-status ready'
+    };
+  }
+  if (status.enabled) {
+    return {
+      text: humanizeTtsStatusError(status.error),
+      className: 'service-status error'
+    };
+  }
+  return {
+    text: 'TTS ist deaktiviert.',
+    className: 'service-status disabled'
+  };
 }
 
 async function loadTtsDevices(button) {
@@ -920,7 +963,7 @@ function addRoom() {
 }
 
 function renderIntegrations() {
-  if (!lightEndpoints || !ttsEndpoints || !config) return;
+  if (!lightEndpoints || !config) return;
 
   const baseUrl = window.location.origin;
   lightEndpoints.innerHTML = '';
@@ -950,10 +993,25 @@ function renderIntegrations() {
     lightEndpoints.append(group);
   });
 
-  renderAlexaDevices();
+  lightEndpoints.append(createTtsEndpointGroup(baseUrl, runnableCommands.length === 0));
 
-  ttsEndpoints.innerHTML = '';
-  ttsEndpoints.append(createEndpointCard({
+  renderAlexaDevices();
+}
+
+function createTtsEndpointGroup(baseUrl, open = false) {
+  const cards = createTtsEndpointCards(baseUrl);
+  const group = createCategoryGroup('TTS', cards.length, open);
+  const status = document.createElement('div');
+  const statusView = ttsStatusView();
+  status.className = statusView.className;
+  status.textContent = statusView.text;
+  group.append(status, ...cards);
+  return group;
+}
+
+function createTtsEndpointCards(baseUrl) {
+  return [
+    createEndpointCard({
     title: 'TTS normal',
     method: 'POST',
     url: `${baseUrl}/tts/speak`,
@@ -967,8 +1025,8 @@ function renderIntegrations() {
       contentType: 'text/plain',
       successText: 'TTS normal'
     }, button)
-  }));
-  ttsEndpoints.append(createEndpointCard({
+    }),
+    createEndpointCard({
     title: 'Alarm',
     method: 'POST',
     url: `${baseUrl}/tts/alarm`,
@@ -982,8 +1040,23 @@ function renderIntegrations() {
       contentType: 'text/plain',
       successText: 'Alarm'
     }, button)
-  }));
-  ttsEndpoints.append(createEndpointCard({
+    }),
+    createEndpointCard({
+    title: 'Lautstärke setzen',
+    method: 'POST',
+    url: `${baseUrl}/tts/volume`,
+    body: String(ttsDefaultVolume?.value || 40),
+    note: 'Setzt die Lautstärke der Alle-Geräte, sonst der Standard-Geräte.',
+    testLabel: 'Lautstärke setzen',
+    testAction: (button) => testEndpoint({
+      method: 'POST',
+      url: `${baseUrl}/tts/volume`,
+      body: String(ttsDefaultVolume?.value || 40),
+      contentType: 'text/plain',
+      successText: 'Lautstärke'
+    }, button)
+    }),
+    createEndpointCard({
     title: 'Alexa2Lox-kompatibel',
     method: 'GET',
     url: `${baseUrl}/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50`,
@@ -995,7 +1068,8 @@ function renderIntegrations() {
       url: `${baseUrl}/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50`,
       successText: 'Alexa2Lox TTS'
     }, button)
-  }));
+    })
+  ];
 }
 
 function createEndpointCard({ title, method, url, body, note, testLabel, testAction }) {
@@ -1435,6 +1509,14 @@ function linesToDeviceList(value) {
   return linesToList(value).filter((item) => !item.includes('replace-with'));
 }
 
+function firstDeviceList(...values) {
+  for (const value of values) {
+    const devices = linesToDeviceList(value);
+    if (devices.length) return devices;
+  }
+  return [];
+}
+
 function numberInRange(value, fallback, min = 0, max = 100) {
   if (String(value ?? '').trim() === '') return fallback;
   const number = Number(value);
@@ -1524,10 +1606,22 @@ function renderEvents(events) {
     meta.textContent = `${formatTime(event.at)} | ${event.type} | ${event.status}`;
     const detail = document.createElement('div');
     detail.className = 'event-detail';
-    detail.textContent = event.url || event.text || JSON.stringify(event);
+    detail.textContent = eventDetailText(event);
     row.append(meta, detail);
     eventsEl.append(row);
   });
+}
+
+function eventDetailText(event) {
+  if (String(event.type || '').startsWith('tts')) {
+    const parts = [];
+    if (event.text) parts.push(event.text);
+    if (event.volume !== undefined) parts.push(`Lautstärke: ${event.volume}`);
+    if (Array.isArray(event.devices) && event.devices.length) parts.push(`Geräte: ${event.devices.join(', ')}`);
+    if (event.compat) parts.push(`Quelle: ${event.compat}`);
+    return parts.join(' | ') || JSON.stringify(event);
+  }
+  return event.url || event.text || JSON.stringify(event);
 }
 
 function escapeHtml(value) {

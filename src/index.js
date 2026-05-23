@@ -224,25 +224,51 @@ async function handleTts(req, res, pathParts, body) {
   }
 
   const cmd = pathParts[1] || 'speak';
+  const payload = parseTtsPayload(body);
   if (cmd === 'lautstaerke' || cmd === 'volume') {
-    await tts.setVolume(body);
-    addEvent({ type: 'tts-volume', status: 'sent', volume: body });
-    return sendJson(res, { ok: true, command: 'volume' });
+    await tts.setVolume(payload.volume ?? payload.text, payload.devices);
+    addEvent({ type: 'tts-volume', status: 'sent', volume: payload.volume ?? payload.text, devices: payload.devices });
+    return sendJson(res, { ok: true, command: 'volume', devices: payload.devices || [] });
   }
   if (cmd === 'alarm') {
-    await tts.alarm(body);
-    addEvent({ type: 'tts-alarm', status: 'sent', text: body });
-    return sendJson(res, { ok: true, command: 'alarm' });
+    const targetDevices = payload.devices || firstNonEmpty(config.tts?.alarmDevices, config.tts?.allDevices, config.tts?.defaultDevices);
+    if (payload.volume !== undefined) {
+      await tts.speakAtVolume(payload.text, payload.volume, targetDevices);
+    } else {
+      await tts.alarm(payload.text, targetDevices);
+    }
+    addEvent({ type: 'tts-alarm', status: 'sent', text: payload.text, volume: payload.volume, devices: targetDevices });
+    return sendJson(res, { ok: true, command: 'alarm', devices: targetDevices });
   }
 
-  await tts.speak(body);
-  addEvent({ type: 'tts-speak', status: 'sent', text: body });
-  return sendJson(res, { ok: true, command: 'speak' });
+  if (payload.volume !== undefined) {
+    await tts.speakAtVolume(payload.text, payload.volume, payload.devices);
+  } else {
+    await tts.speak(payload.text, payload.devices);
+  }
+  addEvent({ type: 'tts-speak', status: 'sent', text: payload.text, volume: payload.volume, devices: payload.devices });
+  return sendJson(res, { ok: true, command: 'speak', devices: payload.devices || [] });
 }
 
 async function handleTtsDevices(res) {
   const devices = await tts.getDeviceInventory();
   return sendJson(res, { devices });
+}
+
+function parseTtsPayload(body) {
+  const raw = String(body || '');
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('{')) {
+    return { text: raw };
+  }
+
+  const parsed = parseJson(trimmed);
+  const devices = normalizeTtsDeviceOverride(parsed.devices ?? parsed.device);
+  return {
+    text: String(parsed.text ?? parsed.message ?? parsed.payload ?? ''),
+    volume: parsed.volume === undefined ? undefined : parsed.volume,
+    devices: devices.length ? devices : undefined
+  };
 }
 
 async function initTts() {
@@ -767,6 +793,18 @@ function resolveTtsDevices(deviceParam) {
     return firstNonEmpty(config.tts?.allDevices, config.tts?.alarmDevices, config.tts?.defaultDevices);
   }
   return raw.split(',').map((device) => device.trim()).filter(Boolean);
+}
+
+function normalizeTtsDeviceOverride(value) {
+  if (Array.isArray(value)) {
+    return value.map((device) => String(device).trim()).filter(Boolean);
+  }
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  if (raw.toUpperCase() === 'ALL') {
+    return firstNonEmpty(config.tts?.allDevices, config.tts?.alarmDevices, config.tts?.defaultDevices);
+  }
+  return raw.split(/\r?\n|,/).map((device) => device.trim()).filter(Boolean);
 }
 
 function firstNonEmpty(...lists) {

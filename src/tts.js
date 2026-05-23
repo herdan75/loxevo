@@ -5,6 +5,9 @@ import { dirname, join, resolve } from 'node:path';
 
 const appRequire = createRequire(import.meta.url);
 const COMMAND_TIMEOUT_MS = 5000;
+const NATIVE_SEQUENCE_TIMEOUT_MS = 8000;
+const NATIVE_FIRE_AND_FORGET_MS = 100;
+const MEDIA_VOLUME_TIMEOUT_MS = 1200;
 
 export class TtsService {
   constructor(config) {
@@ -71,7 +74,8 @@ export class TtsService {
 
         this.ready = true;
         this.lastError = null;
-        console.log('TTS ist mit alexa-remote2 verbunden.');
+        const sequenceMode = this.hasNativeSequenceSupport() ? 'native Sequenzen' : 'sendSequenceCommand-Fallback';
+        console.log(`TTS ist mit alexa-remote2 verbunden (${sequenceMode}).`);
         finishFirstCallback();
       });
     });
@@ -179,7 +183,8 @@ export class TtsService {
       allDevices: configuredDeviceList(this.config.allDevices),
       alarmDevices: configuredDeviceList(this.config.alarmDevices),
       defaultVolume: normalizeVolume(this.config.defaultVolume, 40),
-      alarmVolume: normalizeVolume(this.config.alarmVolume, 100)
+      alarmVolume: normalizeVolume(this.config.alarmVolume, 100),
+      nativeSequences: this.hasNativeSequenceSupport()
     };
   }
 
@@ -267,10 +272,16 @@ export class TtsService {
     if (!text || typeof text !== 'string') {
       throw new Error('TTS braucht einen Text im Request-Body.');
     }
+    if (await this.tryNativeSequence(type, text, targets, volume)) {
+      return;
+    }
     await this.runForTargets(targets, (device) => this.exec(device, type, text, volume), type);
   }
 
   async sendCommandToTargets(type, value, targets) {
+    if (await this.tryNativeCommand(type, value, targets)) {
+      return;
+    }
     await this.runForTargets(targets, (device) => this.exec(device, type, value), type);
   }
 
@@ -295,6 +306,261 @@ export class TtsService {
     if (failures.length) {
       console.warn(`TTS ${type}: einzelne Geraete fehlgeschlagen: ${failures.join(' | ')}`);
     }
+  }
+
+  async tryNativeSequence(type, text, targets, volume) {
+    try {
+      const devices = this.resolveNativeDevices(targets);
+      if (!devices.length) return false;
+      const sender = this.getNativeSequenceSender(devices);
+      if (!sender) return false;
+
+      if (type === 'speakAtVolume') {
+        const sequence = await this.buildNativeSpeakAtVolumeNode(text, normalizeVolume(volume, 40), devices);
+        await this.sendNativeSequence(sequence, sender);
+        return true;
+      }
+
+      if (type === 'speak') {
+        await this.sendNativeSequence(this.parallelNode(devices.map((device) => this.speakNode(text, device))), sender);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.warn(`TTS ${type}: native Alexa-Sequenz nicht moeglich, nutze Fallback. ${error.message}`);
+      return false;
+    }
+  }
+
+  async tryNativeCommand(type, value, targets) {
+    if (type !== 'volume') return false;
+
+    try {
+      const devices = this.resolveNativeDevices(targets);
+      if (!devices.length) return false;
+      const sender = this.getNativeSequenceSender(devices);
+      if (!sender) return false;
+
+      const volume = normalizeVolume(value, NaN);
+      await this.sendNativeSequence(this.parallelNode(devices.map((device) => this.volumeNode(volume, device))), sender);
+      return true;
+    } catch (error) {
+      console.warn(`TTS ${type}: native Alexa-Sequenz nicht moeglich, nutze Fallback. ${error.message}`);
+      return false;
+    }
+  }
+
+  getNativeSequenceSender(devices = []) {
+    if (typeof this.remote?.sendSequenceNodeExt === 'function') {
+      return this.remote.sendSequenceNodeExt.bind(this.remote);
+    }
+    if (typeof this.remote?.sendSequenceNode === 'function') {
+      return this.remote.sendSequenceNode.bind(this.remote);
+    }
+    if (typeof this.remote?.sendSequenceCommand === 'function' && devices[0]?.serialNumber) {
+      return (startNode) => new Promise((resolve, reject) => {
+        this.remote.sendSequenceCommand(
+          devices[0].serialNumber,
+          {
+            sequence: {
+              '@type': 'com.amazon.alexa.behaviors.model.Sequence',
+              startNode
+            }
+          },
+          (error, response) => {
+            if (error) reject(error);
+            else resolve(response);
+          }
+        );
+      });
+    }
+    return null;
+  }
+
+  hasNativeSequenceSupport() {
+    return Boolean(
+      typeof this.remote?.sendSequenceNodeExt === 'function' ||
+      typeof this.remote?.sendSequenceNode === 'function' ||
+      typeof this.remote?.sendSequenceCommand === 'function'
+    );
+  }
+
+  async sendNativeSequence(sequenceNode, sender) {
+    if (!sequenceNode) {
+      throw new Error('Leere Alexa-Sequenz.');
+    }
+
+    const result = await withTimeout(new Promise((resolve, reject) => {
+      let settled = false;
+      let fireAndForgetTimer = null;
+      const finish = (error, response) => {
+        if (settled) return;
+        settled = true;
+        if (fireAndForgetTimer) clearTimeout(fireAndForgetTimer);
+        if (error) reject(error);
+        else resolve(response);
+      };
+
+      try {
+        const response = sender(sequenceNode, finish);
+        if (response && typeof response.then === 'function') {
+          response.then((payload) => finish(null, payload)).catch((error) => finish(error));
+        } else if (response !== undefined) {
+          finish(null, response);
+        } else {
+          fireAndForgetTimer = setTimeout(() => finish(null, { fireAndForget: true }), NATIVE_FIRE_AND_FORGET_MS);
+        }
+      } catch (error) {
+        finish(error);
+      }
+    }), NATIVE_SEQUENCE_TIMEOUT_MS, 'Keine Antwort von der nativen Alexa-Sequenz.');
+
+    if (isPlainObject(result) && typeof result.message === 'string' && result.message) {
+      throw new Error(result.message);
+    }
+  }
+
+  async buildNativeSpeakAtVolumeNode(text, volume, devices) {
+    const setVolume = this.parallelNode(devices.map((device) => this.volumeNode(volume, device)));
+    const speak = this.parallelNode(devices.map((device) => this.speakNode(text, device)));
+    const restore = await this.buildRestoreVolumeNode(devices);
+    return this.serialNode([setVolume, speak, restore].filter(Boolean));
+  }
+
+  async buildRestoreVolumeNode(devices) {
+    const nodes = [];
+    await Promise.all(devices.map(async (device) => {
+      const previousVolume = await this.readCurrentVolume(device);
+      if (!Number.isFinite(previousVolume)) return;
+      nodes.push(this.volumeNode(previousVolume, device));
+    }));
+    return nodes.length ? this.parallelNode(nodes) : null;
+  }
+
+  async readCurrentVolume(device) {
+    if (typeof this.remote?.getMediaPromise !== 'function') return NaN;
+
+    try {
+      const media = await withTimeout(
+        this.remote.getMediaPromise(device.raw || device),
+        MEDIA_VOLUME_TIMEOUT_MS,
+        'Media-Status Timeout'
+      );
+      return normalizeVolume(media?.volume, NaN);
+    } catch {
+      return NaN;
+    }
+  }
+
+  resolveNativeDevices(targets) {
+    const devices = [];
+    const seen = new Set();
+    for (const target of targets) {
+      for (const device of this.expandNativeDevice(target)) {
+        const native = this.toNativeDevice(device, target);
+        if (!native || seen.has(native.serialNumber)) continue;
+        seen.add(native.serialNumber);
+        devices.push(native);
+      }
+    }
+    return devices;
+  }
+
+  expandNativeDevice(target, depth = 1) {
+    const device = this.findNativeDevice(target);
+    if (!device) return [];
+    const members = Array.isArray(device.clusterMembers) ? device.clusterMembers : [];
+    if (members.length && depth > 0) {
+      return members.flatMap((member) => this.expandNativeDevice(member, depth - 1));
+    }
+    return [device];
+  }
+
+  findNativeDevice(target) {
+    const value = typeof target === 'string' ? target.trim() : target;
+    if (!value) return null;
+
+    if (typeof this.remote?.find === 'function') {
+      try {
+        const found = this.remote.find(value);
+        if (found) return found;
+      } catch {
+        // Fall through to serialNumbers.
+      }
+    }
+
+    const serial = String(value);
+    const device = this.remote?.serialNumbers?.[serial];
+    if (isPlainObject(device)) {
+      return { ...device, serialNumber: firstText(device.serialNumber, serial) };
+    }
+    return null;
+  }
+
+  toNativeDevice(device, fallbackSerial) {
+    if (!isPlainObject(device)) return null;
+
+    const serialNumber = firstText(device.serialNumber, device.deviceSerialNumber, device.deviceSerial, fallbackSerial);
+    const deviceType = firstText(device.deviceType, device.deviceTypeId);
+    const customerId = firstText(device.deviceOwnerCustomerId, device.customerId, this.remote?.ownerCustomerId);
+    if (!serialNumber || !deviceType || !customerId) return null;
+
+    return {
+      raw: device,
+      serialNumber,
+      deviceType,
+      customerId
+    };
+  }
+
+  speakNode(text, device) {
+    return {
+      '@type': 'com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode',
+      type: 'Alexa.Speak',
+      operationPayload: {
+        deviceType: device.deviceType,
+        deviceSerialNumber: device.serialNumber,
+        locale: this.getLocale(),
+        customerId: device.customerId,
+        textToSpeak: text
+      }
+    };
+  }
+
+  volumeNode(volume, device) {
+    return {
+      '@type': 'com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode',
+      type: 'Alexa.DeviceControls.Volume',
+      operationPayload: {
+        deviceType: device.deviceType,
+        deviceSerialNumber: device.serialNumber,
+        locale: this.getLocale(),
+        customerId: device.customerId,
+        value: normalizeVolume(volume, 40)
+      }
+    };
+  }
+
+  serialNode(nodes) {
+    return this.containerNode('SerialNode', nodes);
+  }
+
+  parallelNode(nodes) {
+    if (nodes.length === 1) return nodes[0];
+    return this.containerNode('ParallelNode', nodes);
+  }
+
+  containerNode(type, nodes) {
+    return {
+      '@type': `com.amazon.alexa.behaviors.model.${type}`,
+      nodesToExecute: nodes,
+      name: null
+    };
+  }
+
+  getLocale() {
+    return this.config.acceptLanguage || defaultAcceptLanguage(this.config.amazonPage || this.auth?.amazonPage);
   }
 
   exec(device, type, value, volume) {
@@ -587,6 +853,21 @@ function stableStringify(value) {
       .join(',')}}`;
   }
   return JSON.stringify(value);
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
 }
 
 function isPlainObject(value) {

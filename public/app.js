@@ -207,25 +207,6 @@ async function saveJsonConfig(button) {
   }
 }
 
-async function postText(url, text, button, successText = 'TTS gesendet') {
-  setButtonFeedback(button, 'pending', 'Sendet');
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'text/plain' },
-      body: text
-    });
-    await ensureOk(response);
-    await loadTtsStatus();
-    await loadEvents();
-    setButtonFeedback(button, 'success', 'Gesendet');
-    showToast(successText, 'ok');
-  } catch (error) {
-    setButtonFeedback(button, 'error', 'Fehler');
-    showToast(error.message, 'error');
-  }
-}
-
 async function postTtsTest(kind, button) {
   const isAlarm = kind === 'alarm';
   const endpoint = isAlarm ? '/tts/alarm' : '/tts/speak';

@@ -1,5 +1,9 @@
 # LoxEvo
 
+[![CI](https://github.com/herdan75/loxevo/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/herdan75/loxevo/actions/workflows/ci.yml)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 > **Status: lauffaehige Entwicklungsversion**
 >
 > LoxEvo ist als lauffaehige Docker/LoxBerry-Basis nutzbar. Die wichtigsten Funktionen fuer Loxone-Befehle, virtuelle Alexa-Geraete und Alexa-TTS sind umgesetzt und getestet. Trotzdem koennen noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst pruefen und Loxone-Kommandos bei Bedarf im Dry-Run testen.

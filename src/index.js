@@ -92,6 +92,13 @@ async function handleRequest(req, res, { bridgeOnly = false } = {}) {
       return await handleTts(req, res, pathParts, body);
     }
 
+    // Node-RED-kompatibler Loxone-Einstieg: POST /<cmd>
+    // Beispiele: /geschirrspueler -> TTS, /alarm -> Alarm, /lautstaerke -> Lautstaerke.
+    if (req.method === 'POST' && pathParts.length === 1 && isLoxoneTtsCompatPath(pathParts[0])) {
+      const body = await readBody(req);
+      return await handleLoxoneTtsShortPath(res, url, pathParts[0], body);
+    }
+
     sendJson(res, { error: 'not found' }, 404);
   } catch (error) {
     console.error(error);
@@ -243,6 +250,54 @@ async function handleTts(req, res, pathParts, body) {
   return sendJson(res, { ok: true, command: 'speak', devices: targetDevices });
 }
 
+async function handleLoxoneTtsShortPath(res, url, commandName, body) {
+  const cmd = normalizeKey(commandName);
+  const payload = parseTtsPayloadWithQuery(body, url.searchParams);
+
+  if ((cmd === 'lautstaerke' || cmd === 'volume') && !Number.isFinite(Number(payload.volume ?? payload.text))) {
+    return sendJson(res, { ok: false, error: `Ungueltige Lautstaerke fuer "${cmd}".` }, 400);
+  }
+
+  if (cmd !== 'lautstaerke' && cmd !== 'volume' && payload.text !== '0' && !containsSpeechText(payload.text)) {
+    addEvent({ type: 'tts-speak', status: 'ignored', key: cmd, text: payload.text, compat: 'loxone-short-path' });
+    return sendJson(res, { ok: false, error: `Kein gueltiger TTS-Text fuer "${cmd}" im Request-Body.` }, 400);
+  }
+
+  addEvent({ type: 'tts-short-path', status: 'accepted', key: cmd, text: payload.text, volume: payload.volume, compat: 'loxone-short-path' });
+  executeLoxoneTtsShortPath(cmd, payload).catch((error) => {
+    console.warn(`Loxone-TTS-Kurzpfad "${cmd}" fehlgeschlagen: ${error.message}`);
+    addEvent({ type: 'tts-short-path', status: 'error', key: cmd, text: payload.text, error: error.message, compat: 'loxone-short-path' });
+  });
+
+  return sendJson(res, { ok: true, accepted: true, route: cmd });
+}
+
+async function executeLoxoneTtsShortPath(cmd, payload) {
+  if (cmd === 'lautstaerke' || cmd === 'volume') {
+    const volume = payload.volume ?? payload.text;
+    const targetDevices = payload.devices || firstNonEmpty(config.tts?.allDevices, config.tts?.defaultDevices);
+    await tts.setVolume(volume, targetDevices);
+    addEvent({ type: 'tts-volume', status: 'sent', key: cmd, volume, devices: targetDevices, compat: 'loxone-short-path' });
+    return;
+  }
+
+  if (payload.text === '0' && config.tts?.ignoreZeroText !== false) {
+    addEvent({ type: 'tts-speak', status: 'ignored', key: cmd, text: payload.text, compat: 'loxone-short-path' });
+    return;
+  }
+
+  if (cmd === 'alarm') {
+    const targetDevices = payload.devices || firstNonEmpty(config.tts?.alarmDevices, config.tts?.allDevices, config.tts?.defaultDevices);
+    await tts.alarm(payload.text, targetDevices, payload.volume);
+    addEvent({ type: 'tts-alarm', status: 'sent', key: cmd, text: payload.text, volume: payload.volume, devices: targetDevices, compat: 'loxone-short-path' });
+    return;
+  }
+
+  const targetDevices = payload.devices || firstNonEmpty(config.tts?.defaultDevices);
+  await tts.speak(payload.text, targetDevices);
+  addEvent({ type: 'tts-speak', status: 'sent', key: cmd, text: payload.text, devices: targetDevices, compat: 'loxone-short-path' });
+}
+
 async function handleTtsDevices(res) {
   const devices = await tts.getDeviceInventory();
   return sendJson(res, { devices });
@@ -251,6 +306,9 @@ async function handleTtsDevices(res) {
 function parseTtsPayload(body) {
   const raw = String(body || '');
   const trimmed = raw.trim();
+  if (looksLikeFormBody(trimmed)) {
+    return parseTtsFormPayload(new URLSearchParams(trimmed));
+  }
   if (!trimmed.startsWith('{')) {
     return { text: raw };
   }
@@ -260,6 +318,27 @@ function parseTtsPayload(body) {
   return {
     text: String(parsed.text ?? parsed.message ?? parsed.payload ?? ''),
     volume: parsed.volume === undefined ? undefined : parsed.volume,
+    devices: devices.length ? devices : undefined
+  };
+}
+
+function parseTtsPayloadWithQuery(body, params) {
+  const payload = parseTtsPayload(body);
+  const queryPayload = parseTtsFormPayload(params);
+  return {
+    text: firstText(payload.text, queryPayload.text),
+    volume: payload.volume === undefined ? queryPayload.volume : payload.volume,
+    devices: payload.devices || queryPayload.devices
+  };
+}
+
+function parseTtsFormPayload(params) {
+  const devices = normalizeTtsDeviceOverride(params.get('devices') || params.get('device') || params.get('d') || '');
+  const text = firstText(params.get('text'), params.get('t'), params.get('message'), params.get('payload'));
+  const volume = firstText(params.get('volume'), params.get('vol'), params.get('v'));
+  return {
+    text,
+    volume: volume === '' ? undefined : volume,
     devices: devices.length ? devices : undefined
   };
 }
@@ -798,6 +877,38 @@ function normalizeTtsDeviceOverride(value) {
     return firstNonEmpty(config.tts?.allDevices, config.tts?.alarmDevices, config.tts?.defaultDevices);
   }
   return raw.split(/\r?\n|,/).map((device) => device.trim()).filter(Boolean);
+}
+
+function isLoxoneTtsCompatPath(value) {
+  const path = normalizeKey(value);
+  return !new Set([
+    'admin',
+    'api',
+    'assets',
+    'command',
+    'description.xml',
+    'favicon.ico',
+    'health',
+    'light',
+    'tts'
+  ]).has(path);
+}
+
+function containsSpeechText(value) {
+  return /[A-Za-z\u00c4\u00d6\u00dc\u00e4\u00f6\u00fc\u00df]/.test(String(value || ''));
+}
+
+function looksLikeFormBody(value) {
+  return /^(text|t|message|payload|volume|vol|v|device|devices|d)=/i.test(String(value || '').trim());
+}
+
+function firstText(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    const text = String(value);
+    if (text !== '') return text;
+  }
+  return '';
 }
 
 function firstNonEmpty(...lists) {

@@ -188,6 +188,21 @@ Body: 70
 
 `/tts/speak` spricht schnell mit der aktuell am Echo eingestellten Lautstaerke. `/tts/alarm` nutzt immer die Alarm-Lautstaerke und uebersteuert damit die aktuelle Echo-Lautstaerke fuer diese Ausgabe. Der separate Lautstaerke-Aufruf setzt die Lautstaerke der Alle-Geraete, sonst der Standard-Geraete.
 
+Node-RED-kompatibler Kurzpfad fuer bestehende Loxone-Ausgaenge:
+
+```text
+POST http://<loxberry>:8080/geschirrspueler
+Body: Geschirrspueler ist fertig.
+
+POST http://<loxberry>:8080/alarm
+Body: Achtung, Alarm wurde ausgeloest.
+
+POST http://<loxberry>:8080/lautstaerke
+Body: 70
+```
+
+Das entspricht dem bisherigen Node-RED-Prinzip `POST /:cmd`: `alarm` nutzt die Alarm-Geraete, `lautstaerke` setzt die Lautstaerke, alle anderen Namen sprechen den Text aus dem Body auf den Standard-Geraeten. LoxEvo beantwortet diese Kurzpfade sofort und sendet die Alexa-Ausgabe im Hintergrund, damit Loxone nicht auf die TTS-Ausfuehrung warten muss.
+
 ## Alexa2Lox-kompatibler TTS-Aufruf
 
 Damit bestehende Loxone-Aufrufe leichter migriert werden koennen, gibt es zusaetzlich einen kompatiblen Einstieg:

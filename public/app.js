@@ -996,62 +996,107 @@ function createTtsEndpointGroup(baseUrl, open = false) {
 function createTtsEndpointCards(baseUrl) {
   return [
     createEndpointCard({
-    title: 'TTS normal',
-    method: 'POST',
-    url: `${baseUrl}/tts/speak`,
-    body: 'Geschirrspüler ist fertig.',
-    note: 'Schnelle Sprachausgabe ohne Lautstärke-Vorbefehl.',
-    testLabel: 'TTS testen',
-    testAction: (button) => testEndpoint({
+      title: 'TTS normal',
       method: 'POST',
       url: `${baseUrl}/tts/speak`,
       body: 'Geschirrspüler ist fertig.',
-      contentType: 'text/plain',
-      successText: 'TTS normal'
-    }, button)
+      note: 'Schnelle Sprachausgabe ohne Lautstärke-Vorbefehl.',
+      testLabel: 'TTS testen',
+      testAction: (button) => testEndpoint({
+        method: 'POST',
+        url: `${baseUrl}/tts/speak`,
+        body: 'Geschirrspüler ist fertig.',
+        contentType: 'text/plain',
+        successText: 'TTS normal'
+      }, button)
     }),
     createEndpointCard({
-    title: 'Alarm',
-    method: 'POST',
-    url: `${baseUrl}/tts/alarm`,
-    body: 'Achtung, Alarm wurde ausgelöst.',
-    note: 'Nutzt die Alarm-Geräteliste und erzwingt die Alarm-Lautstärke.',
-    testLabel: 'Alarm testen',
-    testAction: (button) => testEndpoint({
+      title: 'Loxone Kurzpfad',
+      method: 'POST',
+      url: `${baseUrl}/meldung`,
+      body: 'Geschirrspueler ist fertig.',
+      note: 'Node-RED-kompatibel: POST /<name> mit Text im Body spricht auf den Standard-Geraeten. Die HTTP-Antwort kommt sofort, die Ausgabe laeuft im Hintergrund.',
+      testLabel: 'Kurzpfad testen',
+      testAction: (button) => testEndpoint({
+        method: 'POST',
+        url: `${baseUrl}/meldung`,
+        body: 'Geschirrspueler ist fertig.',
+        contentType: 'text/plain',
+        successText: 'TTS Kurzpfad'
+      }, button)
+    }),
+    createEndpointCard({
+      title: 'Alarm',
       method: 'POST',
       url: `${baseUrl}/tts/alarm`,
       body: 'Achtung, Alarm wurde ausgelöst.',
-      contentType: 'text/plain',
-      successText: 'Alarm'
-    }, button)
+      note: 'Nutzt die Alarm-Geräteliste und erzwingt die Alarm-Lautstärke.',
+      testLabel: 'Alarm testen',
+      testAction: (button) => testEndpoint({
+        method: 'POST',
+        url: `${baseUrl}/tts/alarm`,
+        body: 'Achtung, Alarm wurde ausgelöst.',
+        contentType: 'text/plain',
+        successText: 'Alarm'
+      }, button)
     }),
     createEndpointCard({
-    title: 'Lautstärke setzen',
-    method: 'POST',
-    url: `${baseUrl}/tts/volume`,
-    body: String(ttsDefaultVolume?.value || 40),
-    note: 'Setzt die Lautstärke der Alle-Geräte, sonst der Standard-Geräte. Das ist bewusst getrennt von normaler TTS.',
-    testLabel: 'Lautstärke setzen',
-    testAction: (button) => testEndpoint({
+      title: 'Alarm Kurzpfad',
+      method: 'POST',
+      url: `${baseUrl}/alarm`,
+      body: 'Achtung, Alarm wurde ausgeloest.',
+      note: 'Node-RED-kompatibel: POST /alarm nutzt die Alarm-Geraete und die Alarm-Lautstaerke.',
+      testLabel: 'Alarm Kurzpfad',
+      testAction: (button) => testEndpoint({
+        method: 'POST',
+        url: `${baseUrl}/alarm`,
+        body: 'Achtung, Alarm wurde ausgeloest.',
+        contentType: 'text/plain',
+        successText: 'Alarm Kurzpfad'
+      }, button)
+    }),
+    createEndpointCard({
+      title: 'Lautstärke setzen',
       method: 'POST',
       url: `${baseUrl}/tts/volume`,
       body: String(ttsDefaultVolume?.value || 40),
-      contentType: 'text/plain',
-      successText: 'Lautstärke'
-    }, button)
+      note: 'Setzt die Lautstärke der Alle-Geräte, sonst der Standard-Geräte. Das ist bewusst getrennt von normaler TTS.',
+      testLabel: 'Lautstärke setzen',
+      testAction: (button) => testEndpoint({
+        method: 'POST',
+        url: `${baseUrl}/tts/volume`,
+        body: String(ttsDefaultVolume?.value || 40),
+        contentType: 'text/plain',
+        successText: 'Lautstärke'
+      }, button)
     }),
     createEndpointCard({
-    title: 'Alexa2Lox-kompatibel',
-    method: 'GET',
-    url: `${baseUrl}/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50`,
-    body: '',
-    note: 'Kompatibler Einstieg für bestehende Loxone-Aufrufe.',
-    testLabel: 'Compat testen',
-    testAction: (button) => testEndpoint({
+      title: 'Lautstaerke Kurzpfad',
+      method: 'POST',
+      url: `${baseUrl}/lautstaerke`,
+      body: String(ttsDefaultVolume?.value || 40),
+      note: 'Node-RED-kompatibel: POST /lautstaerke mit Zahl im Body setzt die Lautstaerke der Alle-Geraete, sonst der Standard-Geraete.',
+      testLabel: 'Kurzpfad setzen',
+      testAction: (button) => testEndpoint({
+        method: 'POST',
+        url: `${baseUrl}/lautstaerke`,
+        body: String(ttsDefaultVolume?.value || 40),
+        contentType: 'text/plain',
+        successText: 'Lautstaerke Kurzpfad'
+      }, button)
+    }),
+    createEndpointCard({
+      title: 'Alexa2Lox-kompatibel',
       method: 'GET',
       url: `${baseUrl}/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50`,
-      successText: 'Alexa2Lox TTS'
-    }, button)
+      body: '',
+      note: 'Kompatibler Einstieg für bestehende Loxone-Aufrufe.',
+      testLabel: 'Compat testen',
+      testAction: (button) => testEndpoint({
+        method: 'GET',
+        url: `${baseUrl}/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50`,
+        successText: 'Alexa2Lox TTS'
+      }, button)
     })
   ];
 }
@@ -1599,9 +1644,11 @@ function renderEvents(events) {
 function eventDetailText(event) {
   if (String(event.type || '').startsWith('tts')) {
     const parts = [];
+    if (event.key) parts.push(`Befehl: ${event.key}`);
     if (event.text) parts.push(event.text);
     if (event.volume !== undefined) parts.push(`Lautstärke: ${event.volume}`);
     if (Array.isArray(event.devices) && event.devices.length) parts.push(`Geräte: ${event.devices.join(', ')}`);
+    if (event.error) parts.push(`Fehler: ${event.error}`);
     if (event.compat) parts.push(`Quelle: ${event.compat}`);
     return parts.join(' | ') || JSON.stringify(event);
   }

@@ -321,6 +321,41 @@ leer lassen
 
 Dieser Aufruf setzt die Lautstaerke der `Alle-Geraete`, falls dort Geraete konfiguriert sind. Wenn `Alle-Geraete` leer ist, nutzt LoxEvo die `Standard-Geraete`.
 
+Wenn die Lautstaerke in Loxone ueber Radiotasten, Status oder einen Wertbaustein ausgewaehlt wird, kann der Wert direkt an LoxEvo uebergeben werden. Wichtig ist nur, dass im HTTP-Body am Ende eine Zahl zwischen `0` und `100` steht.
+
+Typisches Beispiel mit einem Loxone-Wert:
+
+```text
+Befehl bei EIN:
+/lautstaerke
+
+HTTP header bei EIN:
+leer lassen
+
+HTTP Methode bei EIN:
+POST
+
+HTTP body bei EIN:
+<v>
+
+Befehl bei AUS:
+leer lassen
+```
+
+`<v>` ist der von Loxone eingesetzte aktuelle Wert des Ausgangsbefehls. Wenn der vorgeschaltete Baustein also `10`, `40`, `70` oder `100` liefert, setzt LoxEvo genau diese Alexa-Lautstaerke. Die Schreibweise des Pfads ist unkritisch: `/Lautstaerke` und `/lautstaerke` werden gleich behandelt.
+
+Fuer Radiotasten empfiehlt sich, direkt Prozentwerte als Ausgabewerte zu verwenden:
+
+```text
+Taste 1 -> 10
+Taste 2 -> 20
+Taste 3 -> 30
+Taste 4 -> 40
+Taste 5 -> 50
+Taste 6 -> 70
+Taste 7 -> 100
+```
+
 ### Zielgeraete in LoxEvo
 
 Die Echo-Zielgeraete werden nicht in Loxone gepflegt, sondern in LoxEvo:

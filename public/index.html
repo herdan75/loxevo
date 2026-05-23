@@ -84,23 +84,31 @@
           <button id="refreshIntegrationsBtn" type="button" class="secondary">Aufrufe aktualisieren</button>
         </div>
 
-        <div class="endpoint-block">
-          <h3>Befehle</h3>
-          <p>Wenn ein externes System diese URL aufruft, sendet LoxEvo den passenden Loxone-Befehl.</p>
-          <div id="lightEndpoints" class="endpoint-list"></div>
-        </div>
+        <div class="integration-sections">
+          <details class="config-section endpoint-block" open>
+            <summary>Befehle</summary>
+            <div class="config-section-body">
+              <p>Wenn ein externes System diese URL aufruft, sendet LoxEvo den passenden Loxone-Befehl.</p>
+              <div id="lightEndpoints" class="endpoint-list"></div>
+            </div>
+          </details>
 
-        <div class="endpoint-block">
-          <h3>Alexa Geräte</h3>
-          <p>Diese Namen werden Alexa als virtuelle Geräte angeboten. Gesprochen wird typischerweise: „Alexa, &lt;Gerätename&gt; an”.</p>
-          <div id="alexaDevices" class="endpoint-list"></div>
-        </div>
+          <details class="config-section endpoint-block">
+            <summary>Alexa Geräte</summary>
+            <div class="config-section-body">
+              <p>Diese Namen werden Alexa als virtuelle Geräte angeboten. Gesprochen wird typischerweise: „Alexa, &lt;Gerätename&gt; an”.</p>
+              <div id="alexaDevices" class="endpoint-list"></div>
+            </div>
+          </details>
 
-        <div class="endpoint-block">
-          <h3>TTS</h3>
-          <p>Diese URLs lösen Alexa-Sprachausgabe aus, zum Beispiel aus Loxone.</p>
-          <div id="ttsStatusCard" class="service-status">TTS-Status wird geladen...</div>
-          <div id="ttsEndpoints" class="endpoint-list"></div>
+          <details class="config-section endpoint-block">
+            <summary>TTS</summary>
+            <div class="config-section-body">
+              <p>Diese URLs lösen Alexa-Sprachausgabe aus, zum Beispiel aus Loxone.</p>
+              <div id="ttsStatusCard" class="service-status">TTS-Status wird geladen...</div>
+              <div id="ttsEndpoints" class="endpoint-list"></div>
+            </div>
+          </details>
         </div>
       </section>
       </section>

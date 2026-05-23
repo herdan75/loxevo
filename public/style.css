@@ -424,6 +424,11 @@ legend {
   margin-top: 12px;
 }
 
+.integration-sections {
+  display: grid;
+  gap: 12px;
+}
+
 label {
   display: grid;
   gap: 6px;
@@ -708,16 +713,7 @@ input[type='range'] {
   font-size: 14px;
 }
 
-.endpoint-block + .endpoint-block {
-  margin-top: 22px;
-}
-
-.endpoint-block h3 {
-  margin: 0 0 6px;
-  font-size: 16px;
-}
-
-.endpoint-block > p {
+.endpoint-block .config-section-body > p {
   margin-bottom: 12px;
   color: var(--muted);
   font-size: 14px;

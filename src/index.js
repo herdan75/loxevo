@@ -284,9 +284,12 @@ function getSetupStatus() {
     },
     {
       id: 'dry-run',
-      label: 'Dry-Run für erste Tests aktiv lassen',
-      ok: config.loxone?.dryRun !== false,
-      detail: 'Live-Modus erst aktivieren, wenn die Tests passen.'
+      label: 'Betriebsmodus bewusst wählen',
+      ok: true,
+      optional: true,
+      detail: config.loxone?.dryRun !== false
+        ? 'Dry-Run ist für erste Tests aktiv. Loxone-Befehle werden nur protokolliert.'
+        : 'Live-Modus ist aktiv. Das ist im produktiven Betrieb korrekt; Loxone-Befehle werden wirklich gesendet.'
     },
     {
       id: 'tts',

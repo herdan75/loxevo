@@ -732,7 +732,9 @@ function renderSetupStatus(errorText) {
   setupPanel.classList.toggle('setup-complete', setupStatus.complete);
   setupPanel.classList.toggle('setup-warning', !setupStatus.complete);
   setupSummary.textContent = setupStatus.complete
-    ? 'Die Basiskonfiguration ist vollständig. Live-Modus erst nach erfolgreichem Test aktivieren.'
+    ? setupStatus.dryRun
+      ? 'Die Basiskonfiguration ist vollständig. Dry-Run ist für erste Tests aktiv.'
+      : 'Die Basiskonfiguration ist vollständig. Live-Modus ist aktiv.'
     : `${setupStatus.openRequired} notwendige Einrichtungsschritte sind noch offen.`;
 
   setupChecks.innerHTML = '';

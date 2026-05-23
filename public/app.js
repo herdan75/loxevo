@@ -1015,7 +1015,7 @@ function createTtsEndpointCards(baseUrl) {
       method: 'POST',
       url: `${baseUrl}/meldung`,
       body: 'Geschirrspueler ist fertig.',
-      note: 'Node-RED-kompatibel: POST /<name> mit Text im Body spricht auf den Standard-Geraeten. Die HTTP-Antwort kommt sofort, die Ausgabe laeuft im Hintergrund.',
+      note: 'Loxone-Kurzpfad: POST /<name> mit Text im Body spricht auf den Standard-Geraeten. Die HTTP-Antwort kommt sofort, die Ausgabe laeuft im Hintergrund.',
       testLabel: 'Kurzpfad testen',
       testAction: (button) => testEndpoint({
         method: 'POST',
@@ -1045,7 +1045,7 @@ function createTtsEndpointCards(baseUrl) {
       method: 'POST',
       url: `${baseUrl}/alarm`,
       body: 'Achtung, Alarm wurde ausgeloest.',
-      note: 'Node-RED-kompatibel: POST /alarm nutzt die Alarm-Geraete und die Alarm-Lautstaerke.',
+      note: 'Loxone-Kurzpfad: POST /alarm nutzt die Alarm-Geraete und die Alarm-Lautstaerke.',
       testLabel: 'Alarm Kurzpfad',
       testAction: (button) => testEndpoint({
         method: 'POST',
@@ -1075,7 +1075,7 @@ function createTtsEndpointCards(baseUrl) {
       method: 'POST',
       url: `${baseUrl}/lautstaerke`,
       body: String(ttsDefaultVolume?.value || 40),
-      note: 'Node-RED-kompatibel: POST /lautstaerke mit Zahl im Body setzt die Lautstaerke der Alle-Geraete, sonst der Standard-Geraete.',
+      note: 'Loxone-Kurzpfad: POST /lautstaerke mit Zahl im Body setzt die Lautstaerke der Alle-Geraete, sonst der Standard-Geraete.',
       testLabel: 'Kurzpfad setzen',
       testAction: (button) => testEndpoint({
         method: 'POST',

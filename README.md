@@ -26,7 +26,7 @@ Loxone
   -> Echo spricht
 ```
 
-Der aktuelle Stand ist ein Docker-faehiger Prototyp mit HTTP-API, Web-UI, generischen Loxone-Befehlen und integriertem TTS-Modul.
+Der aktuelle Stand ist eine Docker-faehige Basis mit HTTP-API, Web-UI, generischen Loxone-Befehlen und integriertem TTS-Modul.
 Loxone-Befehle laufen standardmaessig im Dry-Run-Modus, damit lokal gefahrlos getestet werden kann.
 Wenn TTS aktiviert wird, aber `alexa-remote2` oder die Cookie-Datei noch fehlt, startet LoxEvo trotzdem weiter und zeigt den TTS-Status in der Web-UI an.
 Optional kann LoxEvo virtuelle Alexa-Geraete im lokalen Netzwerk bereitstellen. Alexa findet diese Geraete ueber die lokale Geraetesuche; ein Einschaltbefehl wie `Alexa, Licht Kueche Hell an` loest dann den passenden LoxEvo-Befehl aus.

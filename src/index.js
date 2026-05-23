@@ -22,6 +22,17 @@ let alexaBridge = createAlexaBridge();
 let bridgeHttpServer = null;
 let bridgeHttpStatus = { enabled: false, ready: false, error: null, port: null };
 const events = [];
+const LOXONE_TTS_RESERVED_PATHS = new Set([
+  'admin',
+  'api',
+  'assets',
+  'command',
+  'description.xml',
+  'favicon.ico',
+  'health',
+  'light',
+  'tts'
+]);
 
 await initTts();
 await initAlexaBridge();
@@ -92,7 +103,7 @@ async function handleRequest(req, res, { bridgeOnly = false } = {}) {
       return await handleTts(req, res, pathParts, body);
     }
 
-    // Node-RED-kompatibler Loxone-Einstieg: POST /<cmd>
+    // Loxone-TTS-Kurzpfad: POST /<cmd>
     // Beispiele: /geschirrspueler -> TTS, /alarm -> Alarm, /lautstaerke -> Lautstaerke.
     if (req.method === 'POST' && pathParts.length === 1 && isLoxoneTtsCompatPath(pathParts[0])) {
       const body = await readBody(req);
@@ -881,17 +892,7 @@ function normalizeTtsDeviceOverride(value) {
 
 function isLoxoneTtsCompatPath(value) {
   const path = normalizeKey(value);
-  return !new Set([
-    'admin',
-    'api',
-    'assets',
-    'command',
-    'description.xml',
-    'favicon.ico',
-    'health',
-    'light',
-    'tts'
-  ]).has(path);
+  return !LOXONE_TTS_RESERVED_PATHS.has(path);
 }
 
 function containsSpeechText(value) {

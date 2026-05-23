@@ -232,22 +232,15 @@ async function handleTts(req, res, pathParts, body) {
   }
   if (cmd === 'alarm') {
     const targetDevices = payload.devices || firstNonEmpty(config.tts?.alarmDevices, config.tts?.allDevices, config.tts?.defaultDevices);
-    if (payload.volume !== undefined) {
-      await tts.speakAtVolume(payload.text, payload.volume, targetDevices);
-    } else {
-      await tts.alarm(payload.text, targetDevices);
-    }
+    await tts.alarm(payload.text, targetDevices, payload.volume);
     addEvent({ type: 'tts-alarm', status: 'sent', text: payload.text, volume: payload.volume, devices: targetDevices });
     return sendJson(res, { ok: true, command: 'alarm', devices: targetDevices });
   }
 
-  if (payload.volume !== undefined) {
-    await tts.speakAtVolume(payload.text, payload.volume, payload.devices);
-  } else {
-    await tts.speak(payload.text, payload.devices);
-  }
-  addEvent({ type: 'tts-speak', status: 'sent', text: payload.text, volume: payload.volume, devices: payload.devices });
-  return sendJson(res, { ok: true, command: 'speak', devices: payload.devices || [] });
+  const targetDevices = payload.devices || firstNonEmpty(config.tts?.defaultDevices);
+  await tts.speak(payload.text, targetDevices, payload.volume);
+  addEvent({ type: 'tts-speak', status: 'sent', text: payload.text, volume: payload.volume, devices: targetDevices });
+  return sendJson(res, { ok: true, command: 'speak', devices: targetDevices });
 }
 
 async function handleTtsDevices(res) {

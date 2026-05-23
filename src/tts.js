@@ -4,6 +4,7 @@ import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
 const appRequire = createRequire(import.meta.url);
+const COMMAND_TIMEOUT_MS = 5000;
 
 export class TtsService {
   constructor(config) {
@@ -182,14 +183,17 @@ export class TtsService {
     };
   }
 
-  async speak(text, devices = firstNonEmpty(this.config.defaultDevices)) {
+  async speak(text, devices = firstNonEmpty(this.config.defaultDevices), volume = this.config.defaultVolume) {
     this.assertReady();
-    await this.speakAtVolume(text, normalizeVolume(this.config.defaultVolume, 40), devices);
+    const targets = this.normalizeDevices(devices);
+    this.assertDevices(targets);
+    await this.sendCommandToTargets('volume', normalizeVolume(volume, 40), targets);
+    await this.sendSequenceToTargets('speak', text, targets);
   }
 
-  async alarm(text, devices = firstNonEmpty(this.config.alarmDevices, this.config.allDevices, this.config.defaultDevices)) {
+  async alarm(text, devices = firstNonEmpty(this.config.alarmDevices, this.config.allDevices, this.config.defaultDevices), volume = this.config.alarmVolume) {
     this.assertReady();
-    await this.speakAtVolume(text, normalizeVolume(this.config.alarmVolume, 100), devices);
+    await this.speakAtVolume(text, normalizeVolume(volume, 100), devices);
   }
 
   async speakAtVolume(text, volume, devices = firstNonEmpty(this.config.defaultDevices)) {
@@ -206,7 +210,7 @@ export class TtsService {
 
     const targets = this.normalizeDevices(devices);
     this.assertDevices(targets);
-    await Promise.all(targets.map((device) => this.exec(device, 'volume', value)));
+    await this.sendCommandToTargets('volume', value, targets);
   }
 
   async getDeviceInventory() {
@@ -257,19 +261,66 @@ export class TtsService {
     }
     const targets = this.normalizeDevices(devices);
     this.assertDevices(targets);
-    await Promise.all(targets.map((device) => this.exec(device, type, text, volume)));
+    await this.sendSequenceToTargets(type, text, targets, volume);
+  }
+
+  async sendSequenceToTargets(type, text, targets, volume) {
+    if (!text || typeof text !== 'string') {
+      throw new Error('TTS braucht einen Text im Request-Body.');
+    }
+    await this.runForTargets(targets, (device) => this.exec(device, type, text, volume), type);
+  }
+
+  async sendCommandToTargets(type, value, targets) {
+    await this.runForTargets(targets, (device) => this.exec(device, type, value), type);
+  }
+
+  async runForTargets(targets, runner, type) {
+    const results = await Promise.all(targets.map(async (device) => {
+      try {
+        const result = await runner(device);
+        if (result?.timedOut) {
+          console.warn(`TTS ${type}: keine Rueckmeldung von ${device} nach ${COMMAND_TIMEOUT_MS} ms.`);
+        }
+        return { device, ok: true };
+      } catch (error) {
+        return { device, ok: false, error };
+      }
+    }));
+    const failures = results
+      .filter((result) => !result.ok)
+      .map((result) => `${result.device}: ${result.error.message}`);
+    if (failures.length === targets.length) {
+      throw new Error(`Alexa-Befehl "${type}" konnte an kein Geraet gesendet werden. ${failures.join(' | ')}`);
+    }
+    if (failures.length) {
+      console.warn(`TTS ${type}: einzelne Geraete fehlgeschlagen: ${failures.join(' | ')}`);
+    }
   }
 
   exec(device, type, value, volume) {
     return new Promise((resolve, reject) => {
-      const callback = (error) => (error ? reject(error) : resolve());
+      let settled = false;
+      const finish = (error, result = {}) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (error) reject(error);
+        else resolve(result);
+      };
+      const timer = setTimeout(() => finish(null, { timedOut: true }), COMMAND_TIMEOUT_MS);
+      const callback = (error) => finish(error);
 
-      if (type === 'speakAtVolume') {
-        this.remote.sendSequenceCommand(device, 'speakAtVolume', value, volume, callback);
-        return;
+      try {
+        if (type === 'speakAtVolume') {
+          this.remote.sendSequenceCommand(device, 'speakAtVolume', value, volume, callback);
+          return;
+        }
+
+        this.remote.sendSequenceCommand(device, type, value, callback);
+      } catch (error) {
+        finish(error);
       }
-
-      this.remote.sendSequenceCommand(device, type, value, callback);
     });
   }
 

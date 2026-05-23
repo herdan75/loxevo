@@ -52,7 +52,7 @@ In `data/config.json` ist `loxone.dryRun` standardmaessig `true`. Dann erzeugt L
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
 TTS braucht das Paket `alexa-remote2` und eine gueltige Alexa-Cookie-Datei. Das Paket wird bewusst nicht fest im Docker-Build installiert, damit LoxEvo auch dann startet, wenn npm-Versionen wechseln. Installiere oder aktualisiere es in der Web-UI unter "Wartung"; im Docker/LoxBerry-Betrieb landet es im gemounteten `/config`-Bereich.
-Als Cookie-Datei kann eine reine Cookie-Zeile oder die von Node-RED/applestrudel erzeugte JSON-Datei verwendet werden. Bei JSON-Dateien nutzt LoxEvo `localCookie`, `csrf` und die gespeicherten Registrierungsdaten wie `macDms` und `refreshToken`.
+Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCookie` verwendet werden. Bei JSON-Dateien nutzt LoxEvo `localCookie`, `csrf` und gespeicherte Registrierungsdaten wie `macDms` und `refreshToken`, falls diese vorhanden sind.
 Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen lokalen Login-Proxy. LoxEvo setzt dafuer automatisch die LAN-IP des LoxBerry; bei Bedarf kann `tts.proxyOwnIp` und `tts.proxyPort` in der Web-UI angepasst werden.
 Fuer den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
@@ -188,7 +188,7 @@ Body: 70
 
 `/tts/speak` spricht schnell mit der aktuell am Echo eingestellten Lautstaerke. `/tts/alarm` nutzt immer die Alarm-Lautstaerke und uebersteuert damit die aktuelle Echo-Lautstaerke fuer diese Ausgabe. Der separate Lautstaerke-Aufruf setzt die Lautstaerke der Alle-Geraete, sonst der Standard-Geraete.
 
-Node-RED-kompatibler Kurzpfad fuer bestehende Loxone-Ausgaenge:
+Loxone-Kurzpfade fuer virtuelle Ausgangsbefehle:
 
 ```text
 POST http://<loxberry>:8080/geschirrspueler
@@ -201,11 +201,145 @@ POST http://<loxberry>:8080/lautstaerke
 Body: 70
 ```
 
-Das entspricht dem bisherigen Node-RED-Prinzip `POST /:cmd`: `alarm` nutzt die Alarm-Geraete, `lautstaerke` setzt die Lautstaerke, alle anderen Namen sprechen den Text aus dem Body auf den Standard-Geraeten. LoxEvo beantwortet diese Kurzpfade sofort und sendet die Alexa-Ausgabe im Hintergrund, damit Loxone nicht auf die TTS-Ausfuehrung warten muss.
+Das Prinzip ist bewusst einfach: `alarm` nutzt die Alarm-Geraete, `lautstaerke` setzt die Lautstaerke, alle anderen Namen sprechen den Text aus dem Body auf den Standard-Geraeten. LoxEvo beantwortet diese Kurzpfade sofort und sendet die Alexa-Ausgabe im Hintergrund, damit Loxone nicht auf die TTS-Ausfuehrung warten muss.
+
+## Loxone TTS einrichten
+
+Der empfohlene Weg in Loxone ist ein zentraler virtueller Ausgang fuer LoxEvo und darunter mehrere virtuelle Ausgangsbefehle.
+
+### Zentraler virtueller Ausgang
+
+In Loxone Config einen virtuellen Ausgang anlegen, zum Beispiel `LoxEvo TTS`.
+
+```text
+Adresse:
+http://<loxberry-ip>:8080/
+
+Verbindung nach Senden schliessen:
+aktiviert
+```
+
+Beispiel:
+
+```text
+Adresse:
+http://192.168.178.5:8080/
+```
+
+Die Web-UI von LoxEvo laeuft standardmaessig auf Port `8080`. Der Alexa/Hue-Port `80` ist nur fuer die virtuelle Alexa-Geraetesuche relevant, nicht fuer diese Loxone-TTS-Aufrufe.
+
+### Normale Sprachausgabe
+
+Fuer jede Meldung einen virtuellen Ausgangsbefehl unter dem LoxEvo-Ausgang anlegen.
+
+```text
+Befehl bei EIN:
+/geschirrspueler
+
+HTTP header bei EIN:
+leer lassen
+
+HTTP Methode bei EIN:
+POST
+
+HTTP body bei EIN:
+Geschirrspueler ist fertig. Bitte Tuere oeffnen, damit das Geschirr trocknen kann.
+
+Befehl bei AUS:
+leer lassen
+```
+
+Der Pfad nach dem Slash ist frei waehlbar. LoxEvo nutzt ihn als Namen im Protokoll. Gesprochen wird der Text aus `HTTP body bei EIN`.
+Alternativ kann in `Befehl bei EIN` auch die komplette URL stehen, zum Beispiel `http://192.168.178.5:8080/geschirrspueler`. Uebersichtlicher ist aber der zentrale virtuelle Ausgang mit kurzer Pfadangabe.
+
+Weitere Beispiele:
+
+```text
+Befehl bei EIN: /luefter_dusche_manuell_aus
+HTTP body bei EIN: Luefter Dusche wurde manuell ausgeschaltet. Bitte Luefter wieder einschalten oder Fenster oeffnen.
+
+Befehl bei EIN: /abwesenheit_aktiv
+HTTP body bei EIN: Abwesenheitsmodus aktiviert. Alle Fenster sind geschlossen.
+
+Befehl bei EIN: /waschmaschine
+HTTP body bei EIN: Waesche ist fertig. Bitte Waesche entnehmen.
+```
+
+Normale Meldungen werden auf den in LoxEvo konfigurierten `Standard-Geraeten` gesprochen.
+
+### Alarm aus Loxone
+
+Fuer Alarmmeldungen den reservierten Pfad `/alarm` verwenden.
+
+```text
+Befehl bei EIN:
+/alarm
+
+HTTP header bei EIN:
+leer lassen
+
+HTTP Methode bei EIN:
+POST
+
+HTTP body bei EIN:
+Achtung, Alarm wurde ausgeloest.
+
+Befehl bei AUS:
+leer lassen
+```
+
+Alarm nutzt die in LoxEvo konfigurierten `Alarm-Geraete` und setzt fuer diese Ausgabe die `Alarm-Lautstaerke`. Wenn Alexa die vorherige Lautstaerke liefert, stellt LoxEvo sie nach der Alarm-Ausgabe wieder her. Der Alarm wird pro Loxone-Aufruf genau einmal gesendet.
+
+SSML kann ebenfalls als Body verwendet werden, wenn Alexa es akzeptiert:
+
+```xml
+<speak><prosody pitch="high">Please leave the house. The police has already been called.</prosody><audio src="soundbank://soundlibrary/scifi/amzn_sfx_scifi_alarm_03"/></speak>
+```
+
+Solche Alarmtexte unbedingt live testen, bevor sie fuer einen echten Alarm verwendet werden. Amazon kann SSML- oder Soundbank-Unterstuetzung je nach Geraet, Region oder Alexa-API-Verhalten unterschiedlich behandeln.
+
+### Lautstaerke aus Loxone setzen
+
+Fuer eine reine Lautstaerke-Aenderung den reservierten Pfad `/lautstaerke` verwenden. Der Body muss eine Zahl zwischen `0` und `100` enthalten.
+
+```text
+Befehl bei EIN:
+/lautstaerke
+
+HTTP header bei EIN:
+leer lassen
+
+HTTP Methode bei EIN:
+POST
+
+HTTP body bei EIN:
+70
+
+Befehl bei AUS:
+leer lassen
+```
+
+Dieser Aufruf setzt die Lautstaerke der `Alle-Geraete`, falls dort Geraete konfiguriert sind. Wenn `Alle-Geraete` leer ist, nutzt LoxEvo die `Standard-Geraete`.
+
+### Zielgeraete in LoxEvo
+
+Die Echo-Zielgeraete werden nicht in Loxone gepflegt, sondern in LoxEvo:
+
+```text
+Konfiguration -> TTS-Geraete -> Alexa-Geraete suchen
+```
+
+Dort koennen Geraete per Checkbox zugeordnet werden:
+
+- `Standard`: normale TTS-Meldungen
+- `Alle`: Lautstaerke-Aufrufe oder gemeinsame Gruppen
+- `Alarm`: Alarmmeldungen mit Alarm-Lautstaerke
+
+Dadurch bleiben Loxone-Ausgaenge einfach: Loxone sendet nur Pfad und Text, LoxEvo entscheidet anhand der Konfiguration, welche Echo-Geraete sprechen.
 
 ## Alexa2Lox-kompatibler TTS-Aufruf
 
-Damit bestehende Loxone-Aufrufe leichter migriert werden koennen, gibt es zusaetzlich einen kompatiblen Einstieg:
+Zusaetzlich gibt es einen Alexa2Lox-aehnlichen Einstieg fuer Systeme, die TTS lieber mit Query-Parametern ausloesen:
 
 ```text
 GET http://<loxberry>:8080/admin/plugins/alexa2lox/tts.php?device=Kueche&text=Hallo&vol=50
@@ -221,7 +355,7 @@ Unterstuetzt:
 - Text `0` wird standardmaessig ignoriert
 - `ss` und `Grad` werden fuer bessere Aussprache normalisiert
 
-Hinweis: In diesem Prototyp muessen die Geraete in `config.json` so angegeben werden, wie das TTS-Modul sie ansprechen kann. Im spaeteren EchoLox-Ausbau soll eine echte Geraeteliste mit Namen, Seriennummern und Auswahl per Web-UI folgen.
+Hinweis: Auch dieser kompatible Einstieg nutzt die TTS-Geraetelisten aus der Web-UI. Mit `device=ALL` werden die `Alle-Geraete` genutzt, sonst die `Standard-Geraete`.
 
 ## Rechtliche Linie
 

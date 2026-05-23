@@ -448,6 +448,13 @@ label.is-disabled {
   line-height: 1.45;
 }
 
+.field-note {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
 .range-value {
   justify-self: start;
   min-width: 48px;

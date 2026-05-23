@@ -1019,7 +1019,7 @@ function createTtsEndpointCards(baseUrl) {
     method: 'POST',
     url: `${baseUrl}/tts/speak`,
     body: 'Geschirrspüler ist fertig.',
-    note: 'Einfacher Text im Request-Body.',
+    note: 'Schnelle Sprachausgabe ohne Lautstärke-Vorbefehl.',
     testLabel: 'TTS testen',
     testAction: (button) => testEndpoint({
       method: 'POST',
@@ -1034,7 +1034,7 @@ function createTtsEndpointCards(baseUrl) {
     method: 'POST',
     url: `${baseUrl}/tts/alarm`,
     body: 'Achtung, Alarm wurde ausgelöst.',
-    note: 'Nutzt die Alarm-Geräteliste und Alarm-Lautstärke.',
+    note: 'Nutzt die Alarm-Geräteliste und erzwingt die Alarm-Lautstärke.',
     testLabel: 'Alarm testen',
     testAction: (button) => testEndpoint({
       method: 'POST',
@@ -1049,7 +1049,7 @@ function createTtsEndpointCards(baseUrl) {
     method: 'POST',
     url: `${baseUrl}/tts/volume`,
     body: String(ttsDefaultVolume?.value || 40),
-    note: 'Setzt die Lautstärke der Alle-Geräte, sonst der Standard-Geräte.',
+    note: 'Setzt die Lautstärke der Alle-Geräte, sonst der Standard-Geräte. Das ist bewusst getrennt von normaler TTS.',
     testLabel: 'Lautstärke setzen',
     testAction: (button) => testEndpoint({
       method: 'POST',

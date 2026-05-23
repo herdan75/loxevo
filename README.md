@@ -186,7 +186,7 @@ POST http://<loxberry>:8080/tts/lautstaerke
 Body: 70
 ```
 
-`/tts/speak` nutzt die konfigurierte Standard-Lautstaerke. `/tts/alarm` nutzt immer die Alarm-Lautstaerke und uebersteuert damit die aktuelle Echo-Lautstaerke fuer diese Ausgabe.
+`/tts/speak` spricht schnell mit der aktuell am Echo eingestellten Lautstaerke. `/tts/alarm` nutzt immer die Alarm-Lautstaerke und uebersteuert damit die aktuelle Echo-Lautstaerke fuer diese Ausgabe. Der separate Lautstaerke-Aufruf setzt die Lautstaerke der Alle-Geraete, sonst der Standard-Geraete.
 
 ## Alexa2Lox-kompatibler TTS-Aufruf
 

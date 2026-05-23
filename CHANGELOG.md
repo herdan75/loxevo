@@ -10,7 +10,7 @@ Alle nennenswerten Aenderungen an LoxEvo werden in dieser Datei gesammelt.
 ## 0.1.0
 
 - Lauffaehige Docker/LoxBerry-Basis mit Web-UI.
-- Generische Loxone-Befehle fuer Rubriken wie Licht, Rollladen, Lueftung und Reinigung.
+- Frei definierbare Loxone-Befehle fuer unterschiedliche Funktionen, Raeume und Rubriken.
 - Virtuelle Alexa-Geraete ueber lokalen Hue-kompatiblen Bridge-Eingang.
 - SSDP-Helper fuer Alexa-Geraetesuche neben dem LoxBerry-`ssdpd`.
 - Alexa-TTS ueber `alexa-remote2` mit Geraetesuche, Standard-, Alle- und Alarm-Geraeten.

@@ -1,6 +1,6 @@
 # Installation
 
-> **Hinweis:** LoxEvo ist noch eine Entwicklungsversion. Diese Anleitung ist fuer Tests gedacht, nicht als produktive Freigabe.
+> **Hinweis:** LoxEvo ist eine lauffaehige Entwicklungsversion. Neue Installationen und neue Befehle sollten trotzdem zuerst bewusst getestet werden.
 
 Diese Anleitung beschreibt den Docker-Weg. Private Daten werden erst nach der Installation lokal im Ordner `data/` angelegt oder ueber die Web-UI eingetragen.
 
@@ -40,7 +40,7 @@ Die Web-UI ist fuer das eigene LAN gedacht. Port `8080` sollte nicht direkt ins 
 5. Rubriken und Befehle mit Sprachname, Raum, Funktion, Aktion, Loxone-Typ, UUID und Wert oder Pfad eintragen.
 6. `Dry-Run aktiv` eingeschaltet lassen.
 7. Konfiguration speichern.
-8. Unter `Bedienen` einen Befehl testen.
+8. Unter `Testen` einen Befehl testen.
 9. Unter `Protokoll` pruefen, welche Loxone-URL erzeugt wurde.
 10. Erst wenn alles passt, Dry-Run deaktivieren.
 
@@ -63,7 +63,7 @@ Wichtig: `config.example.json` bleibt absichtlich allgemein und enthaelt nur Pla
 1. Alexa-Cookie-Datei als `data/Node.txt` ablegen.
 2. In der Web-UI unter `Konfiguration` TTS aktivieren.
 3. Cookie-Datei auf `/config/Node.txt` setzen.
-4. Echo-Geraete-IDs eintragen.
+4. Unter `TTS-Geraete` Alexa-Geraete suchen und per Checkbox zuordnen.
 5. Speichern und TTS-Status pruefen.
 
 ## Betrieb

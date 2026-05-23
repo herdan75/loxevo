@@ -1,12 +1,12 @@
 # LoxEvo
 
-> **Status: Entwicklungsversion / Work in Progress**
+> **Status: lauffaehige Entwicklungsversion**
 >
-> LoxEvo ist aktuell noch **nicht produktiv freigegeben**. Das Projekt ist im Aufbau und kann lokal oder auf einem Test-LoxBerry ausprobiert werden. Installation, API, Konfiguration und Alexa/TTS-Integration koennen sich noch aendern. Nutzung bitte nur im Dry-Run oder in einer bewusst getesteten Umgebung.
+> LoxEvo ist als lauffaehige Docker/LoxBerry-Basis nutzbar. Die wichtigsten Funktionen fuer Loxone-Befehle, virtuelle Alexa-Geraete und Alexa-TTS sind umgesetzt und getestet. Trotzdem koennen noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst pruefen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
 Eigene LoxBerry-Zentrale fuer Alexa, Echo-TTS und Loxone.
 
-Dieses Projekt ist bewusst **keine Code-Kopie von EchoLox**. EchoLox und Alexa2Lox dienen als fachliche Referenzen fuer das Zielbild:
+Die Ziele von LoxEvo:
 
 - Alexa-Sprachbefehle sollen einfach bleiben
 - Loxone bleibt die Automationszentrale
@@ -143,7 +143,7 @@ Wenn `alexaBridge.enabled` aktiv ist, bietet LoxEvo jeden aktiven Befehl als vir
 Technisch ist das ein lokaler Hue-kompatibler V1-Bridge-Eingang nur fuer Alexa-Discovery und Ein/Aus-Befehle. Es wird keine Hue-Bridge und keine Hue-Lampe benoetigt; LoxEvo nutzt nur das lokale Discovery/API-Verhalten, damit Alexa ohne eigene Cloud-Skill-Entwicklung virtuelle Geraete finden kann.
 
 Fuer die Geraetesuche muss LoxEvo im gleichen LAN wie die Echo-Geraete erreichbar sein. Im Docker/LoxBerry-Betrieb ist `network_mode: host` deshalb der empfohlene Modus, weil SSDP/UDP 1900 sonst oft nicht sauber bis in den Container gelangt.
-Das Docker-Image enthaelt dafuer einen kleinen Linux-SSDP-Helper. Er nutzt wie EchoLox die Linux-Socket-Optionen fuer gemeinsam nutzbare UDP-Ports und kann dadurch neben dem LoxBerry-`ssdpd` laufen, ohne dessen Dienst abschalten zu muessen.
+Das Docker-Image enthaelt dafuer einen kleinen Linux-SSDP-Helper. Er nutzt Linux-Socket-Optionen fuer gemeinsam nutzbare UDP-Ports und kann dadurch neben dem LoxBerry-`ssdpd` laufen, ohne dessen Dienst abschalten zu muessen.
 Fuer neuere Echo-Geraete sollte die Alexa-Bridge ueber Port 80 erreichbar sein. Die Web-UI kann weiter auf Port 8080 laufen; LoxEvo startet bei abweichendem `alexaBridge.advertisePort` einen zusaetzlichen Alexa/Hue-HTTP-Listener.
 
 Typischer Ablauf:
@@ -391,20 +391,6 @@ Unterstuetzt:
 - `ss` und `Grad` werden fuer bessere Aussprache normalisiert
 
 Hinweis: Auch dieser kompatible Einstieg nutzt die TTS-Geraetelisten aus der Web-UI. Mit `device=ALL` werden die `Alle-Geraete` genutzt, sonst die `Standard-Geraete`.
-
-## Rechtliche Linie
-
-EchoLox ist eine wichtige technische Referenz, aber in der geprueften Repository-Ansicht war kein klares `LICENSE`-File sichtbar. Ohne Lizenz gelten standardmaessig restriktive Urheberrechte. Darum wird LoxEvo als eigenstaendige Implementierung aufgebaut:
-
-- kein Kopieren von EchoLox-Code
-- keine Uebernahme von Assets, Logos, Texten oder Web-UI
-- eigene Projektstruktur und eigener Name
-- Referenzen nur als technische Orientierung
-
-Siehe auch:
-
-- [docs/legal-notes.md](docs/legal-notes.md)
-- [docs/echolox-tts-integration.md](docs/echolox-tts-integration.md)
 
 ## GitHub
 

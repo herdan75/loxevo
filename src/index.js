@@ -22,6 +22,7 @@ let alexaBridge = createAlexaBridge();
 let bridgeHttpServer = null;
 let bridgeHttpStatus = { enabled: false, ready: false, error: null, port: null };
 const events = [];
+const MAX_REQUEST_BODY_SIZE = 1024 * 1024 * 2;
 const LOXONE_TTS_RESERVED_PATHS = new Set([
   'admin',
   'api',
@@ -85,7 +86,7 @@ async function handleRequest(req, res, { bridgeOnly = false } = {}) {
     }
 
     if (pathParts[0] === 'api') {
-      return await handleApi(req, res, pathParts, () => readBody(req));
+      return await handleApi(req, res, pathParts, () => readBody(req), url);
     }
 
     // Frei definierbarer Befehl: /command/kueche_licht_hell
@@ -117,7 +118,7 @@ async function handleRequest(req, res, { bridgeOnly = false } = {}) {
   }
 }
 
-async function handleApi(req, res, pathParts, readRequestBody) {
+async function handleApi(req, res, pathParts, readRequestBody, url) {
   if (req.method === 'GET' && pathParts[1] === 'config') {
     return sendJson(res, config);
   }
@@ -144,6 +145,18 @@ async function handleApi(req, res, pathParts, readRequestBody) {
 
   if (req.method === 'GET' && pathParts[1] === 'dependencies') {
     return sendJson(res, { dependencies: [await getDependencyStatus('alexa-remote2')] });
+  }
+
+  if (req.method === 'GET' && pathParts[1] === 'backup') {
+    return await exportBackup(res, url.searchParams.get('includeCookie') === 'true');
+  }
+
+  if (req.method === 'POST' && pathParts[1] === 'backup' && pathParts[2] === 'restore') {
+    try {
+      return await restoreBackup(res, parseJson(await readRequestBody()));
+    } catch (error) {
+      return sendJson(res, { ok: false, error: error.message }, 400);
+    }
   }
 
   if (req.method === 'POST' && pathParts[1] === 'dependencies' && pathParts[2] === 'alexa-remote2' && pathParts[3] === 'update') {
@@ -192,6 +205,124 @@ async function handleApi(req, res, pathParts, readRequestBody) {
   }
 
   return sendJson(res, { error: 'not found' }, 404);
+}
+
+async function exportBackup(res, includeCookie) {
+  const exportedAt = new Date().toISOString();
+  const backup = {
+    app: config.server?.name || 'LoxEvo',
+    formatVersion: 1,
+    exportedAt,
+    config
+  };
+
+  if (includeCookie) {
+    const cookiePath = resolveCookiePath(config.tts?.cookieFile);
+    try {
+      backup.cookie = {
+        path: config.tts?.cookieFile || '/config/Node.txt',
+        content: await readFile(cookiePath, 'utf8')
+      };
+    } catch (error) {
+      return sendJson(res, { ok: false, error: `Cookie-Datei konnte nicht gelesen werden: ${error.message}` }, 400);
+    }
+  }
+
+  addEvent({ type: 'backup', status: 'exported', text: includeCookie ? 'Backup mit Cookie exportiert.' : 'Backup exportiert.' });
+  return sendJsonDownload(res, backup, `loxevo-backup-${timestampForFile(exportedAt)}.json`);
+}
+
+async function restoreBackup(res, backupPayload) {
+  const nextConfig = readBackupConfig(backupPayload);
+  const cookieTargetPath = resolveBackupCookieTarget(backupPayload, nextConfig);
+  const currentBackupPath = await writeCurrentConfigBackup();
+
+  config = await saveConfig(nextConfig);
+  const cookieRestored = await restoreCookieFromBackup(backupPayload, cookieTargetPath);
+
+  loxone = new LoxoneClient(config);
+  tts = new TtsService(config);
+  await initTts();
+  await restartAlexaBridge();
+  await restartBridgeHttpServer();
+
+  addEvent({
+    type: 'backup',
+    status: 'restored',
+    text: cookieRestored ? 'Backup mit Cookie importiert.' : 'Backup importiert.',
+    backupPath: currentBackupPath
+  });
+
+  return sendJson(res, { ok: true, config, backupPath: currentBackupPath, cookieRestored });
+}
+
+function readBackupConfig(payload) {
+  if (isPlainObject(payload?.config)) {
+    return structuredClone(payload.config);
+  }
+  if (isPlainObject(payload?.server) && isPlainObject(payload?.loxone)) {
+    return structuredClone(payload);
+  }
+  throw new Error('Backup enthaelt keine gueltige LoxEvo-Konfiguration.');
+}
+
+async function writeCurrentConfigBackup() {
+  const configPath = getConfigPath();
+  const backupPath = join(dirname(configPath), `config.backup-${timestampForFile(new Date().toISOString())}.json`);
+  await writeFile(backupPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+  return backupPath;
+}
+
+function resolveBackupCookieTarget(payload, nextConfig) {
+  if (!payload?.cookie?.content) {
+    return null;
+  }
+
+  const targetPath = resolveCookiePath(nextConfig.tts?.cookieFile || payload.cookie.path);
+  if (!isInsideDirectory(targetPath, getConfigDir())) {
+    throw new Error('Cookie-Datei wird nur innerhalb des lokalen Datenordners wiederhergestellt.');
+  }
+
+  return targetPath;
+}
+
+async function restoreCookieFromBackup(payload, targetPath) {
+  if (!targetPath) {
+    return false;
+  }
+
+  await writeFile(targetPath, payload.cookie.content, 'utf8');
+  return true;
+}
+
+function resolveCookiePath(value) {
+  const raw = String(value || 'Node.txt').trim() || 'Node.txt';
+  if (raw.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(raw)) {
+    return resolve(raw);
+  }
+  return resolve(getConfigDir(), raw);
+}
+
+function getConfigPath() {
+  return resolve(process.env.CONFIG_PATH || './config.json');
+}
+
+function getConfigDir() {
+  return dirname(getConfigPath());
+}
+
+function isInsideDirectory(path, directory) {
+  const resolvedPath = resolve(path);
+  const resolvedDirectory = resolve(directory);
+  return resolvedPath === resolvedDirectory || resolvedPath.startsWith(`${resolvedDirectory}${sep}`);
+}
+
+function timestampForFile(value) {
+  return String(value).replace(/\D/g, '').slice(0, 14);
+}
+
+function isPlainObject(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
 async function runConfiguredCommand(res, commandKey) {
@@ -809,7 +940,7 @@ function readBody(req) {
     req.setEncoding('utf8');
     req.on('data', (chunk) => {
       data += chunk;
-      if (data.length > 1024 * 256) {
+      if (data.length > MAX_REQUEST_BODY_SIZE) {
         reject(new Error('Request body zu groß.'));
         req.destroy();
       }
@@ -830,6 +961,15 @@ function parseJson(body) {
 function sendJson(res, payload, statusCode = 200) {
   res.writeHead(statusCode, { 'content-type': 'application/json' });
   res.end(JSON.stringify(payload));
+}
+
+function sendJsonDownload(res, payload, filename) {
+  res.writeHead(200, {
+    'content-type': 'application/json; charset=utf-8',
+    'content-disposition': `attachment; filename="${filename}"`,
+    'cache-control': 'no-store'
+  });
+  res.end(`${JSON.stringify(payload, null, 2)}\n`);
 }
 
 function sendText(res, payload, statusCode = 200) {

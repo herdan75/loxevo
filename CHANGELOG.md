@@ -6,6 +6,8 @@ Alle nennenswerten Aenderungen an LoxEvo werden in dieser Datei gesammelt.
 
 - GitHub Actions CI fuer Node-Syntaxcheck und Docker-Build ergaenzt.
 - README-Badges fuer CI, Docker und Lizenz ergaenzt.
+- Backup-Export und -Import fuer LoxEvo-Einstellungen ergaenzt.
+- Hinweise zur sauberen Deinstallation und zum Erhalt des Datenordners ergaenzt.
 
 ## 0.1.0
 

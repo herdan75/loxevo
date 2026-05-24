@@ -52,6 +52,10 @@ const setupChecks = document.querySelector('#setupChecks');
 const setupConfigBtn = document.querySelector('#setupConfigBtn');
 const refreshMaintenanceBtn = document.querySelector('#refreshMaintenanceBtn');
 const dependencyStatus = document.querySelector('#dependencyStatus');
+const backupIncludeCookie = document.querySelector('#backupIncludeCookie');
+const exportBackupBtn = document.querySelector('#exportBackupBtn');
+const importBackupFile = document.querySelector('#importBackupFile');
+const importBackupBtn = document.querySelector('#importBackupBtn');
 
 let config = null;
 let ttsStatus = null;
@@ -77,6 +81,8 @@ refreshIntegrationsBtn.addEventListener('click', () => {
 });
 setupConfigBtn.addEventListener('click', () => showView('configView'));
 refreshMaintenanceBtn.addEventListener('click', () => loadDependencyStatus(refreshMaintenanceBtn));
+exportBackupBtn?.addEventListener('click', () => exportBackup(exportBackupBtn));
+importBackupBtn?.addEventListener('click', () => importBackup(importBackupBtn));
 ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
 refreshTtsDevicesBtn?.addEventListener('click', () => loadTtsDevices(refreshTtsDevicesBtn));
 ttsDefaultVolume?.addEventListener('input', () => {
@@ -262,6 +268,90 @@ async function putJson(url, payload) {
   });
   await ensureOk(response);
   return response.json();
+}
+
+async function exportBackup(button) {
+  const includeCookie = Boolean(backupIncludeCookie?.checked);
+  const url = `/api/backup?includeCookie=${includeCookie ? 'true' : 'false'}`;
+  setButtonFeedback(button, 'pending', 'Exportiert');
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    await ensureOk(response);
+    const blob = await response.blob();
+    downloadBlob(blob, filenameFromResponse(response) || `loxevo-backup-${timestampForFile(new Date())}.json`);
+    await loadEvents();
+    setButtonFeedback(button, 'success', 'Exportiert');
+    showToast(includeCookie ? 'Backup mit Cookie exportiert' : 'Backup exportiert', 'ok');
+  } catch (error) {
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
+}
+
+async function importBackup(button) {
+  const file = importBackupFile?.files?.[0];
+  if (!file) {
+    showToast('Bitte zuerst eine Backup-Datei auswählen', 'error');
+    return;
+  }
+
+  const ok = window.confirm('Backup importieren? Die aktuelle Konfiguration wird vorher im Datenordner gesichert.');
+  if (!ok) return;
+
+  setButtonFeedback(button, 'pending', 'Importiert');
+  try {
+    const response = await fetch('/api/backup/restore', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: await file.text()
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || `HTTP ${response.status}`);
+    }
+
+    config = result.config;
+    populateForms();
+    syncJsonFromForms();
+    updateDryRunUi(Boolean(config.loxone?.dryRun));
+    renderCommands();
+    renderCommandEditor();
+    await loadTtsStatus();
+    await loadTtsDevices();
+    await loadAlexaBridgeStatus();
+    await loadSetupStatus();
+    await loadDependencyStatus();
+    renderIntegrations();
+    await loadEvents();
+    if (importBackupFile) importBackupFile.value = '';
+
+    setButtonFeedback(button, 'success', 'Importiert');
+    showToast(result.cookieRestored ? 'Backup mit Cookie importiert' : 'Backup importiert', 'ok');
+  } catch (error) {
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function filenameFromResponse(response) {
+  const disposition = response.headers.get('content-disposition') || '';
+  const match = disposition.match(/filename="([^"]+)"/i);
+  return match ? match[1] : '';
+}
+
+function timestampForFile(date) {
+  return date.toISOString().replace(/\D/g, '').slice(0, 14);
 }
 
 async function ensureOk(response) {

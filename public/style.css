@@ -276,6 +276,34 @@ h2 {
   font-size: 14px;
 }
 
+.backup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.backup-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.backup-card h3 {
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 18px;
+}
+
+.backup-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .version-select {
   width: auto;
   min-width: 160px;
@@ -1018,6 +1046,7 @@ pre {
   .form-row,
   .form-row.three,
   .form-row.four,
+  .backup-grid,
   .device-card,
   .view,
   .scene-row {

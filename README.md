@@ -61,6 +61,8 @@ Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen l
 Fuer den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
 Die Web-UI zeigt unter "Wartung" die installierte `alexa-remote2`-Version, verfuegbare npm-Versionen und kann Installation oder Update im laufenden Container anstossen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
+Im gleichen Register koennen die Einstellungen als Backup exportiert und spaeter wieder importiert werden. Der Export enthaelt standardmaessig die LoxEvo-Konfiguration; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden.
+Backup-Dateien koennen sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten und sollten deshalb privat bleiben.
 
 Private Daten gehoeren in `data/`:
 
@@ -69,6 +71,7 @@ Private Daten gehoeren in `data/`:
 
 Dieser Ordner ist absichtlich von Git ausgenommen, damit keine Loxone-Zugangsdaten, UUIDs oder Alexa-Geraete-IDs veroeffentlicht werden.
 Alle privaten Werte werden nach der Installation ueber die Web-UI oder direkt in `data/config.json` gepflegt.
+Bei einer Neuinstallation reicht es normalerweise, den Ordner `data/` zu sichern und spaeter wieder in den Projektordner zu legen.
 
 Wichtig fuer Live-Tests: Die Web-UI zeigt und speichert Loxone-Zugangsdaten. LoxEvo sollte deshalb nur im eigenen LAN oder per VPN erreichbar sein und nicht direkt ins Internet freigegeben werden.
 
@@ -90,6 +93,21 @@ Die Oberflaeche ist in klare Bereiche gegliedert:
 - `Protokoll`: zuletzt simulierte oder gesendete Aktionen ansehen
 
 Die JSON-Ansicht bleibt als Expertenmodus erhalten.
+
+## Backup und Deinstallation
+
+Backups werden in der Web-UI unter `Wartung` erstellt. Der normale Export enthaelt `config.json` mit Loxone-, Alexa-Bridge-, Befehls- und TTS-Einstellungen. Die Alexa-Cookie-Datei `Node.txt` wird nur exportiert, wenn der entsprechende Haken gesetzt ist, weil diese Datei Zugriffsdaten fuer das Amazon-Konto enthalten kann. Backup-Dateien enthalten private Installationsdaten und sollten nicht veroeffentlicht werden.
+
+Beim Import legt LoxEvo zuerst eine Sicherung der aktuellen Konfiguration im lokalen Datenordner an und schreibt danach die importierte Konfiguration. Wenn im Backup ein Cookie enthalten ist, wird es ebenfalls in den konfigurierten Cookie-Pfad geschrieben.
+Installierte npm-Pakete wie `alexa-remote2` werden nicht in die Backup-Datei aufgenommen. Wenn der komplette Ordner `data/` erhalten bleibt, bleiben sie lokal vorhanden; nach einer frischen Wiederherstellung koennen sie im Register `Wartung` erneut installiert werden.
+
+Eine normale Deinstallation entfernt den Container:
+
+```bash
+docker compose down
+```
+
+Damit bleiben `data/config.json`, `data/Node.txt` und lokal installierte Wartungspakete bewusst erhalten. Fuer eine vollstaendige Entfernung danach den Projektordner `/mnt/docker/loxevo` loeschen und bei Bedarf das lokale Image `loxevo:local` sowie ungenutzten Docker-Build-Cache entfernen. LoxEvo installiert keinen systemd-Dienst und keinen SSDP-Helper direkt auf dem Host; der SSDP-Helper steckt nur im Docker-Image.
 
 Echte Loxone-Requests aktivieren:
 

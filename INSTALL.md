@@ -104,6 +104,12 @@ Die Dateien in `data/` bleiben dabei erhalten.
 
 Die installierte `alexa-remote2`-Version, der Installationspfad und verfuegbare Versionen sind in der Web-UI unter "Wartung" sichtbar.
 
+## Backup und Wiederherstellung
+
+In der Web-UI unter `Wartung` kann ein Backup der Einstellungen exportiert werden. Der normale Export enthaelt die LoxEvo-Konfiguration aus `data/config.json`. Die Alexa-Cookie-Datei `data/Node.txt` wird nur exportiert, wenn der Haken dafuer gesetzt ist. Backup-Dateien koennen sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten.
+
+Beim Import legt LoxEvo zuerst eine Sicherung der aktuellen Konfiguration im Datenordner an und spielt danach die importierte Konfiguration ein. Wenn das Backup eine Cookie-Datei enthaelt, wird diese ebenfalls wiederhergestellt.
+
 ## Neuinstallation oder Ruecksetzen
 
 Container stoppen:
@@ -126,6 +132,24 @@ docker compose up -d
 ```
 
 Beim naechsten Start wird wieder eine frische `data/config.json` aus `config.example.json` angelegt.
+
+## Deinstallation
+
+Container stoppen und entfernen:
+
+```bash
+docker compose down
+```
+
+Damit bleiben der Projektordner und `data/` bewusst erhalten. Das ist sinnvoll, wenn LoxEvo spaeter wieder installiert oder repariert werden soll.
+
+Fuer eine vollstaendige Entfernung:
+
+```bash
+docker compose down --rmi local
+```
+
+Danach den Projektordner `/mnt/docker/loxevo` nur dann loeschen, wenn `data/config.json` und `data/Node.txt` nicht mehr gebraucht werden oder vorher gesichert wurden. LoxEvo installiert keinen systemd-Dienst und keinen Helper direkt auf dem Host; der SSDP-Helper laeuft nur innerhalb des Containers.
 
 ## Typische Probleme
 

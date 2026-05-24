@@ -154,13 +154,15 @@ static void build_notify(char *out, size_t out_size, const char *ip, const char 
            ip, port, nt, usn, bridge_id);
 }
 
-static int create_socket(const char *ip) {
+static int create_socket_with_options(const char *ip, bool use_reuse_port) {
   int sock = socket(AF_INET, SOCK_DGRAM, 0);
   if (sock < 0) return -1;
 
   int enabled = 1;
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(enabled));
-  setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &enabled, sizeof(enabled));
+  if (use_reuse_port) {
+    setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &enabled, sizeof(enabled));
+  }
 
   int recv_buffer = 65536;
   setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &recv_buffer, sizeof(recv_buffer));
@@ -200,6 +202,26 @@ static int create_socket(const char *ip) {
   setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
 
   return sock;
+}
+
+static int create_socket(const char *ip, bool *reuse_port_used) {
+  int sock = create_socket_with_options(ip, true);
+  if (sock >= 0) {
+    if (reuse_port_used) *reuse_port_used = true;
+    return sock;
+  }
+
+  if (errno != EADDRINUSE) {
+    return -1;
+  }
+
+  sock = create_socket_with_options(ip, false);
+  if (sock >= 0) {
+    if (reuse_port_used) *reuse_port_used = false;
+    return sock;
+  }
+
+  return -1;
 }
 
 static void send_notify_burst(int sock, const char *ip, const char *port,
@@ -288,13 +310,14 @@ int main(int argc, char **argv) {
   signal(SIGTERM, handle_signal);
   signal(SIGINT, handle_signal);
 
-  int sock = create_socket(ip);
+  bool reuse_port_used = false;
+  int sock = create_socket(ip, &reuse_port_used);
   if (sock < 0) {
     fprintf(stderr, "ERROR bind UDP 1900 failed: %s\n", strerror(errno));
     return 1;
   }
 
-  log_line("READY", "bind=0.0.0.0:%d reuseport=1 location=http://%s:%s/description.xml", SSDP_PORT, ip, port);
+  log_line("READY", "bind=0.0.0.0:%d reuseport=%d location=http://%s:%s/description.xml", SSDP_PORT, reuse_port_used ? 1 : 0, ip, port);
   send_notify_burst(sock, ip, port, bridge_id, uuid);
 
   time_t last_notify = time(NULL);

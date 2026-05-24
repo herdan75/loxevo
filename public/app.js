@@ -1064,11 +1064,31 @@ function renderPreflightStatus() {
       marker.textContent = preflightLevelLabel(check.level);
 
       const content = document.createElement('div');
+      content.className = 'preflight-check-content';
+      const titleRow = document.createElement('div');
+      titleRow.className = 'preflight-check-title';
       const label = document.createElement('strong');
       label.textContent = check.label || 'Prüfung';
+      const helpText = preflightHelpText(section.title, check);
+      const helpButton = document.createElement('button');
+      helpButton.type = 'button';
+      helpButton.className = 'info-button preflight-info-button';
+      helpButton.textContent = 'i';
+      helpButton.title = 'Prüfung erklären';
+      helpButton.setAttribute('aria-label', `${check.label || 'Prüfung'} erklären`);
+      helpButton.setAttribute('aria-expanded', 'false');
       const detail = document.createElement('p');
       detail.textContent = check.detail || '';
-      content.append(label, detail);
+      const help = document.createElement('p');
+      help.className = 'preflight-help';
+      help.textContent = helpText;
+      help.hidden = true;
+      helpButton.addEventListener('click', () => {
+        help.hidden = !help.hidden;
+        helpButton.setAttribute('aria-expanded', String(!help.hidden));
+      });
+      titleRow.append(label, helpButton);
+      content.append(titleRow, detail, help);
 
       row.append(marker, content);
       body.append(row);
@@ -1107,6 +1127,54 @@ function preflightLevelLabel(level) {
   if (level === 'warning') return 'Prüfen';
   if (level === 'optional') return 'Optional';
   return 'Info';
+}
+
+function preflightHelpText(sectionTitle = '', check = {}) {
+  const label = check.label || 'Prüfung';
+  const key = `${sectionTitle}|${label}`;
+  const help = {
+    'LoxEvo|Web-UI und API': 'Prüft, ob die LoxEvo-Weboberfläche und API grundsätzlich erreichbar sind und auf welchem Port sie laufen.',
+    'LoxEvo|Version': 'Zeigt die lokal laufende LoxEvo-Version und, falls verfügbar, den Git-Commit. Das hilft beim Abgleich mit GitHub oder Support-Hinweisen.',
+    'LoxEvo|Laufzeit': 'Zeigt, seit wann der aktuelle Prozess läuft und mit welcher Node.js-Version er gestartet wurde. Nach einem Neustart beginnt diese Laufzeit neu.',
+    'LoxEvo|Konfiguration lesbar': 'Prüft, ob LoxEvo die gespeicherte Konfigurationsdatei lesen kann. Ohne diese Datei kann die Oberfläche keine Einstellungen laden.',
+    'LoxEvo|Datenordner beschreibbar': 'Prüft, ob LoxEvo im Datenordner schreiben darf. Das ist nötig für Speichern, Backup, Import-Sicherung und Cookie-Dateien.',
+    'LoxEvo|Datenhaltung': 'Erklärt, wo LoxEvo seine persistenten Daten erwartet. Docker-Neustarts sind unkritisch, solange dieser Datenordner erhalten bleibt.',
+    'LoxEvo|Diagnosequelle': 'Dieser Hinweis erscheint nur, wenn Detaildaten vom Server nicht geladen wurden und die Weboberfläche auf lokale Browserdaten zurückfällt.',
+    'LoxEvo|Ports': 'Zeigt die wichtigsten Ports aus der Konfiguration: Web-UI/API und den separaten Alexa/Hue-Port für virtuelle Geräte.',
+    'Loxone|Miniserver URL': 'Prüft, ob eine echte Miniserver-Adresse eingetragen ist und kein Beispielwert verwendet wird.',
+    'Loxone|Zugangsdaten': 'Prüft nur, ob Benutzer und Passwort eingetragen sind. Es wird kein Login-Test gegen den Miniserver ausgeführt.',
+    'Loxone|Befehle': 'Prüft, ob aktive Befehle vollständig genug konfiguriert sind, damit daraus Loxone-Aufrufe gebaut werden können.',
+    'Loxone|Betriebsmodus': 'Zeigt, ob Loxone-Befehle nur simuliert werden oder im Live-Modus wirklich an den Miniserver gesendet werden.',
+    'Loxone|Letzter Loxone-Befehl': 'Zeigt den letzten Loxone-Befehl seit dem letzten LoxEvo-Start. Nach einem Neustart ist diese Historie leer.',
+    'Alexa TTS|Alexa-Verbindung': 'Prüft, ob die lokale alexa-remote2-Verbindung bereit ist. Nur dann kann LoxEvo Sprachausgaben an Echo-Geräte senden.',
+    'Alexa TTS|alexa-remote2': 'Prüft, ob das npm-Paket alexa-remote2 lokal installiert ist. Dieses Paket wird für Alexa-TTS benötigt.',
+    'Alexa TTS|Cookie-Datei': 'Prüft, ob die konfigurierte Amazon-Cookie-Datei lesbar ist. Der Inhalt wird nicht angezeigt.',
+    'Alexa TTS|Standard-Geräte': 'Prüft, ob mindestens ein Echo-Gerät für normale Sprachausgaben ausgewählt ist.',
+    'Alexa TTS|Alarm-Geräte': 'Prüft, ob eigene Alarm-Geräte konfiguriert sind. Falls nicht, nutzt LoxEvo die vorhandene TTS-Geräteauswahl als Fallback.',
+    'Alexa TTS|Lautstärke': 'Zeigt die konfigurierten Lautstärken für normale TTS-Ausgaben und Alarm-Ausgaben.',
+    'Alexa TTS|TTS-Sequenzen': 'Zeigt, ob LoxEvo native Alexa-Sequenzen nutzt. Dieser Modus ist für schnelle Sprachausgabe mit Lautstärke wichtig.',
+    'Alexa TTS|Letzte TTS-Aktion': 'Zeigt die letzte TTS-, Alarm- oder Lautstärkeaktion seit dem letzten Start.',
+    'Virtuelle Alexa-Geräte|Alexa/Hue-HTTP': 'Prüft, ob der lokale Hue-kompatible HTTP-Endpunkt für Alexa läuft. Neuere Echo-Geräte erwarten dafür meist Port 80.',
+    'Virtuelle Alexa-Geräte|Gerätesuche': 'Prüft den SSDP/UDP-1900-Status. Dieser ist vor allem für das Finden neuer Geräte wichtig; bereits gefundene Geräte können weiter funktionieren.',
+    'Virtuelle Alexa-Geräte|Virtuelle Geräte': 'Zeigt, wie viele aktive LoxEvo-Befehle Alexa als virtuelle Geräte angeboten werden.',
+    'Virtuelle Alexa-Geräte|Discovery-Helper': 'Prüft, ob der optionale Host-Helper für die Gerätesuche erreichbar ist. Er wird nur benötigt, wenn UDP 1900 durch LoxBerry oder einen anderen Dienst belegt ist.',
+    'Virtuelle Alexa-Geräte|Bridge-Info': 'Zeigt technische Basisdaten der lokalen Hue-Bridge-Emulation, zum Beispiel Bridge-ID, Description-URL und Ports.',
+    'Virtuelle Alexa-Geräte|Letzte Alexa-Aktion': 'Zeigt die letzte Alexa-Geräteaktion oder Gerätesuche-Aktion seit dem letzten Start.',
+    'Backup|Export und Import': 'Prüft, ob der Datenordner grundsätzlich für Backup-Export und Import-Sicherung nutzbar ist.',
+    'Backup|Lokale Sicherungen': 'Zeigt, ob LoxEvo im Datenordner vorhandene Sicherungsdateien findet.',
+    'Backup|Alexa-Cookie': 'Erinnert daran, dass das Amazon-Cookie nur exportiert wird, wenn der Backup-Haken ausdrücklich gesetzt ist.',
+    'Backup|Letzte Backup-Aktion': 'Zeigt den letzten Backup-Export oder Import seit dem letzten Start.'
+  };
+  const statusText = preflightLevelMeaning(check.level);
+  return `${help[key] || `Erklärt den Prüfpunkt "${label}" im Bereich "${sectionTitle || 'Systemprüfung'}".`} ${statusText}`;
+}
+
+function preflightLevelMeaning(level) {
+  if (level === 'ok') return 'Status OK bedeutet: Der Prüfpunkt ist für den aktuellen Betrieb erfüllt.';
+  if (level === 'error') return 'Status Fehler bedeutet: Dieser Punkt sollte geprüft werden, weil eine Funktion wahrscheinlich nicht oder nur teilweise funktioniert.';
+  if (level === 'warning') return 'Status Prüfen bedeutet: Die Grundfunktion kann laufen, aber die Einstellung sollte kontrolliert werden.';
+  if (level === 'optional') return 'Status Optional bedeutet: Für den aktuellen Betrieb nicht zwingend kritisch, aber für die genannte Zusatzfunktion relevant.';
+  return 'Status Info bedeutet: Reine Zustandsinformation ohne akuten Handlungsbedarf.';
 }
 
 async function loadDependencyStatus(button) {

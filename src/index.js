@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { constants } from 'node:fs';
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
@@ -25,6 +25,7 @@ let discoveryControl = new DiscoveryControl(config);
 let bridgeHttpServer = null;
 let bridgeHttpStatus = { enabled: false, ready: false, error: null, port: null };
 const events = [];
+const startedAt = new Date();
 const MAX_REQUEST_BODY_SIZE = 1024 * 1024 * 2;
 const LOXONE_TTS_RESERVED_PATHS = new Set([
   'admin',
@@ -586,20 +587,29 @@ async function getPreflightStatus() {
     ? await getDiscoveryStatus()
     : { helper: { available: false, ready: false }, alexaBridge: alexaBridgeStatus };
   const configPath = getConfigPath();
+  const configDir = getConfigDir();
   const configReadError = await accessError(configPath, constants.R_OK);
-  const configWriteError = await accessError(getConfigDir(), constants.W_OK);
+  const configWriteError = await accessError(configDir, constants.W_OK);
+  const packageVersion = await getPackageVersion();
+  const buildCommit = await getBuildCommit();
   const alexaRemoteVersion = await getInstalledPackageVersion('alexa-remote2');
+  const cookieInfo = await getCookieFileInfo(config.tts?.cookieFile);
+  const backupInfo = await getBackupInfo();
+  const lastLoxoneEvent = latestEvent((event) => ['command', 'alexa-command', 'light'].includes(event.type));
+  const lastTtsEvent = latestEvent((event) => String(event.type || '').startsWith('tts'));
+  const lastAlexaEvent = latestEvent((event) => event.type === 'alexa-command' || String(event.type || '').startsWith('alexa-discovery') || String(event.type || '').startsWith('alexa-bridge'));
+  const lastBackupEvent = latestEvent((event) => event.type === 'backup');
 
   const sections = [
     {
       title: 'LoxEvo',
       checks: [
         preflightCheck('ok', 'Web-UI und API', `Läuft auf Port ${config.server?.port || 8080}.`),
+        preflightCheck('info', 'Version', describeVersion(packageVersion, buildCommit)),
+        preflightCheck('info', 'Laufzeit', `Gestartet: ${formatDateTimeForDetail(startedAt.toISOString())}. Laufzeit: ${formatDuration(process.uptime())}. Node.js ${process.version}.`),
         preflightCheck(configReadError ? 'error' : 'ok', 'Konfiguration lesbar', configReadError || `Datei: ${configPath}`),
-        preflightCheck(configWriteError ? 'error' : 'ok', 'Datenordner beschreibbar', configWriteError || 'Konfiguration, Backup und Cookie-Datei können im Datenordner geschrieben werden.'),
-        preflightCheck('info', 'Betriebsmodus', config.loxone?.dryRun !== false
-          ? 'Dry-Run ist aktiv. Loxone-Befehle werden nur protokolliert.'
-          : 'Live-Modus ist aktiv. Loxone-Befehle werden wirklich an den Miniserver gesendet.')
+        preflightCheck(configWriteError ? 'error' : 'ok', 'Datenordner beschreibbar', configWriteError || `Ordner: ${configDir}`),
+        preflightCheck('info', 'Datenhaltung', 'Konfiguration, Backup und Cookie-Datei liegen im Datenordner. Alexa-Cookies werden nur bei bewusst gesetztem Backup-Haken exportiert.')
       ]
     },
     {
@@ -613,7 +623,11 @@ async function getPreflightStatus() {
           : 'Benutzer oder Passwort fehlen noch.'),
         preflightCheck(commandsConfigured(config.commands) || roomsConfigured(config.rooms) ? 'ok' : 'error', 'Befehle', commandsConfigured(config.commands) || roomsConfigured(config.rooms)
           ? 'Aktive Befehle haben gültige Loxone-Ziele.'
-          : 'Es sind noch keine vollständig konfigurierten aktiven Befehle vorhanden.')
+          : 'Es sind noch keine vollständig konfigurierten aktiven Befehle vorhanden.'),
+        preflightCheck('info', 'Betriebsmodus', config.loxone?.dryRun !== false
+          ? 'Dry-Run ist aktiv. Loxone-Befehle werden nur protokolliert.'
+          : 'Live-Modus ist aktiv. Loxone-Befehle werden wirklich an den Miniserver gesendet.'),
+        preflightCheck(lastLoxoneEvent ? eventLevel(lastLoxoneEvent) : 'info', 'Letzter Loxone-Befehl', describeEvent(lastLoxoneEvent, 'Seit dem letzten Start wurde noch kein Loxone-Befehl ausgeführt.'))
       ]
     },
     {
@@ -623,13 +637,18 @@ async function getPreflightStatus() {
         preflightCheck(config.tts?.enabled ? (alexaRemoteVersion ? 'ok' : 'warning') : 'optional', 'alexa-remote2', alexaRemoteVersion
           ? `Installiert: ${alexaRemoteVersion}.`
           : 'Nicht lokal gefunden. Wenn TTS genutzt wird, im Register Wartung installieren.'),
+        preflightCheck(config.tts?.enabled ? cookieLevel(cookieInfo, ttsStatus) : 'optional', 'Cookie-Datei', describeCookieInfo(cookieInfo, config.tts?.enabled)),
         preflightCheck(config.tts?.enabled ? (configuredCount(ttsStatus.defaultDevices) > 0 ? 'ok' : 'warning') : 'optional', 'Standard-Geräte', configuredCount(ttsStatus.defaultDevices) > 0
           ? `${configuredCount(ttsStatus.defaultDevices)} Standard-Gerät(e) konfiguriert.`
           : 'Für normale TTS-Ausgaben ist kein Standard-Gerät ausgewählt.'),
         preflightCheck(config.tts?.enabled ? (configuredCount(ttsStatus.alarmDevices) > 0 ? 'ok' : 'info') : 'optional', 'Alarm-Geräte', configuredCount(ttsStatus.alarmDevices) > 0
           ? `${configuredCount(ttsStatus.alarmDevices)} Alarm-Gerät(e) konfiguriert.`
           : 'Keine eigenen Alarm-Geräte konfiguriert; LoxEvo nutzt dann die vorhandene Geräteauswahl als Fallback.'),
-        preflightCheck(config.tts?.enabled ? 'info' : 'optional', 'Lautstärke', `Standard ${ttsStatus.defaultVolume ?? config.tts?.defaultVolume ?? 40}%, Alarm ${ttsStatus.alarmVolume ?? config.tts?.alarmVolume ?? 100}%.`)
+        preflightCheck(config.tts?.enabled ? 'info' : 'optional', 'Lautstärke', `Standard ${ttsStatus.defaultVolume ?? config.tts?.defaultVolume ?? 40}%, Alarm ${ttsStatus.alarmVolume ?? config.tts?.alarmVolume ?? 100}%.`),
+        preflightCheck(config.tts?.enabled ? (ttsStatus.nativeSequences ? 'ok' : 'info') : 'optional', 'TTS-Sequenzen', ttsStatus.nativeSequences
+          ? 'Native Alexa-Sequenzen sind aktiv; das ist der schnelle Modus für Sprachausgabe mit Lautstärke.'
+          : 'Native Sequenzen sind nicht aktiv; TTS funktioniert ggf. langsamer oder mit Fallback.'),
+        preflightCheck(lastTtsEvent ? eventLevel(lastTtsEvent) : 'info', 'Letzte TTS-Aktion', describeEvent(lastTtsEvent, 'Seit dem letzten Start wurde noch keine TTS-Aktion ausgeführt.'))
       ]
     },
     {
@@ -640,14 +659,18 @@ async function getPreflightStatus() {
         preflightCheck(config.alexaBridge?.enabled ? (Number(alexaBridgeStatus.deviceCount) > 0 ? 'ok' : 'warning') : 'optional', 'Virtuelle Geräte', Number(alexaBridgeStatus.deviceCount) > 0
           ? `${alexaBridgeStatus.deviceCount} aktive Befehle werden Alexa als Geräte angeboten.`
           : 'Es gibt noch keine aktiven Befehle, die Alexa als Geräte finden kann.'),
-        preflightCheck(config.alexaBridge?.enabled ? discoveryHelperLevel(discoveryStatus) : 'optional', 'Discovery-Helper', discoveryHelperDetail(discoveryStatus))
+        preflightCheck(config.alexaBridge?.enabled ? discoveryHelperLevel(discoveryStatus) : 'optional', 'Discovery-Helper', discoveryHelperDetail(discoveryStatus)),
+        preflightCheck(config.alexaBridge?.enabled ? 'info' : 'optional', 'Bridge-Info', describeBridgeInfo(alexaBridgeStatus)),
+        preflightCheck(lastAlexaEvent ? eventLevel(lastAlexaEvent) : 'info', 'Letzte Alexa-Aktion', describeEvent(lastAlexaEvent, 'Seit dem letzten Start wurde noch keine Alexa-Geräteaktion protokolliert.'))
       ]
     },
     {
       title: 'Backup',
       checks: [
         preflightCheck(configWriteError ? 'error' : 'ok', 'Export und Import', configWriteError || 'Backups können exportiert und Import-Sicherungen im Datenordner angelegt werden.'),
-        preflightCheck('info', 'Alexa-Cookie', 'Die Cookie-Datei wird nur exportiert, wenn der Haken beim Backup gesetzt ist.')
+        preflightCheck(backupInfo.error ? 'warning' : 'info', 'Lokale Sicherungen', describeBackupInfo(backupInfo)),
+        preflightCheck('info', 'Alexa-Cookie', 'Die Cookie-Datei wird nur exportiert, wenn der Haken beim Backup gesetzt ist.'),
+        preflightCheck(lastBackupEvent ? eventLevel(lastBackupEvent) : 'info', 'Letzte Backup-Aktion', describeEvent(lastBackupEvent, 'Seit dem letzten Start wurde noch kein Backup exportiert oder importiert.'))
       ]
     }
   ];
@@ -670,6 +693,201 @@ async function accessError(path, mode) {
   } catch (error) {
     return error.message;
   }
+}
+
+async function getPackageVersion() {
+  try {
+    const packageJson = JSON.parse(await readFile(join(rootDir, 'package.json'), 'utf8'));
+    return packageJson.version || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getBuildCommit() {
+  const envCommit = process.env.LOXEVO_COMMIT || process.env.GIT_COMMIT || process.env.SOURCE_COMMIT;
+  if (envCommit) return shortCommit(envCommit);
+
+  try {
+    const head = (await readFile(join(rootDir, '.git', 'HEAD'), 'utf8')).trim();
+    if (!head.startsWith('ref:')) return shortCommit(head);
+    const refPath = head.slice(5).trim().split('/').filter(Boolean);
+    const ref = (await readFile(join(rootDir, '.git', ...refPath), 'utf8')).trim();
+    return shortCommit(ref);
+  } catch {
+    return null;
+  }
+}
+
+function shortCommit(value) {
+  const raw = String(value || '').trim();
+  return raw ? raw.slice(0, 12) : null;
+}
+
+async function getCookieFileInfo(cookieFile) {
+  const path = resolveCookiePath(cookieFile);
+  try {
+    await access(path, constants.R_OK);
+    const fileStat = await stat(path);
+    return {
+      path,
+      exists: true,
+      size: fileStat.size,
+      modifiedAt: fileStat.mtime.toISOString()
+    };
+  } catch (error) {
+    return {
+      path,
+      exists: false,
+      error: error.message
+    };
+  }
+}
+
+async function getBackupInfo() {
+  try {
+    const directory = getConfigDir();
+    const files = await readdir(directory);
+    const backupFiles = [];
+
+    for (const fileName of files) {
+      if (!/^loxevo-backup-\d+\.json$/.test(fileName) && !/^config\.backup-\d+\.json$/.test(fileName)) {
+        continue;
+      }
+      try {
+        const filePath = join(directory, fileName);
+        const fileStat = await stat(filePath);
+        backupFiles.push({
+          name: fileName,
+          path: filePath,
+          size: fileStat.size,
+          modifiedAt: fileStat.mtime.toISOString(),
+          modifiedMs: fileStat.mtimeMs
+        });
+      } catch {
+        // Ignore files that disappeared while reading the directory.
+      }
+    }
+
+    backupFiles.sort((left, right) => right.modifiedMs - left.modifiedMs);
+    return {
+      directory,
+      count: backupFiles.length,
+      latest: backupFiles[0] || null
+    };
+  } catch (error) {
+    return { directory: getConfigDir(), count: 0, latest: null, error: error.message };
+  }
+}
+
+function latestEvent(predicate) {
+  return events.find(predicate) || null;
+}
+
+function eventLevel(event) {
+  if (!event) return 'info';
+  if (event.status === 'error') return 'error';
+  if (event.status === 'warning' || event.status === 'ignored') return 'warning';
+  return 'info';
+}
+
+function describeEvent(event, emptyText) {
+  if (!event) return emptyText;
+  const parts = [
+    formatDateTimeForDetail(event.at),
+    [event.type, event.status].filter(Boolean).join('/'),
+    event.label || event.key || event.commandType || event.compat || '',
+    event.text ? truncate(String(event.text), 90) : ''
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
+function describeVersion(version, commit) {
+  const pieces = [];
+  pieces.push(version ? `LoxEvo ${version}` : 'LoxEvo-Version konnte nicht ermittelt werden');
+  if (commit) pieces.push(`Commit ${commit}`);
+  return `${pieces.join(', ')}.`;
+}
+
+function describeCookieInfo(info, enabled) {
+  if (!enabled) {
+    return `TTS ist deaktiviert. Konfigurierter Pfad: ${info.path}.`;
+  }
+  if (info.exists) {
+    return `Lesbar: ${info.path}. Größe: ${formatBytes(info.size)}, geändert: ${formatDateTimeForDetail(info.modifiedAt)}.`;
+  }
+  return `Nicht lesbar: ${info.path}. ${info.error || ''}`.trim();
+}
+
+function cookieLevel(info, status) {
+  if (info.exists) return 'ok';
+  return status.ready ? 'warning' : 'error';
+}
+
+function describeBackupInfo(info) {
+  if (info.error) {
+    return `Backup-Ordner konnte nicht gelesen werden: ${info.error}`;
+  }
+  if (!info.count) {
+    return `Noch keine lokalen Sicherungsdateien in ${info.directory} gefunden.`;
+  }
+  return `${info.count} Sicherungsdatei(en) gefunden. Neueste: ${info.latest.name}, ${formatBytes(info.latest.size)}, ${formatDateTimeForDetail(info.latest.modifiedAt)}.`;
+}
+
+function describeBridgeInfo(status) {
+  if (!status.enabled) {
+    return 'Virtuelle Alexa-Geräte sind deaktiviert.';
+  }
+  const pieces = [
+    `Name: ${config.alexaBridge?.name || config.server?.name || 'LoxEvo'}`,
+    `Bridge-ID: ${status.bridgeId || 'nicht gesetzt'}`,
+    `Beschreibung: ${status.descriptionUrl || 'nicht bereit'}`,
+    `Web-UI/API: ${config.server?.port || 8080}`,
+    `Alexa/Hue: ${status.port || config.alexaBridge?.advertisePort || 80}`
+  ];
+  return `${pieces.join(' · ')}.`;
+}
+
+function formatDateTimeForDetail(value) {
+  if (!value) return 'unbekannt';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return 'unbekannt';
+  return date.toLocaleString('de-CH', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+}
+
+function formatDuration(value) {
+  let seconds = Math.max(0, Math.floor(Number(value) || 0));
+  const days = Math.floor(seconds / 86400);
+  seconds %= 86400;
+  const hours = Math.floor(seconds / 3600);
+  seconds %= 3600;
+  const minutes = Math.floor(seconds / 60);
+  seconds %= 60;
+  const parts = [];
+  if (days) parts.push(`${days} Tag(e)`);
+  if (hours) parts.push(`${hours} h`);
+  if (minutes) parts.push(`${minutes} min`);
+  if (!parts.length) parts.push(`${seconds} s`);
+  return parts.slice(0, 2).join(' ');
+}
+
+function formatBytes(value) {
+  const bytes = Number(value) || 0;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 102.4) / 10} KB`;
+  return `${Math.round(bytes / 1024 / 102.4) / 10} MB`;
+}
+
+function truncate(value, maxLength) {
+  const text = String(value || '');
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
 }
 
 function summarizePreflight(sections) {

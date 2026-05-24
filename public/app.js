@@ -940,7 +940,9 @@ function buildClientPreflightStatus() {
     {
       title: 'LoxEvo',
       checks: [
-        preflightRow('info', 'Web-UI und API', `Web-UI läuft auf Port ${config.server?.port || 8080}.`)
+        preflightRow('info', 'Web-UI und API', `Web-UI läuft auf Port ${config.server?.port || 8080}.`),
+        preflightRow('info', 'Diagnosequelle', 'Server-Details konnten nicht geladen werden; diese Ansicht nutzt den lokalen Browserstatus.'),
+        preflightRow('info', 'Ports', `Web-UI/API ${config.server?.port || 8080}, Alexa/Hue ${config.alexaBridge?.advertisePort || 80}.`)
       ]
     },
     {
@@ -956,8 +958,10 @@ function buildClientPreflightStatus() {
       title: 'Alexa TTS',
       checks: [
         preflightRow(config.tts?.enabled ? (tts.ready ? 'ok' : 'error') : 'optional', 'Alexa-Verbindung', tts.enabled ? (tts.ready ? 'Alexa TTS ist bereit.' : humanizeTtsStatusError(tts.error)) : 'TTS ist deaktiviert.'),
+        preflightRow(config.tts?.enabled ? 'info' : 'optional', 'Cookie-Datei', config.tts?.cookieFile ? `Konfigurierter Pfad: ${config.tts.cookieFile}.` : 'Keine Cookie-Datei konfiguriert.'),
         preflightRow(config.tts?.enabled ? (deviceListCount(tts.defaultDevices) ? 'ok' : 'warning') : 'optional', 'Standard-Geräte', deviceListCount(tts.defaultDevices) ? `${deviceListCount(tts.defaultDevices)} Standard-Gerät(e) konfiguriert.` : 'Kein Standard-Gerät ausgewählt.'),
-        preflightRow(config.tts?.enabled ? 'info' : 'optional', 'Lautstärke', `Standard ${tts.defaultVolume ?? config.tts?.defaultVolume ?? 40}%, Alarm ${tts.alarmVolume ?? config.tts?.alarmVolume ?? 100}%.`)
+        preflightRow(config.tts?.enabled ? 'info' : 'optional', 'Lautstärke', `Standard ${tts.defaultVolume ?? config.tts?.defaultVolume ?? 40}%, Alarm ${tts.alarmVolume ?? config.tts?.alarmVolume ?? 100}%.`),
+        preflightRow(config.tts?.enabled ? (tts.nativeSequences ? 'ok' : 'info') : 'optional', 'TTS-Sequenzen', tts.nativeSequences ? 'Native Alexa-Sequenzen sind aktiv.' : 'Native Sequenzen konnten lokal nicht bestätigt werden.')
       ]
     },
     {
@@ -966,13 +970,15 @@ function buildClientPreflightStatus() {
         preflightRow(config.alexaBridge?.enabled ? (bridge.bridgeHttp?.error ? 'error' : 'ok') : 'optional', 'Alexa/Hue-HTTP', bridge.bridgeHttp?.error || (config.alexaBridge?.enabled ? `Alexa/Hue-Port ${bridge.bridgeHttp?.port || bridge.port || config.alexaBridge?.advertisePort || 80}.` : 'Virtuelle Alexa-Geräte sind deaktiviert.')),
         preflightRow(config.alexaBridge?.enabled ? (bridge.ready ? 'ok' : 'optional') : 'optional', 'Gerätesuche', bridge.ready ? 'Gerätesuche ist aktiv.' : 'Gerätesuche ist aktuell nicht aktiv. Vorhandene Geräte können weiter funktionieren.'),
         preflightRow(config.alexaBridge?.enabled ? (Number(bridge.deviceCount || activeCommandCount) ? 'ok' : 'warning') : 'optional', 'Virtuelle Geräte', `${Number(bridge.deviceCount || activeCommandCount)} virtuelle Geräte/Befehle vorbereitet.`),
-        preflightRow(helper.available ? 'ok' : 'optional', 'Discovery-Helper', helper.available ? 'Host-Helper ist erreichbar.' : 'Host-Helper ist nur für neue Gerätesuche bei belegtem UDP 1900 nötig.')
+        preflightRow(helper.available ? 'ok' : 'optional', 'Discovery-Helper', helper.available ? 'Host-Helper ist erreichbar.' : 'Host-Helper ist nur für neue Gerätesuche bei belegtem UDP 1900 nötig.'),
+        preflightRow(config.alexaBridge?.enabled ? 'info' : 'optional', 'Bridge-Info', `Name ${config.alexaBridge?.name || 'LoxEvo'}, Alexa/Hue-Port ${bridge.port || config.alexaBridge?.advertisePort || 80}.`)
       ]
     },
     {
       title: 'Backup',
       checks: [
         preflightRow('info', 'Export und Import', 'Backup-Funktion ist in der Web-UI verfügbar.'),
+        preflightRow('info', 'Lokale Sicherungen', 'Details zu vorhandenen Sicherungsdateien kommen aus der Server-Systemprüfung.'),
         preflightRow('info', 'Alexa-Cookie', 'Die Cookie-Datei wird nur exportiert, wenn der Haken beim Backup gesetzt ist.')
       ]
     }

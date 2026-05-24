@@ -1536,9 +1536,21 @@ function firstNonEmpty(...lists) {
 }
 
 function addEvent(event) {
+  const normalizedEvent = normalizeEvent(event);
   events.unshift({
     at: new Date().toISOString(),
-    ...event
+    ...normalizedEvent
   });
   events.splice(50);
+}
+
+function normalizeEvent(event) {
+  if (!event) return {};
+  const normalized = { ...event };
+  const type = String(normalized.type || '');
+  const text = [normalized.text, normalized.error].filter(Boolean).join(' ');
+  if (type.startsWith('alexa-') && normalized.status === 'error' && isDiscoveryPortIssue(text)) {
+    normalized.status = 'optional';
+  }
+  return normalized;
 }

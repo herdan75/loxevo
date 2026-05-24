@@ -200,6 +200,7 @@ async function saveConfig(button) {
     await loadAlexaBridgeStatus();
     await loadDiscoveryStatus();
     await loadSetupStatus();
+    await loadPreflightStatus();
     renderIntegrations();
     setButtonFeedback(button, 'success', 'Gespeichert');
     showToast('Konfiguration gespeichert', 'ok');
@@ -225,6 +226,7 @@ async function saveJsonConfig(button) {
     await loadAlexaBridgeStatus();
     await loadDiscoveryStatus();
     await loadSetupStatus();
+    await loadPreflightStatus();
     renderIntegrations();
     setButtonFeedback(button, 'success', 'Gespeichert');
     showToast('JSON gespeichert', 'ok');
@@ -746,11 +748,18 @@ async function runDiscoveryAction(action, button) {
       alexaBridgeInfo = discoveryInfo.alexaBridge;
     }
     renderAlexaBridgeStatus();
+    await loadAlexaBridgeStatus();
+    await loadDiscoveryStatus();
+    await loadSetupStatus();
+    await loadPreflightStatus();
     await loadEvents();
     setButtonFeedback(button, 'success', successLabel);
     showToast(action === 'start' ? 'Gerätesuche aktiviert' : 'Gerätesuche beendet', 'ok');
   } catch (error) {
     await loadDiscoveryStatus();
+    await loadAlexaBridgeStatus();
+    await loadSetupStatus();
+    await loadPreflightStatus();
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
   }
@@ -888,22 +897,114 @@ async function loadPreflightStatus(button) {
   try {
     const response = await fetch(`/api/preflight?ts=${Date.now()}`, { cache: 'no-store' });
     await ensureOk(response);
-    preflightInfo = await response.json();
+    const payload = await response.json();
+    preflightInfo = isValidPreflightPayload(payload) ? payload : buildClientPreflightStatus('Server lieferte keine Detaildaten.');
     renderPreflightStatus();
     if (button) {
       setButtonFeedback(button, 'success', 'Geprüft');
       showToast('Systemprüfung aktualisiert', 'ok');
     }
   } catch (error) {
-    preflightInfo = null;
-    preflightSummary.textContent = `Systemprüfung konnte nicht geladen werden: ${error.message}`;
-    preflightSummary.className = 'service-status error';
-    preflightChecks.innerHTML = '';
-    if (button) {
-      setButtonFeedback(button, 'error', 'Fehler');
-      showToast(error.message, 'error');
+    const fallback = buildClientPreflightStatus(error.message);
+    if (fallback) {
+      preflightInfo = fallback;
+      renderPreflightStatus();
+      if (button) {
+        setButtonFeedback(button, 'success', 'Geladen');
+        showToast('Systemprüfung mit lokalen Statusdaten geladen', 'ok');
+      }
+    } else {
+      preflightInfo = null;
+      preflightSummary.textContent = `Systemprüfung konnte nicht geladen werden: ${error.message}`;
+      preflightSummary.className = 'service-status error';
+      preflightChecks.innerHTML = '';
+      if (button) {
+        setButtonFeedback(button, 'error', 'Fehler');
+        showToast(error.message, 'error');
+      }
     }
   }
+}
+
+function isValidPreflightPayload(payload) {
+  return Boolean(payload && Array.isArray(payload.sections) && payload.sections.length);
+}
+
+function buildClientPreflightStatus(reason) {
+  if (!config) return null;
+  const activeCommandCount = Object.keys(getRunnableCommands()).length;
+  const tts = ttsStatus || { enabled: Boolean(config.tts?.enabled), ready: false };
+  const bridge = alexaBridgeInfo || { enabled: Boolean(config.alexaBridge?.enabled), ready: false, deviceCount: activeCommandCount };
+  const helper = discoveryInfo?.helper || {};
+  const sections = [
+    {
+      title: 'LoxEvo',
+      checks: [
+        preflightRow('warning', 'Server-Systemprüfung', `Detaildaten wurden lokal aus dem Browserstatus aufgebaut. Grund: ${reason}`),
+        preflightRow('info', 'Web-UI und API', `Web-UI läuft auf Port ${config.server?.port || 8080}.`)
+      ]
+    },
+    {
+      title: 'Loxone',
+      checks: [
+        preflightRow(config.loxone?.baseUrl ? 'ok' : 'error', 'Miniserver URL', config.loxone?.baseUrl ? 'Miniserver-URL ist eingetragen.' : 'Miniserver-URL fehlt.'),
+        preflightRow(config.loxone?.username && config.loxone?.password ? 'ok' : 'error', 'Zugangsdaten', config.loxone?.username && config.loxone?.password ? 'Benutzer und Passwort sind eingetragen.' : 'Benutzer oder Passwort fehlen.'),
+        preflightRow(activeCommandCount ? 'ok' : 'warning', 'Befehle', activeCommandCount ? `${activeCommandCount} aktive Befehle vorhanden.` : 'Noch keine aktiven Befehle vorhanden.'),
+        preflightRow('info', 'Betriebsmodus', config.loxone?.dryRun !== false ? 'Dry-Run ist aktiv.' : 'Live-Modus ist aktiv.')
+      ]
+    },
+    {
+      title: 'Alexa TTS',
+      checks: [
+        preflightRow(config.tts?.enabled ? (tts.ready ? 'ok' : 'error') : 'optional', 'Alexa-Verbindung', tts.enabled ? (tts.ready ? 'Alexa TTS ist bereit.' : humanizeTtsStatusError(tts.error)) : 'TTS ist deaktiviert.'),
+        preflightRow(config.tts?.enabled ? (deviceListCount(tts.defaultDevices) ? 'ok' : 'warning') : 'optional', 'Standard-Geräte', deviceListCount(tts.defaultDevices) ? `${deviceListCount(tts.defaultDevices)} Standard-Gerät(e) konfiguriert.` : 'Kein Standard-Gerät ausgewählt.'),
+        preflightRow(config.tts?.enabled ? 'info' : 'optional', 'Lautstärke', `Standard ${tts.defaultVolume ?? config.tts?.defaultVolume ?? 40}%, Alarm ${tts.alarmVolume ?? config.tts?.alarmVolume ?? 100}%.`)
+      ]
+    },
+    {
+      title: 'Virtuelle Alexa-Geräte',
+      checks: [
+        preflightRow(config.alexaBridge?.enabled ? (bridge.bridgeHttp?.error ? 'error' : 'ok') : 'optional', 'Alexa/Hue-HTTP', bridge.bridgeHttp?.error || (config.alexaBridge?.enabled ? `Alexa/Hue-Port ${bridge.bridgeHttp?.port || bridge.port || config.alexaBridge?.advertisePort || 80}.` : 'Virtuelle Alexa-Geräte sind deaktiviert.')),
+        preflightRow(config.alexaBridge?.enabled ? (bridge.ready ? 'ok' : 'optional') : 'optional', 'Gerätesuche', bridge.ready ? 'Gerätesuche ist aktiv.' : 'Gerätesuche ist aktuell nicht aktiv. Vorhandene Geräte können weiter funktionieren.'),
+        preflightRow(config.alexaBridge?.enabled ? (Number(bridge.deviceCount || activeCommandCount) ? 'ok' : 'warning') : 'optional', 'Virtuelle Geräte', `${Number(bridge.deviceCount || activeCommandCount)} virtuelle Geräte/Befehle vorbereitet.`),
+        preflightRow(helper.available ? 'ok' : 'optional', 'Discovery-Helper', helper.available ? 'Host-Helper ist erreichbar.' : 'Host-Helper ist nur für neue Gerätesuche bei belegtem UDP 1900 nötig.')
+      ]
+    },
+    {
+      title: 'Backup',
+      checks: [
+        preflightRow('info', 'Export und Import', 'Backup-Funktion ist in der Web-UI verfügbar.'),
+        preflightRow('info', 'Alexa-Cookie', 'Die Cookie-Datei wird nur exportiert, wenn der Haken beim Backup gesetzt ist.')
+      ]
+    }
+  ];
+  return {
+    checkedAt: new Date().toISOString(),
+    summary: summarizePreflightForClient(sections),
+    sections
+  };
+}
+
+function preflightRow(level, label, detail) {
+  return { level, label, detail };
+}
+
+function summarizePreflightForClient(sections) {
+  const counts = sections.flatMap((section) => section.checks || []).reduce((result, check) => {
+    result[check.level] = (result[check.level] || 0) + 1;
+    return result;
+  }, {});
+  const level = counts.error ? 'error' : counts.warning ? 'warning' : 'ok';
+  const text = counts.error
+    ? `${counts.error} kritische Prüfung(en) offen.`
+    : counts.warning
+      ? `${counts.warning} Hinweis(e) prüfen.`
+      : 'Systemprüfung abgeschlossen.';
+  return { level, text, counts };
+}
+
+function deviceListCount(values) {
+  return Array.isArray(values) ? values.filter((value) => value && !String(value).includes('replace-with')).length : 0;
 }
 
 function renderPreflightStatus() {
@@ -1118,6 +1219,7 @@ async function updateDependency(name, version, button) {
     await ensureOk(response);
     dependencyInfo = await response.json();
     renderDependencyStatus();
+    await loadPreflightStatus();
     setButtonFeedback(button, 'success', 'Installiert');
     showToast('Update installiert. Neustart erforderlich.', 'ok');
   } catch (error) {
@@ -1146,6 +1248,7 @@ async function setDryRun(enabled) {
     syncJsonFromForms();
     updateDryRunUi(result.dryRun);
     await loadSetupStatus();
+    await loadPreflightStatus();
     await loadEvents();
     showToast(result.dryRun ? 'Dry-Run aktiv' : 'Live-Modus aktiv', result.dryRun ? 'ok' : 'ok');
   } catch (error) {

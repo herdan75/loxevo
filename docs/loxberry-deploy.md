@@ -91,7 +91,7 @@ Für virtuelle Alexa-Geräte muss LoxEvo im gleichen Netzwerk wie die Echo-Gerä
 Für neuere Echo-Geräte sollte die Alexa-Bridge über Port 80 erreichbar sein. Die normale Web-UI kann auf Port 8080 bleiben; LoxEvo startet dann zusätzlich einen lokalen Alexa/Hue-HTTP-Listener auf Port 80. Falls dieser Port bereits vom LoxBerry-Webserver belegt ist, muss der Portkonflikt vor dem Alexa-Test gelöst werden.
 Eine echte Hue-Bridge ist dafür nicht nötig. LoxEvo stellt nur die lokale Discovery und die Hue-kompatiblen Ein/Aus-Endpunkte bereit, die Alexa zur Gerätesuche und zum Auslösen der konfigurierten Befehle nutzt.
 
-Wenn LoxBerry-`ssdpd` oder `lbssdpd` den Port 1900 belegt, funktionieren bereits gefundene Alexa-Geraete meist weiter, neue Geraete werden aber wahrscheinlich nicht gefunden. Fuer die Bedienung per Button kann optional ein enger Host-Helper installiert werden:
+Wenn LoxBerry-`ssdpd` oder `lbssdpd` den Port 1900 belegt, funktionieren bereits gefundene Alexa-Geraete meist weiter, neue Geraete werden aber wahrscheinlich nicht gefunden. Fuer die Bedienung per Button kann optional ein enger Host-Helper installiert werden. Das passiert nicht automatisch durch den Docker-Container, weil dafuer Host-/Root-Rechte noetig sind:
 
 ```bash
 cd /mnt/docker/loxevo

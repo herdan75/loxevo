@@ -699,7 +699,7 @@ function renderDiscoveryStatus() {
   }
 
   if (!helper.available) {
-    discoveryStatus.textContent = helper.error || 'Discovery-Host-Helper ist nicht erreichbar.';
+    discoveryStatus.textContent = 'Host-Helper ist nicht installiert oder nicht erreichbar. Nur für neue Gerätesuche bei belegtem UDP 1900 nötig; der Info-Button zeigt den einmaligen Installationsbefehl.';
     discoveryStatus.className = 'service-status error';
     return;
   }

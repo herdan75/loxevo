@@ -108,7 +108,7 @@ Die installierte `alexa-remote2`-Version, der Installationspfad und verfuegbare 
 
 Neue Alexa-Geraete werden ueber SSDP/UDP 1900 gesucht. Auf LoxBerry ist dieser Port oft durch den Dienst `ssdpd` oder `lbssdpd` belegt. Vorhandene Alexa-Geraete koennen trotzdem weiter funktionieren, neue Geraete werden dann aber meist nicht gefunden.
 
-Fuer eine einfache Bedienung per Web-UI kann einmalig ein enger Host-Helper installiert werden:
+Fuer eine einfache Bedienung per Web-UI kann einmalig ein enger Host-Helper installiert werden. Das passiert bewusst nicht automatisch durch den Docker-Container, weil dafuer Host-/Root-Rechte noetig sind. Der Schritt ist nur erforderlich, wenn UDP 1900 belegt ist und neue Alexa-Geraete gesucht werden sollen:
 
 ```bash
 cd /mnt/docker/loxevo

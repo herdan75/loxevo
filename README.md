@@ -188,6 +188,7 @@ Fuer neuere Echo-Geraete sollte die Alexa-Bridge ueber Port 80 erreichbar sein. 
 SSDP/UDP 1900 wird nur fuer die Suche neuer Alexa-Geraete gebraucht. Bereits gefundene Geraete koennen danach normalerweise weiter ueber den Alexa/Hue-HTTP-Port bedient werden. Wenn LoxBerry-`ssdpd` oder ein anderer SSDP-Dienst den Port 1900 belegt, zeigt LoxEvo deshalb eine klare Meldung: vorhandene Geraete koennen weiter funktionieren, neue Geraete werden aber wahrscheinlich nicht gefunden.
 
 Optional kann auf dem LoxBerry-Host ein enger Discovery-Helper installiert werden. Er pausiert fuer die Geraetesuche nur die Dienste `ssdpd` und `lbssdpd` und startet sie danach wieder. Der Helper fuehrt keine freien Shell-Befehle aus und ist nur lokal auf `127.0.0.1` erreichbar.
+Dieser Schritt wird nicht automatisch durch den Docker-Container ausgefuehrt, weil dafuer bewusst Host-/Root-Rechte noetig sind. Er ist nur erforderlich, wenn UDP 1900 belegt ist und neue Alexa-Geraete gesucht werden sollen.
 
 ```bash
 cd /mnt/docker/loxevo

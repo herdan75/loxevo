@@ -28,7 +28,10 @@ TOKEN = os.environ.get("LOXEVO_DISCOVERY_TOKEN", "").strip()
 
 
 def run_command(*args: str) -> subprocess.CompletedProcess[str]:
-  return subprocess.run(args, text=True, capture_output=True, check=False)
+  try:
+    return subprocess.run(args, text=True, capture_output=True, check=False)
+  except FileNotFoundError as error:
+    return subprocess.CompletedProcess(args, 127, "", str(error))
 
 
 def systemctl(*args: str) -> subprocess.CompletedProcess[str]:
@@ -62,7 +65,7 @@ def service_status() -> list[dict[str, object]]:
 
 def port_owner() -> str:
   result = run_command("ss", "-ulpn", "sport", "=", ":1900")
-  return result.stdout.strip()
+  return result.stdout.strip() or result.stderr.strip()
 
 
 def read_state() -> dict[str, object]:

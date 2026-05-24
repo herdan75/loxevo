@@ -164,21 +164,26 @@
             </div>
           </details>
 
-          <div class="discovery-control">
-            <div class="status-help-row">
-              <div id="discoveryStatus" class="service-status">Geraetesuche-Status wird geladen...</div>
-              <button id="discoveryHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="discoveryHelpText" aria-label="Geraetesuche-Hilfe anzeigen">i</button>
+          <details class="config-section">
+            <summary>Alexa-Gerätesuche</summary>
+            <div class="config-section-body">
+              <div class="discovery-control">
+                <div class="status-help-row">
+                  <div id="discoveryStatus" class="service-status">Gerätesuche-Status wird geladen...</div>
+                  <button id="discoveryHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="discoveryHelpText" aria-label="Gerätesuche-Hilfe anzeigen">i</button>
+                </div>
+                <div id="discoveryHelpText" class="help-box" hidden>
+                  <p>Die Alexa-Gerätesuche braucht SSDP/UDP 1900. Auf LoxBerry ist dieser Port oft durch den LoxBerry-SSDP-Dienst belegt. Vorhandene Alexa-Geräte können trotzdem weiter funktionieren; neue Geräte werden dann aber meist nicht gefunden.</p>
+                  <p>Mit <strong>Gerätesuche aktivieren</strong> pausiert der optionale LoxEvo-Host-Helper kurz den LoxBerry-SSDP-Dienst und startet die LoxEvo-Suche. Mit <strong>Gerätesuche beenden</strong> wird der vorher aktive Dienst wieder gestartet und LoxEvo gibt den SSDP-Port frei.</p>
+                  <p>Der Host-Helper ist bewusst eng begrenzt: Er kennt nur Status, Start und Stopp der Dienste <code>ssdpd</code> und <code>lbssdpd</code>. Er führt keine freien Shell-Befehle aus.</p>
+                </div>
+                <div class="actions discovery-actions">
+                  <button id="startDiscoveryBtn" type="button">Gerätesuche aktivieren</button>
+                  <button id="stopDiscoveryBtn" type="button" class="secondary">Gerätesuche beenden</button>
+                </div>
+              </div>
             </div>
-            <div id="discoveryHelpText" class="help-box" hidden>
-              <p>Die Alexa-Geraetesuche braucht SSDP/UDP 1900. Auf LoxBerry ist dieser Port oft durch den LoxBerry-SSDP-Dienst belegt. Vorhandene Alexa-Geraete koennen trotzdem weiter funktionieren; neue Geraete werden dann aber meist nicht gefunden.</p>
-              <p>Mit <strong>Geraetesuche aktivieren</strong> pausiert der optionale LoxEvo-Host-Helper kurz den LoxBerry-SSDP-Dienst und startet die LoxEvo-Suche. Mit <strong>Geraetesuche beenden</strong> wird der vorher aktive Dienst wieder gestartet und LoxEvo gibt den SSDP-Port frei.</p>
-              <p>Der Host-Helper ist bewusst eng begrenzt: Er kennt nur Status, Start und Stopp der Dienste <code>ssdpd</code> und <code>lbssdpd</code>. Er fuehrt keine freien Shell-Befehle aus.</p>
-            </div>
-            <div class="actions discovery-actions">
-              <button id="startDiscoveryBtn" type="button">Geraetesuche aktivieren</button>
-              <button id="stopDiscoveryBtn" type="button" class="secondary">Geraetesuche beenden</button>
-            </div>
-          </div>
+          </details>
 
           <details class="config-section">
             <summary>Alexa TTS</summary>

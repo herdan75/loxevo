@@ -888,16 +888,19 @@ function getAlexaBridgeStatus() {
 }
 
 async function getDiscoveryStatus() {
-  const helper = await discoveryControl.getStatus();
+  const alexaBridgeStatus = getAlexaBridgeStatus();
+  const helper = alexaBridgeStatus.enabled
+    ? await discoveryControl.getStatus()
+    : { available: false, ready: false, error: null };
   return {
     helper,
-    alexaBridge: getAlexaBridgeStatus()
+    alexaBridge: alexaBridgeStatus
   };
 }
 
 async function startDiscoveryMode(res) {
   if (!config.alexaBridge?.enabled) {
-    return sendJson(res, { ok: false, error: 'Virtuelle Alexa-Geraete sind deaktiviert.' }, 400);
+    return sendJson(res, { ok: false, error: 'Virtuelle Alexa-Geräte sind deaktiviert.' }, 400);
   }
 
   const helper = await discoveryControl.start();
@@ -908,16 +911,16 @@ async function startDiscoveryMode(res) {
 
   await restartAlexaBridge();
   await restartBridgeHttpServer();
-  addEvent({ type: 'alexa-discovery', status: 'started', text: 'Alexa-Geraetesuche aktiviert.' });
+  addEvent({ type: 'alexa-discovery', status: 'started', text: 'Alexa-Gerätesuche aktiviert.' });
   return sendJson(res, { ok: true, helper, discovery: await getDiscoveryStatus() });
 }
 
 async function stopDiscoveryMode(res) {
   if (!config.alexaBridge?.enabled) {
-    return sendJson(res, { ok: false, error: 'Virtuelle Alexa-Geraete sind deaktiviert.' }, 400);
+    return sendJson(res, { ok: false, error: 'Virtuelle Alexa-Geräte sind deaktiviert.' }, 400);
   }
 
-  await alexaBridge.pauseDiscovery('Alexa-Geraetesuche ist deaktiviert. Vorhandene Alexa-Geraete koennen weiter funktionieren.');
+  await alexaBridge.pauseDiscovery('Alexa-Gerätesuche ist deaktiviert. Vorhandene Alexa-Geräte können weiter funktionieren.');
   await restartBridgeHttpServer();
 
   const helper = await discoveryControl.stop();
@@ -926,7 +929,7 @@ async function stopDiscoveryMode(res) {
     return sendJson(res, { ok: false, error: helper.error, discovery: await getDiscoveryStatus() }, 503);
   }
 
-  addEvent({ type: 'alexa-discovery', status: 'stopped', text: 'Alexa-Geraetesuche deaktiviert.' });
+  addEvent({ type: 'alexa-discovery', status: 'stopped', text: 'Alexa-Gerätesuche deaktiviert.' });
   return sendJson(res, { ok: true, helper, discovery: await getDiscoveryStatus() });
 }
 

@@ -94,6 +94,15 @@ Die Oberflaeche ist in klare Bereiche gegliedert:
 
 Die JSON-Ansicht bleibt als Expertenmodus erhalten.
 
+Empfohlener Ablauf fuer neue Installationen:
+
+1. LoxEvo starten und die Web-UI oeffnen.
+2. Loxone-Zugang eintragen und `Dry-Run aktiv` eingeschaltet lassen.
+3. Erste Befehle in `Konfiguration -> Befehle und Sprachnamen` anlegen.
+4. Unter `Testen` pruefen, ob die erzeugten Loxone-URLs stimmen.
+5. Erst danach den Live-Modus aktivieren.
+6. Optional TTS und virtuelle Alexa-Geraete einrichten.
+
 ## Backup und Deinstallation
 
 Backups werden in der Web-UI unter `Wartung` erstellt. Der normale Export enthaelt `config.json` mit Loxone-, Alexa-Bridge-, Befehls- und TTS-Einstellungen. Die Alexa-Cookie-Datei `Node.txt` wird nur exportiert, wenn der entsprechende Haken gesetzt ist, weil diese Datei Zugriffsdaten fuer das Amazon-Konto enthalten kann. Backup-Dateien enthalten private Installationsdaten und sollten nicht veroeffentlicht werden.
@@ -176,16 +185,23 @@ Technisch ist das ein lokaler Hue-kompatibler V1-Bridge-Eingang nur fuer Alexa-D
 
 Fuer die Geraetesuche muss LoxEvo im gleichen LAN wie die Echo-Geraete erreichbar sein. Im Docker/LoxBerry-Betrieb ist `network_mode: host` deshalb der empfohlene Modus, weil SSDP/UDP 1900 sonst oft nicht sauber bis in den Container gelangt.
 Fuer neuere Echo-Geraete sollte die Alexa-Bridge ueber Port 80 erreichbar sein. Die Web-UI kann weiter auf Port 8080 laufen; LoxEvo startet bei abweichendem `alexaBridge.advertisePort` einen zusaetzlichen Alexa/Hue-HTTP-Listener.
-SSDP/UDP 1900 wird nur fuer die Suche neuer Alexa-Geraete gebraucht. Bereits gefundene Geraete koennen danach normalerweise weiter ueber den Alexa/Hue-HTTP-Port bedient werden. Wenn LoxBerry-`ssdpd` den Port 1900 belegt, zeigt LoxEvo deshalb eine klare Meldung: vorhandene Geraete koennen weiter funktionieren, neue Geraete werden aber wahrscheinlich nicht gefunden.
+SSDP/UDP 1900 wird nur fuer die Suche neuer Alexa-Geraete gebraucht. Bereits gefundene Geraete koennen danach normalerweise weiter ueber den Alexa/Hue-HTTP-Port bedient werden. Wenn LoxBerry-`ssdpd` oder ein anderer SSDP-Dienst den Port 1900 belegt, zeigt LoxEvo deshalb eine klare Meldung: vorhandene Geraete koennen weiter funktionieren, neue Geraete werden aber wahrscheinlich nicht gefunden.
 
-Optional kann auf dem LoxBerry-Host ein enger Discovery-Helper installiert werden. Er pausiert fuer die Geraetesuche nur die Dienste `ssdpd` und `lbssdpd` und startet sie danach wieder. Der Helper fuehrt keine freien Shell-Befehle aus.
+Optional kann auf dem LoxBerry-Host ein enger Discovery-Helper installiert werden. Er pausiert fuer die Geraetesuche nur die Dienste `ssdpd` und `lbssdpd` und startet sie danach wieder. Der Helper fuehrt keine freien Shell-Befehle aus und ist nur lokal auf `127.0.0.1` erreichbar.
 
 ```bash
 cd /mnt/docker/loxevo
 sudo sh tools/install-discovery-helper.sh
 ```
 
-Danach kann die Geraetesuche in der Web-UI unter `Konfiguration -> Alexa Geraete` per Button aktiviert und wieder beendet werden.
+Danach kann die Geraetesuche in der Web-UI per Button gesteuert werden:
+
+1. `Konfiguration -> Alexa-Geraetesuche` oeffnen.
+2. `Geraetesuche aktivieren` klicken.
+3. In der Alexa-App nach neuen Geraeten suchen.
+4. Nach der Suche `Geraetesuche beenden` klicken.
+
+Damit wird dem LoxBerry der SSDP-Dienst nicht dauerhaft weggenommen. Die Buttons funktionieren nur, wenn der optionale Host-Helper installiert und gestartet ist.
 
 Typischer Ablauf:
 

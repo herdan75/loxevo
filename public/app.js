@@ -617,7 +617,7 @@ function renderAlexaBridgeStatus() {
   }
 
   if (status.discoveryPaused) {
-    alexaBridgeStatus.textContent = status.discoveryPauseReason || 'Alexa-Geraetesuche ist deaktiviert. Vorhandene Geraete koennen weiter funktionieren.';
+    alexaBridgeStatus.textContent = status.discoveryPauseReason || 'Alexa-Gerätesuche ist deaktiviert. Vorhandene Geräte können weiter funktionieren.';
     alexaBridgeStatus.className = 'service-status disabled';
     renderAlexaDevices();
     renderDiscoveryStatus();
@@ -679,20 +679,20 @@ function renderDiscoveryStatus() {
   if (stopDiscoveryBtn) stopDiscoveryBtn.disabled = true;
 
   if (!enabled) {
-    discoveryStatus.textContent = 'Geraetesuche ist deaktiviert, weil virtuelle Alexa-Geraete deaktiviert sind.';
+    discoveryStatus.textContent = 'Gerätesuche ist deaktiviert, weil virtuelle Alexa-Geräte deaktiviert sind.';
     discoveryStatus.className = 'service-status disabled';
     return;
   }
 
   if (bridge.ready) {
-    discoveryStatus.textContent = 'Geraetesuche aktiv. Alexa kann neue virtuelle Geraete finden.';
+    discoveryStatus.textContent = 'Gerätesuche aktiv. Alexa kann neue virtuelle Geräte finden.';
     discoveryStatus.className = 'service-status ready';
     if (stopDiscoveryBtn) stopDiscoveryBtn.disabled = !helper.available;
     return;
   }
 
   if (bridge.discoveryPaused) {
-    discoveryStatus.textContent = 'Geraetesuche ist deaktiviert. Vorhandene Alexa-Geraete koennen weiter funktionieren.';
+    discoveryStatus.textContent = 'Gerätesuche ist deaktiviert. Vorhandene Alexa-Geräte können weiter funktionieren.';
     discoveryStatus.className = 'service-status disabled';
     if (startDiscoveryBtn) startDiscoveryBtn.disabled = !helper.available;
     return;
@@ -704,14 +704,14 @@ function renderDiscoveryStatus() {
     return;
   }
 
-  discoveryStatus.textContent = 'Geraetesuche ist nicht aktiv. Mit dem Button kann LoxEvo den LoxBerry-SSDP-Dienst kurz pausieren und die Suche starten.';
+  discoveryStatus.textContent = 'Gerätesuche ist nicht aktiv. Mit dem Button kann LoxEvo den LoxBerry-SSDP-Dienst kurz pausieren und die Suche starten.';
   discoveryStatus.className = 'service-status error';
   if (startDiscoveryBtn) startDiscoveryBtn.disabled = false;
 }
 
 async function runDiscoveryAction(action, button) {
   const successLabel = action === 'start' ? 'Aktiviert' : 'Beendet';
-  setButtonFeedback(button, 'pending', action === 'start' ? 'Aktiviert' : 'Beendet');
+  setButtonFeedback(button, 'pending', action === 'start' ? 'Startet' : 'Stoppt');
   try {
     const response = await fetch(`/api/discovery/${action}`, { method: 'POST' });
     const payload = await response.json().catch(() => ({}));
@@ -728,7 +728,7 @@ async function runDiscoveryAction(action, button) {
     renderAlexaBridgeStatus();
     await loadEvents();
     setButtonFeedback(button, 'success', successLabel);
-    showToast(action === 'start' ? 'Geraetesuche aktiviert' : 'Geraetesuche beendet', 'ok');
+    showToast(action === 'start' ? 'Gerätesuche aktiviert' : 'Gerätesuche beendet', 'ok');
   } catch (error) {
     await loadDiscoveryStatus();
     setButtonFeedback(button, 'error', 'Fehler');
@@ -749,9 +749,12 @@ function renderSystemNotice() {
 
   if (alexaBridgeInfo?.enabled && !alexaBridgeInfo.discoveryPaused && (!alexaBridgeInfo.ready || alexaBridgeInfo.bridgeHttp?.error)) {
     const bridgeText = alexaBridgeInfo.bridgeHttp?.error || humanizeAlexaBridgeError(alexaBridgeInfo.error);
+    const bridgeDetail = bridgeText.includes('Vorhandene Geräte')
+      ? bridgeText
+      : `${bridgeText} Bereits gefundene Geräte können weiter funktionieren; neue Geräte werden so aber wahrscheinlich nicht gefunden.`;
     issues.push({
       title: 'Alexa-Gerätesuche ist nicht bereit',
-      text: `${bridgeText} Bereits gefundene Geräte können weiter funktionieren; neue Geräte werden so aber wahrscheinlich nicht gefunden.`
+      text: bridgeDetail
     });
   }
 
@@ -792,10 +795,7 @@ function humanizeAlexaBridgeError(errorText = '') {
   const text = String(errorText || '');
   const lower = text.toLowerCase();
   if ((lower.includes('eaddrinuse') || lower.includes('bind udp 1900 failed')) && lower.includes('1900')) {
-    return 'Virtuelle Alexa-Geraete sind aktiviert, aber SSDP/UDP 1900 ist belegt. Vorhandene Geraete koennen weiter funktionieren; fuer neue Geraete die Geraetesuche ueber den Button aktivieren.';
-  }
-  if ((lower.includes('eaddrinuse') || lower.includes('bind udp 1900 failed')) && lower.includes('1900')) {
-    return 'Virtuelle Alexa-Geräte sind aktiviert, aber SSDP/UDP 1900 konnte nicht geöffnet werden. LoxEvo versucht den SSDP-Start automatisch erneut. Wenn die Meldung bleibt, blockiert vermutlich LoxBerry-ssdpd oder ein anderer Dienst die Gerätesuche.';
+    return 'Virtuelle Alexa-Geräte sind aktiviert, aber SSDP/UDP 1900 ist belegt. Vorhandene Geräte können weiter funktionieren; für neue Geräte die Gerätesuche unter Konfiguration -> Alexa-Gerätesuche aktivieren.';
   }
   return `Alexa-Geräte sind aktiviert, aber noch nicht bereit: ${text || 'Status unbekannt'}`;
 }

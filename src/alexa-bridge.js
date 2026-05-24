@@ -644,7 +644,7 @@ function friendlySsdpError(error, lanAddress) {
     return new Error(
       `SSDP/UDP-Port 1900 konnte nicht geoeffnet werden. ` +
       `Der Port ist vermutlich durch LoxBerry-ssdpd oder einen anderen SSDP-Dienst belegt. ` +
-      `Vorhandene Alexa-Geraete koennen weiter funktionieren; fuer neue Geraete muss die Geraetesuche kurz aktiviert werden. ` +
+      `Vorhandene Alexa-Geräte können weiter funktionieren; für neue Geräte muss die Gerätesuche kurz aktiviert werden. ` +
       `Gepruefte Adresse: ${lanAddress || '0.0.0.0'}. Originalfehler: ${message}`
     );
   }

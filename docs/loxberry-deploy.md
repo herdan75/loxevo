@@ -98,7 +98,15 @@ cd /mnt/docker/loxevo
 sudo sh tools/install-discovery-helper.sh
 ```
 
-Der Helper laeuft nur lokal auf `127.0.0.1` und darf nur Status, Start und Stopp der Dienste `ssdpd` und `lbssdpd` ausfuehren. Danach kann die Alexa-Geraetesuche in der Web-UI unter `Konfiguration -> Alexa Geraete` gezielt aktiviert und wieder beendet werden.
+Der Helper laeuft nur lokal auf `127.0.0.1` und darf nur Status, Start und Stopp der Dienste `ssdpd` und `lbssdpd` ausfuehren. Danach kann die Alexa-Geraetesuche in der Web-UI unter `Konfiguration -> Alexa-Geraetesuche` gezielt aktiviert und wieder beendet werden.
+
+Der normale Ablauf ist:
+
+1. In LoxEvo `Geraetesuche aktivieren` klicken.
+2. In der Alexa-App nach neuen Geraeten suchen.
+3. In LoxEvo `Geraetesuche beenden` klicken.
+
+So wird der LoxBerry-SSDP-Dienst nur fuer die eigentliche Suche pausiert.
 
 ## Backup und Deinstallation
 

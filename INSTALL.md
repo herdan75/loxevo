@@ -115,7 +115,16 @@ cd /mnt/docker/loxevo
 sudo sh tools/install-discovery-helper.sh
 ```
 
-Der Helper laeuft nur auf `127.0.0.1` und kennt nur drei Aktionen: Status lesen, Geraetesuche starten und Geraetesuche beenden. Dabei werden nur `ssdpd` und `lbssdpd` kurz gestoppt und danach wieder gestartet. Danach stehen die Buttons unter `Konfiguration -> Alexa Geraete` zur Verfuegung.
+Der Helper laeuft nur auf `127.0.0.1` und kennt nur drei Aktionen: Status lesen, Geraetesuche starten und Geraetesuche beenden. Dabei werden nur `ssdpd` und `lbssdpd` kurz gestoppt und danach wieder gestartet.
+
+Danach laeuft die Suche fuer normale Nutzer ohne SSH:
+
+1. In LoxEvo `Konfiguration -> Alexa-Geraetesuche` oeffnen.
+2. `Geraetesuche aktivieren` klicken.
+3. In der Alexa-App nach neuen Geraeten suchen.
+4. Danach in LoxEvo `Geraetesuche beenden` klicken.
+
+Wenn der Helper nicht installiert ist, bleiben die Buttons deaktiviert und LoxEvo zeigt eine entsprechende Meldung. Alle anderen Funktionen koennen trotzdem laufen.
 
 ## Backup und Wiederherstellung
 

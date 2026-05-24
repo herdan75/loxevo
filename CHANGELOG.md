@@ -1,24 +1,25 @@
 # Changelog
 
-Alle nennenswerten Aenderungen an LoxEvo werden in dieser Datei gesammelt.
+Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
-- GitHub Actions CI fuer Node-Syntaxcheck und Docker-Build ergaenzt.
-- README-Badges fuer CI, Docker und Lizenz ergaenzt.
-- Backup-Export und -Import fuer LoxEvo-Einstellungen ergaenzt.
-- Hinweise zur sauberen Deinstallation und zum Erhalt des Datenordners ergaenzt.
-- Optionalen Host-Helper fuer die Alexa-Geraetesuche per Web-UI-Button ergaenzt.
-- Globale Warnleiste fuer TTS- und Alexa-Geraetesuche-Probleme ergaenzt.
-- LAN-IP-Fallback und Port-80-Hinweise fuer die Alexa-Geraetesuche ergaenzt.
+- GitHub Actions CI für Node-Syntaxcheck und Docker-Build ergänzt.
+- README-Badges für CI, Docker und Lizenz ergänzt.
+- Backup-Export und -Import für LoxEvo-Einstellungen ergänzt.
+- Hinweise zur sauberen Deinstallation und zum Erhalt des Datenordners ergänzt.
+- Optionalen Host-Helper für die Alexa-Gerätesuche per Web-UI-Button ergänzt.
+- Globale Hinweisleiste für TTS- und Alexa-Gerätesuche-Probleme ergänzt.
+- LAN-IP-Fallback und Port-80-Hinweise für die Alexa-Gerätesuche ergänzt.
+- Doku und UI-Hinweise für den aktuellen Discovery-/TTS-Stand nachgezogen.
 
 ## 0.1.0
 
-- Lauffaehige Docker/LoxBerry-Basis mit Web-UI.
-- Frei definierbare Loxone-Befehle fuer unterschiedliche Funktionen, Raeume und Rubriken.
-- Virtuelle Alexa-Geraete ueber lokalen Hue-kompatiblen Bridge-Eingang.
-- Lokaler SSDP-Helper fuer die Alexa-Geraetesuche.
-- Alexa-TTS ueber `alexa-remote2` mit Geraetesuche, Standard-, Alle- und Alarm-Geraeten.
-- Schnelle native TTS-Sequenzen fuer normale Sprachausgabe und Alarm.
-- Loxone-Kurzpfade fuer TTS, Alarm und Lautstaerke.
-- Wartungsbereich fuer `alexa-remote2`-Versionen und Updates.
+- Lauffähige Docker/LoxBerry-Basis mit Web-UI.
+- Frei definierbare Loxone-Befehle für unterschiedliche Funktionen, Räume und Rubriken.
+- Virtuelle Alexa-Geräte über lokalen Hue-kompatiblen Bridge-Eingang.
+- Lokaler SSDP-Helper für die Alexa-Gerätesuche.
+- Alexa-TTS über `alexa-remote2` mit Gerätesuche, Standard-, Alle- und Alarm-Geräten.
+- Schnelle native TTS-Sequenzen für normale Sprachausgabe und Alarm.
+- Loxone-Kurzpfade für TTS, Alarm und Lautstärke.
+- Wartungsbereich für `alexa-remote2`-Versionen und Updates.

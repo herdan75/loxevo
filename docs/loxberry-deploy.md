@@ -1,12 +1,12 @@
 # LoxBerry Docker Deployment
 
-> **Hinweis:** Diese Deployment-Anleitung beschreibt die lauffaehige Entwicklungsversion. Neue Befehle und Live-Zugriffe sollten zuerst bewusst getestet werden.
+> **Hinweis:** Diese Deployment-Anleitung beschreibt die lauffähige Entwicklungsversion. Neue Befehle und Live-Zugriffe sollten zuerst bewusst getestet werden.
 
-Diese Anleitung ist fuer den ersten Test von LoxEvo auf dem LoxBerry gedacht.
+Diese Anleitung ist für den ersten Test von LoxEvo auf dem LoxBerry gedacht.
 
 ## Ziel
 
-LoxEvo laeuft als eigener Docker-Container auf dem LoxBerry:
+LoxEvo läuft als eigener Docker-Container auf dem LoxBerry:
 
 ```text
 Loxone -> http://<loxberry>:8080/... -> LoxEvo -> Alexa TTS
@@ -33,11 +33,11 @@ src/
 public/
 ```
 
-`data/config.json` enthaelt deine Loxone- und LoxEvo-Konfiguration.
-`data/Node.txt` ist die Alexa-Cookie-Datei fuer `alexa-remote2`.
+`data/config.json` enthält deine Loxone- und LoxEvo-Konfiguration.
+`data/Node.txt` ist die Alexa-Cookie-Datei für `alexa-remote2`.
 LoxEvo akzeptiert sowohl eine reine Cookie-Zeile als auch JSON-Dateien mit `localCookie`. Bei JSON-Dateien werden `localCookie`, `csrf` und die gespeicherten Registrierungsdaten wie `macDms` und `refreshToken` verwendet.
 Wenn Amazon eine neue Anmeldung verlangt, zeigt das Log eine lokale Proxy-URL. Diese URL muss die LAN-IP des LoxBerry enthalten. Falls dort `undefined` oder eine falsche IP steht, in der Web-UI unter `Konfiguration -> Alexa TTS` die Proxy-IP eintragen.
-Der komplette Ordner `data/` ist fuer private lokale Daten gedacht und wird nicht ins GitHub-Repository uebernommen.
+Der komplette Ordner `data/` ist für private lokale Daten gedacht und wird nicht ins GitHub-Repository übernommen.
 
 Vor dem ersten Start:
 
@@ -58,7 +58,7 @@ In `config.json` muss der TTS-Cookie-Pfad im Container stehen:
 }
 ```
 
-Der komplette lokale `data/`-Ordner wird ueber `docker-compose.yml` so eingebunden:
+Der komplette lokale `data/`-Ordner wird über `docker-compose.yml` so eingebunden:
 
 ```yaml
 volumes:
@@ -73,7 +73,7 @@ Im Projektordner auf dem LoxBerry:
 docker compose up -d --build
 ```
 
-Status pruefen:
+Status prüfen:
 
 ```bash
 docker compose ps
@@ -91,26 +91,26 @@ Für virtuelle Alexa-Geräte muss LoxEvo im gleichen Netzwerk wie die Echo-Gerä
 Für neuere Echo-Geräte sollte die Alexa-Bridge über Port 80 erreichbar sein. Die normale Web-UI kann auf Port 8080 bleiben; LoxEvo startet dann zusätzlich einen lokalen Alexa/Hue-HTTP-Listener auf Port 80. Falls dieser Port bereits vom LoxBerry-Webserver belegt ist, muss der Portkonflikt vor dem Alexa-Test gelöst werden.
 Eine echte Hue-Bridge ist dafür nicht nötig. LoxEvo stellt nur die lokale Discovery und die Hue-kompatiblen Ein/Aus-Endpunkte bereit, die Alexa zur Gerätesuche und zum Auslösen der konfigurierten Befehle nutzt.
 
-Wenn LoxBerry-`ssdpd` oder `lbssdpd` den Port 1900 belegt, funktionieren bereits gefundene Alexa-Geraete meist weiter, neue Geraete werden aber wahrscheinlich nicht gefunden. Fuer die Bedienung per Button kann optional ein enger Host-Helper installiert werden. Das passiert nicht automatisch durch den Docker-Container, weil dafuer Host-/Root-Rechte noetig sind:
+Wenn LoxBerry-`ssdpd` oder `lbssdpd` den Port 1900 belegt, funktionieren bereits gefundene Alexa-Geräte meist weiter, neue Geräte werden aber wahrscheinlich nicht gefunden. Für die Bedienung per Button kann optional ein enger Host-Helper installiert werden. Das passiert nicht automatisch durch den Docker-Container, weil dafür Host-/Root-Rechte nötig sind:
 
 ```bash
 cd /mnt/docker/loxevo
 sudo sh tools/install-discovery-helper.sh
 ```
 
-Der Helper laeuft nur lokal auf `127.0.0.1` und darf nur Status, Start und Stopp der Dienste `ssdpd` und `lbssdpd` ausfuehren. Danach kann die Alexa-Geraetesuche in der Web-UI unter `Konfiguration -> Alexa-Geraetesuche` gezielt aktiviert und wieder beendet werden.
+Der Helper läuft nur lokal auf `127.0.0.1` und darf nur Status, Start und Stopp der Dienste `ssdpd` und `lbssdpd` ausführen. Danach kann die Alexa-Gerätesuche in der Web-UI unter `Konfiguration -> Alexa-Gerätesuche` gezielt aktiviert und wieder beendet werden.
 
 Der normale Ablauf ist:
 
-1. In LoxEvo `Geraetesuche aktivieren` klicken.
-2. In der Alexa-App nach neuen Geraeten suchen.
-3. In LoxEvo `Geraetesuche beenden` klicken.
+1. In LoxEvo `Gerätesuche aktivieren` klicken.
+2. In der Alexa-App nach neuen Geräten suchen.
+3. In LoxEvo `Gerätesuche beenden` klicken.
 
-So wird der LoxBerry-SSDP-Dienst nur fuer die eigentliche Suche pausiert.
+So wird der LoxBerry-SSDP-Dienst nur für die eigentliche Suche pausiert.
 
 ## Backup und Deinstallation
 
-Vor groesseren Aenderungen kann in der Web-UI unter `Wartung` ein Backup exportiert werden. Standardmaessig enthaelt es `data/config.json`; die Alexa-Cookie-Datei `data/Node.txt` wird nur mit exportiert, wenn der Haken dafuer gesetzt ist. Backup-Dateien koennen sensible Loxone- und Alexa-Daten enthalten und sollten privat bleiben.
+Vor größeren Änderungen kann in der Web-UI unter `Wartung` ein Backup exportiert werden. Standardmäßig enthält es `data/config.json`; die Alexa-Cookie-Datei `data/Node.txt` wird nur mit exportiert, wenn der Haken dafür gesetzt ist. Backup-Dateien können sensible Loxone- und Alexa-Daten enthalten und sollten privat bleiben.
 
 Beim Import erstellt LoxEvo zuerst eine Sicherung der aktuellen Konfiguration im Datenordner und spielt danach das Backup ein.
 
@@ -120,14 +120,14 @@ Eine normale Deinstallation entfernt nur den Container:
 docker compose down
 ```
 
-`data/` bleibt dabei erhalten. Fuer eine vollstaendige Entfernung zusaetzlich das lokale Image entfernen und den Projektordner `/mnt/docker/loxevo` nur loeschen, wenn die Einstellungen nicht mehr gebraucht werden. Wenn der optionale Discovery-Helper installiert wurde, zusaetzlich `loxevo-discovery-helper.service` deaktivieren und `/usr/local/sbin/loxevo-discovery-helper` entfernen.
+`data/` bleibt dabei erhalten. Für eine vollständige Entfernung zusätzlich das lokale Image entfernen und den Projektordner `/mnt/docker/loxevo` nur löschen, wenn die Einstellungen nicht mehr gebraucht werden. Wenn der optionale Discovery-Helper installiert wurde, zusätzlich `loxevo-discovery-helper.service` deaktivieren und `/usr/local/sbin/loxevo-discovery-helper` entfernen.
 
 ## Erster Test
 
 1. In der Web-UI `Dry-Run aktiv` eingeschaltet lassen.
 2. Einen aktiven Befehl testen.
-3. Unter `Externe Aufrufe` die erzeugten Befehls- und TTS-Aufrufe pruefen.
-4. Optional unter `Konfiguration -> Alexa Geräte` die virtuellen Alexa-Geräte aktivieren und speichern.
+3. Unter `Externe Aufrufe` die erzeugten Befehls- und TTS-Aufrufe prüfen.
+4. Optional unter `Konfiguration -> Alexa-Geräte` die virtuellen Alexa-Geräte aktivieren und speichern.
 5. In der Alexa-App nach neuen Geräten suchen.
 6. TTS-Status kontrollieren und unter `Konfiguration -> TTS-Geräte` die Echo-Geräte aus Alexa laden.
 7. Standard- und Alarm-Geräte auswählen, Lautstärke-Schieber setzen und eine kurze Testmeldung senden.
@@ -137,7 +137,7 @@ docker compose down
 
 `alexa-remote2 ist nicht installiert`
 
-In der Web-UI unter `Wartung` eine Version auswaehlen und installieren. Danach LoxEvo ueber den Button in der Web-UI oder mit `docker compose restart loxevo` neu starten.
+In der Web-UI unter `Wartung` eine Version auswählen und installieren. Danach LoxEvo über den Button in der Web-UI oder mit `docker compose restart loxevo` neu starten.
 
 `Alexa-Cookie konnte nicht gelesen werden`
 

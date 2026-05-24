@@ -523,7 +523,6 @@ async function initTts() {
 
 function getSetupStatus() {
   const ttsStatus = tts.getStatus();
-  const alexaBridgeStatus = getAlexaBridgeStatus();
   const ttsReady = !config.tts?.enabled || (ttsStatus.ready && ttsDevicesConfigured(ttsStatus));
   const checks = [
     {
@@ -559,13 +558,6 @@ function getSetupStatus() {
       ok: ttsReady,
       optional: true,
       detail: ttsDetail(ttsStatus)
-    },
-    {
-      id: 'alexa-bridge',
-      label: 'Optional: Alexa-Geräte aktivieren',
-      ok: !config.alexaBridge?.enabled || alexaBridgeStatus.ready,
-      optional: true,
-      detail: alexaBridgeDetail(alexaBridgeStatus)
     }
   ];
 
@@ -1208,22 +1200,6 @@ function ttsDetail(status) {
     return 'Mindestens ein Alexa-Gerät für TTS eintragen.';
   }
   return 'Alexa TTS ist bereit.';
-}
-
-function alexaBridgeDetail(status) {
-  if (!status.enabled) {
-    return 'Virtuelle Alexa-Geräte sind deaktiviert und können später eingerichtet werden.';
-  }
-  if (status.bridgeHttp?.error) {
-    return status.bridgeHttp.error;
-  }
-  if (status.error) {
-    if (isDiscoveryPortIssue(status.error)) {
-      return 'SSDP/UDP-Port 1900 konnte nicht geöffnet werden. Der Port ist vermutlich durch LoxBerry-ssdpd oder einen anderen SSDP-Dienst belegt. Vorhandene Alexa-Geräte funktionieren weiter; für neue Geräte muss die Gerätesuche kurz aktiviert werden.';
-    }
-    return status.error;
-  }
-  return `${status.deviceCount} virtuelle Geräte für Alexa bereit.`;
 }
 
 function isDiscoveryPortIssue(errorText = '') {

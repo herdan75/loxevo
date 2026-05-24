@@ -683,7 +683,7 @@ function humanizeAlexaBridgeError(errorText = '') {
   const text = String(errorText || '');
   const lower = text.toLowerCase();
   if ((lower.includes('eaddrinuse') || lower.includes('bind udp 1900 failed')) && lower.includes('1900')) {
-    return 'Virtuelle Alexa-Geräte sind aktiviert, aber SSDP/UDP 1900 konnte nicht geöffnet werden. Der Linux-SSDP-Helper versucht normalerweise die gemeinsame Nutzung mit LoxBerry-ssdpd; bitte Docker-Host-Netzwerk und Logs prüfen.';
+    return 'Virtuelle Alexa-Geräte sind aktiviert, aber SSDP/UDP 1900 konnte nicht geöffnet werden. LoxEvo versucht den SSDP-Start automatisch erneut. Wenn die Meldung bleibt, blockiert vermutlich LoxBerry-ssdpd oder ein anderer Dienst die Gerätesuche.';
   }
   return `Alexa-Geräte sind aktiviert, aber noch nicht bereit: ${text || 'Status unbekannt'}`;
 }

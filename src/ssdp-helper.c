@@ -154,7 +154,7 @@ static void build_notify(char *out, size_t out_size, const char *ip, const char 
            ip, port, nt, usn, bridge_id);
 }
 
-static int create_socket_with_options(const char *ip, bool use_reuse_port) {
+static int create_socket_with_options(const char *ip, const char *bind_ip, bool use_reuse_port) {
   int sock = socket(AF_INET, SOCK_DGRAM, 0);
   if (sock < 0) return -1;
 
@@ -171,7 +171,7 @@ static int create_socket_with_options(const char *ip, bool use_reuse_port) {
   memset(&bind_addr, 0, sizeof(bind_addr));
   bind_addr.sin_family = AF_INET;
   bind_addr.sin_port = htons(SSDP_PORT);
-  bind_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  bind_addr.sin_addr.s_addr = is_empty(bind_ip) ? htonl(INADDR_ANY) : inet_addr(bind_ip);
 
   if (bind(sock, (struct sockaddr *)&bind_addr, sizeof(bind_addr)) < 0) {
     int saved_errno = errno;
@@ -183,7 +183,7 @@ static int create_socket_with_options(const char *ip, bool use_reuse_port) {
   struct ip_mreq mreq;
   memset(&mreq, 0, sizeof(mreq));
   mreq.imr_multiaddr.s_addr = inet_addr(SSDP_GROUP);
-  mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+  mreq.imr_interface.s_addr = is_empty(ip) ? htonl(INADDR_ANY) : inet_addr(ip);
 
   if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
     int saved_errno = errno;
@@ -204,23 +204,35 @@ static int create_socket_with_options(const char *ip, bool use_reuse_port) {
   return sock;
 }
 
-static int create_socket(const char *ip, bool *reuse_port_used) {
-  int sock = create_socket_with_options(ip, true);
-  if (sock >= 0) {
-    if (reuse_port_used) *reuse_port_used = true;
-    return sock;
+static int create_socket(const char *ip, bool *reuse_port_used, char *bind_label, size_t bind_label_size) {
+  const char *bind_addresses[] = { "", ip };
+  bool reuse_port_values[] = { true, false };
+  int last_errno = 0;
+
+  for (size_t address_index = 0; address_index < sizeof(bind_addresses) / sizeof(bind_addresses[0]); address_index += 1) {
+    const char *bind_ip = bind_addresses[address_index];
+    if (address_index > 0 && is_empty(bind_ip)) continue;
+
+    for (size_t reuse_index = 0; reuse_index < sizeof(reuse_port_values) / sizeof(reuse_port_values[0]); reuse_index += 1) {
+      bool use_reuse_port = reuse_port_values[reuse_index];
+      int sock = create_socket_with_options(ip, bind_ip, use_reuse_port);
+      if (sock >= 0) {
+        if (reuse_port_used) *reuse_port_used = use_reuse_port;
+        if (bind_label && bind_label_size > 0) {
+          snprintf(bind_label, bind_label_size, "%s", is_empty(bind_ip) ? "0.0.0.0" : bind_ip);
+        }
+        return sock;
+      }
+
+      last_errno = errno;
+      if (last_errno != EADDRINUSE) {
+        errno = last_errno;
+        return -1;
+      }
+    }
   }
 
-  if (errno != EADDRINUSE) {
-    return -1;
-  }
-
-  sock = create_socket_with_options(ip, false);
-  if (sock >= 0) {
-    if (reuse_port_used) *reuse_port_used = false;
-    return sock;
-  }
-
+  errno = last_errno;
   return -1;
 }
 
@@ -311,13 +323,14 @@ int main(int argc, char **argv) {
   signal(SIGINT, handle_signal);
 
   bool reuse_port_used = false;
-  int sock = create_socket(ip, &reuse_port_used);
+  char bind_label[INET_ADDRSTRLEN] = "0.0.0.0";
+  int sock = create_socket(ip, &reuse_port_used, bind_label, sizeof(bind_label));
   if (sock < 0) {
     fprintf(stderr, "ERROR bind UDP 1900 failed: %s\n", strerror(errno));
     return 1;
   }
 
-  log_line("READY", "bind=0.0.0.0:%d reuseport=%d location=http://%s:%s/description.xml", SSDP_PORT, reuse_port_used ? 1 : 0, ip, port);
+  log_line("READY", "bind=%s:%d reuseport=%d location=http://%s:%s/description.xml", bind_label, SSDP_PORT, reuse_port_used ? 1 : 0, ip, port);
   send_notify_burst(sock, ip, port, bridge_id, uuid);
 
   time_t last_notify = time(NULL);

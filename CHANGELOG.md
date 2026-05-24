@@ -10,6 +10,7 @@ Alle nennenswerten Aenderungen an LoxEvo werden in dieser Datei gesammelt.
 - Hinweise zur sauberen Deinstallation und zum Erhalt des Datenordners ergaenzt.
 - SSDP-Helper robuster gemacht, wenn LoxBerry-`ssdpd` UDP 1900 bereits belegt.
 - Globale Warnleiste fuer TTS- und Alexa-Geraetesuche-Probleme ergaenzt.
+- Automatische SSDP-Neustartversuche und LAN-IP-Fallback fuer die Alexa-Geraetesuche ergaenzt.
 
 ## 0.1.0
 

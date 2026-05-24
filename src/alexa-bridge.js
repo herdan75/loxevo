@@ -19,6 +19,8 @@ export class AlexaBridgeService {
     this.ssdpMode = '';
     this.lastCommandAt = new Map();
     this.commandCooldownMs = 1500;
+    this.retryTimer = null;
+    this.retryDelayMs = 30000;
   }
 
   async start() {
@@ -32,6 +34,7 @@ export class AlexaBridgeService {
       await this.startSsdp();
       this.ready = true;
       this.lastError = null;
+      this.clearRetry();
       this.handlers.addEvent?.({
         type: 'alexa-bridge',
         status: 'ready',
@@ -45,10 +48,12 @@ export class AlexaBridgeService {
         status: 'error',
         text: error.message
       });
+      this.scheduleRetry();
     }
   }
 
   async stop() {
+    this.clearRetry();
     if (this.helper) {
       const helper = this.helper;
       this.helper = null;
@@ -63,6 +68,22 @@ export class AlexaBridgeService {
     this.ready = false;
     this.ssdpMode = '';
     this.lastCommandAt.clear();
+  }
+
+  clearRetry() {
+    if (!this.retryTimer) return;
+    clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+  }
+
+  scheduleRetry() {
+    if (this.retryTimer || !this.isEnabled()) return;
+    this.retryTimer = setTimeout(async () => {
+      this.retryTimer = null;
+      if (!this.isEnabled() || this.ready) return;
+      console.log('Alexa-Bridge SSDP retry');
+      await this.start();
+    }, this.retryDelayMs);
   }
 
   getStatus() {

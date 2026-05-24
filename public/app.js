@@ -132,6 +132,7 @@ async function load() {
     await loadAlexaBridgeStatus();
     await loadDiscoveryStatus();
     await loadSetupStatus();
+    await loadDependencyStatus();
     renderCommands();
     renderCommandEditor();
     renderIntegrations();
@@ -875,6 +876,7 @@ function showView(viewId) {
   }
   if (viewId === 'maintenanceView') {
     loadPreflightStatus();
+    loadDependencyStatus();
   }
 }
 
@@ -908,6 +910,13 @@ function renderPreflightStatus() {
   if (!preflightSummary || !preflightChecks || !preflightInfo) return;
   const summary = preflightInfo.summary || {};
   const counts = summary.counts || {};
+  const sections = preflightInfo.sections || [];
+  if (!sections.length) {
+    preflightSummary.textContent = 'Systemprüfung konnte keine Detaildaten laden. Bitte LoxEvo neu starten oder die Seite aktualisieren.';
+    preflightSummary.className = 'service-status warning';
+    preflightChecks.innerHTML = '<p class="empty">Keine Prüfpunkte vorhanden.</p>';
+    return;
+  }
   const countText = [
     `${counts.ok || 0} OK`,
     `${counts.warning || 0} prüfen`,
@@ -919,7 +928,7 @@ function renderPreflightStatus() {
   preflightSummary.className = `service-status ${preflightServiceClass(summary.level)}`;
   preflightChecks.innerHTML = '';
 
-  (preflightInfo.sections || []).forEach((section) => {
+  sections.forEach((section) => {
     const card = document.createElement('details');
     card.className = 'preflight-section';
     card.open = sectionHasAction(section);
@@ -927,10 +936,13 @@ function renderPreflightStatus() {
     const summaryEl = document.createElement('summary');
     const title = document.createElement('strong');
     title.textContent = section.title || 'Prüfung';
+    const sectionMeta = document.createElement('span');
+    sectionMeta.className = 'preflight-section-meta';
+    sectionMeta.textContent = sectionStatusText(section);
     const badge = document.createElement('span');
     badge.className = 'count-badge';
     badge.textContent = String((section.checks || []).length);
-    summaryEl.append(title, badge);
+    summaryEl.append(title, sectionMeta, badge);
 
     const body = document.createElement('div');
     body.className = 'preflight-section-body';
@@ -960,6 +972,22 @@ function renderPreflightStatus() {
 
 function sectionHasAction(section) {
   return (section.checks || []).some((check) => ['error', 'warning'].includes(check.level));
+}
+
+function sectionStatusText(section) {
+  const checks = section.checks || [];
+  const counts = checks.reduce((result, check) => {
+    result[check.level] = (result[check.level] || 0) + 1;
+    return result;
+  }, {});
+  if (counts.error) return `${counts.error} Fehler`;
+  if (counts.warning) return `${counts.warning} prüfen`;
+  if (counts.optional && !counts.ok && !counts.info) return `${counts.optional} optional`;
+  const pieces = [];
+  if (counts.ok) pieces.push(`${counts.ok} OK`);
+  if (counts.info) pieces.push(`${counts.info} Info`);
+  if (counts.optional) pieces.push(`${counts.optional} optional`);
+  return pieces.join(' · ') || 'Keine Prüfpunkte';
 }
 
 function preflightServiceClass(level) {

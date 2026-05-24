@@ -270,7 +270,7 @@ h2 {
 
 .setup-check.optional.open {
   border-color: #edd29a;
-  background: #fffaf0;
+  background: #ffffff;
 }
 
 .setup-check p {
@@ -291,9 +291,9 @@ h2 {
 }
 
 .preflight-section > summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   min-height: 44px;
   padding: 0 14px;
@@ -303,6 +303,12 @@ h2 {
 
 .preflight-section > summary::marker {
   color: var(--muted);
+}
+
+.preflight-section-meta {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .preflight-section-body {
@@ -350,10 +356,14 @@ h2 {
   color: var(--danger);
 }
 
-.preflight-check.warning,
-.preflight-check.optional {
+.preflight-check.warning {
   border-color: #edd29a;
   background: #fffaf0;
+}
+
+.preflight-check.optional {
+  border-color: #edd29a;
+  background: #ffffff;
 }
 
 .preflight-check.warning .preflight-marker,

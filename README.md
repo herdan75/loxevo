@@ -60,8 +60,8 @@ Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCoo
 Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen lokalen Login-Proxy. LoxEvo setzt dafür automatisch die LAN-IP des LoxBerry; bei Bedarf kann `tts.proxyOwnIp` und `tts.proxyPort` in der Web-UI angepasst werden.
 Für den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
-Die Web-UI zeigt unter `Wartung` eine lokale Systemprüfung für Konfiguration, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Diese Prüfung läuft nur beim Öffnen des Registers oder per Button und erzeugt keine dauernde Hintergrundlast.
-Im gleichen Register kann LoxEvo per Button die installierte `alexa-remote2`-Version und verfügbare npm-Versionen prüfen und Installation oder Update im laufenden Container anstoßen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
+Die Web-UI zeigt unter `Wartung` eine lokale Systemprüfung für Konfiguration, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Diese Prüfung läuft beim Öffnen des Registers oder per Button und erzeugt keine dauernde Hintergrundlast.
+Im gleichen Register zeigt LoxEvo die installierte `alexa-remote2`-Version und verfügbare npm-Versionen und kann Installation oder Update im laufenden Container anstoßen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
 Im gleichen Register können die Einstellungen als Backup exportiert und später wieder importiert werden. Der Export enthält standardmäßig die LoxEvo-Konfiguration; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden.
 Backup-Dateien können sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten und sollten deshalb privat bleiben.
 

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig, saveConfig } from './config.js';
 import { AlexaBridgeService } from './alexa-bridge.js';
 import { isCommandType, readCommandTarget } from './command-utils.js';
+import { DiscoveryControl } from './discovery-control.js';
 import { LoxoneClient } from './loxone.js';
 import { TtsService } from './tts.js';
 
@@ -19,6 +20,7 @@ let config = await loadConfig();
 let loxone = new LoxoneClient(config);
 let tts = new TtsService(config);
 let alexaBridge = createAlexaBridge();
+let discoveryControl = new DiscoveryControl(config);
 let bridgeHttpServer = null;
 let bridgeHttpStatus = { enabled: false, ready: false, error: null, port: null };
 const events = [];
@@ -143,6 +145,18 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
     return sendJson(res, getAlexaBridgeStatus());
   }
 
+  if (req.method === 'GET' && pathParts[1] === 'discovery' && pathParts[2] === 'status') {
+    return sendJson(res, await getDiscoveryStatus());
+  }
+
+  if (req.method === 'POST' && pathParts[1] === 'discovery' && pathParts[2] === 'start') {
+    return await startDiscoveryMode(res);
+  }
+
+  if (req.method === 'POST' && pathParts[1] === 'discovery' && pathParts[2] === 'stop') {
+    return await stopDiscoveryMode(res);
+  }
+
   if (req.method === 'GET' && pathParts[1] === 'dependencies') {
     return sendJson(res, { dependencies: [await getDependencyStatus('alexa-remote2')] });
   }
@@ -184,6 +198,7 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
     config = await saveConfig(nextConfig);
     loxone = new LoxoneClient(config);
     tts = new TtsService(config);
+    discoveryControl = new DiscoveryControl(config);
     await initTts();
     await restartAlexaBridge();
     await restartBridgeHttpServer();
@@ -242,6 +257,7 @@ async function restoreBackup(res, backupPayload) {
 
   loxone = new LoxoneClient(config);
   tts = new TtsService(config);
+  discoveryControl = new DiscoveryControl(config);
   await initTts();
   await restartAlexaBridge();
   await restartBridgeHttpServer();
@@ -869,6 +885,49 @@ function getAlexaBridgeStatus() {
     ...alexaBridge.getStatus(),
     bridgeHttp: bridgeHttpStatus
   };
+}
+
+async function getDiscoveryStatus() {
+  const helper = await discoveryControl.getStatus();
+  return {
+    helper,
+    alexaBridge: getAlexaBridgeStatus()
+  };
+}
+
+async function startDiscoveryMode(res) {
+  if (!config.alexaBridge?.enabled) {
+    return sendJson(res, { ok: false, error: 'Virtuelle Alexa-Geraete sind deaktiviert.' }, 400);
+  }
+
+  const helper = await discoveryControl.start();
+  if (!helper.available) {
+    addEvent({ type: 'alexa-discovery', status: 'error', text: helper.error });
+    return sendJson(res, { ok: false, error: helper.error, discovery: await getDiscoveryStatus() }, 503);
+  }
+
+  await restartAlexaBridge();
+  await restartBridgeHttpServer();
+  addEvent({ type: 'alexa-discovery', status: 'started', text: 'Alexa-Geraetesuche aktiviert.' });
+  return sendJson(res, { ok: true, helper, discovery: await getDiscoveryStatus() });
+}
+
+async function stopDiscoveryMode(res) {
+  if (!config.alexaBridge?.enabled) {
+    return sendJson(res, { ok: false, error: 'Virtuelle Alexa-Geraete sind deaktiviert.' }, 400);
+  }
+
+  await alexaBridge.pauseDiscovery('Alexa-Geraetesuche ist deaktiviert. Vorhandene Alexa-Geraete koennen weiter funktionieren.');
+  await restartBridgeHttpServer();
+
+  const helper = await discoveryControl.stop();
+  if (!helper.available) {
+    addEvent({ type: 'alexa-discovery', status: 'warning', text: helper.error });
+    return sendJson(res, { ok: false, error: helper.error, discovery: await getDiscoveryStatus() }, 503);
+  }
+
+  addEvent({ type: 'alexa-discovery', status: 'stopped', text: 'Alexa-Geraetesuche deaktiviert.' });
+  return sendJson(res, { ok: true, helper, discovery: await getDiscoveryStatus() });
 }
 
 async function restartBridgeHttpServer() {

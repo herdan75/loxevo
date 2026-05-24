@@ -21,16 +21,22 @@ export class AlexaBridgeService {
     this.commandCooldownMs = 1500;
     this.retryTimer = null;
     this.retryDelayMs = 30000;
+    this.discoveryPaused = false;
+    this.discoveryPauseReason = '';
   }
 
   async start() {
     if (!this.isEnabled()) {
       this.ready = false;
       this.lastError = null;
+      this.discoveryPaused = false;
+      this.discoveryPauseReason = '';
       return;
     }
 
     try {
+      this.discoveryPaused = false;
+      this.discoveryPauseReason = '';
       await this.startSsdp();
       this.ready = true;
       this.lastError = null;
@@ -53,11 +59,36 @@ export class AlexaBridgeService {
   }
 
   async stop() {
+    await this.stopSsdpTransport();
+    this.ready = false;
+    this.ssdpMode = '';
+    this.discoveryPaused = false;
+    this.discoveryPauseReason = '';
+  }
+
+  async pauseDiscovery(reason) {
+    await this.stopSsdpTransport();
+    this.ready = false;
+    this.lastError = null;
+    this.ssdpMode = 'paused';
+    this.ssdpBindAddress = '';
+    this.discoveryPaused = true;
+    this.discoveryPauseReason = reason || 'Alexa-Gerätesuche ist deaktiviert.';
+  }
+
+  async stopSsdpTransport() {
     this.clearRetry();
     if (this.helper) {
       const helper = this.helper;
       this.helper = null;
-      helper.kill('SIGTERM');
+      await new Promise((resolve) => {
+        const timeout = setTimeout(resolve, 1000);
+        helper.once('exit', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+        helper.kill('SIGTERM');
+      });
     }
     if (this.socket) {
       await new Promise((resolve) => {
@@ -65,8 +96,6 @@ export class AlexaBridgeService {
       });
       this.socket = null;
     }
-    this.ready = false;
-    this.ssdpMode = '';
     this.lastCommandAt.clear();
   }
 
@@ -97,6 +126,8 @@ export class AlexaBridgeService {
       ssdpPort: SSDP_PORT,
       ssdpBindAddress: this.ssdpBindAddress,
       ssdpMode: this.ssdpMode,
+      discoveryPaused: this.discoveryPaused,
+      discoveryPauseReason: this.discoveryPauseReason,
       descriptionUrl: `http://${this.getAdvertiseIp()}:${this.getAdvertisePort()}/description.xml`,
       bridgeId: this.getBridgeId(),
       deviceCount: devices.length,
@@ -117,6 +148,7 @@ export class AlexaBridgeService {
       'command',
       'config',
       'dependencies',
+      'discovery',
       'dry-run',
       'events',
       'light',
@@ -611,7 +643,8 @@ function friendlySsdpError(error, lanAddress) {
   if (error?.code === 'EADDRINUSE' || message.includes('EADDRINUSE') || lower.includes('bind udp 1900 failed')) {
     return new Error(
       `SSDP/UDP-Port 1900 konnte nicht geoeffnet werden. ` +
-      `Der Linux-SSDP-Helper kann normalerweise neben LoxBerry-ssdpd laufen; pruefe Docker-Host-Netzwerk, Berechtigungen und Logs. ` +
+      `Der Port ist vermutlich durch LoxBerry-ssdpd oder einen anderen SSDP-Dienst belegt. ` +
+      `Vorhandene Alexa-Geraete koennen weiter funktionieren; fuer neue Geraete muss die Geraetesuche kurz aktiviert werden. ` +
       `Gepruefte Adresse: ${lanAddress || '0.0.0.0'}. Originalfehler: ${message}`
     );
   }

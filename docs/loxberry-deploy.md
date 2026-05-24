@@ -88,9 +88,17 @@ http://<loxberry-ip>:8080
 
 Beim ersten Start ist `Dry-Run` aktiv. LoxEvo sendet dann noch keine echten Loxone-Befehle, sondern zeigt die erzeugten URLs im Protokoll.
 Für virtuelle Alexa-Geräte muss LoxEvo im gleichen Netzwerk wie die Echo-Geräte laufen. Das Docker-Compose-Setup nutzt deshalb `network_mode: host`, damit die lokale Alexa-Gerätesuche über SSDP/UDP 1900 funktioniert.
-Das Docker-Image bringt dafür einen kleinen Linux-SSDP-Helper mit. Er kann den SSDP-Port gemeinsam mit dem LoxBerry-`ssdpd` nutzen, sodass dieser Dienst normalerweise nicht beendet werden muss.
 Für neuere Echo-Geräte sollte die Alexa-Bridge über Port 80 erreichbar sein. Die normale Web-UI kann auf Port 8080 bleiben; LoxEvo startet dann zusätzlich einen lokalen Alexa/Hue-HTTP-Listener auf Port 80. Falls dieser Port bereits vom LoxBerry-Webserver belegt ist, muss der Portkonflikt vor dem Alexa-Test gelöst werden.
 Eine echte Hue-Bridge ist dafür nicht nötig. LoxEvo stellt nur die lokale Discovery und die Hue-kompatiblen Ein/Aus-Endpunkte bereit, die Alexa zur Gerätesuche und zum Auslösen der konfigurierten Befehle nutzt.
+
+Wenn LoxBerry-`ssdpd` oder `lbssdpd` den Port 1900 belegt, funktionieren bereits gefundene Alexa-Geraete meist weiter, neue Geraete werden aber wahrscheinlich nicht gefunden. Fuer die Bedienung per Button kann optional ein enger Host-Helper installiert werden:
+
+```bash
+cd /mnt/docker/loxevo
+sudo sh tools/install-discovery-helper.sh
+```
+
+Der Helper laeuft nur lokal auf `127.0.0.1` und darf nur Status, Start und Stopp der Dienste `ssdpd` und `lbssdpd` ausfuehren. Danach kann die Alexa-Geraetesuche in der Web-UI unter `Konfiguration -> Alexa Geraete` gezielt aktiviert und wieder beendet werden.
 
 ## Backup und Deinstallation
 
@@ -104,7 +112,7 @@ Eine normale Deinstallation entfernt nur den Container:
 docker compose down
 ```
 
-`data/` bleibt dabei erhalten. Fuer eine vollstaendige Entfernung zusaetzlich das lokale Image entfernen und den Projektordner `/mnt/docker/loxevo` nur loeschen, wenn die Einstellungen nicht mehr gebraucht werden. LoxEvo installiert keinen systemd-Dienst und keinen Helper direkt auf dem Host.
+`data/` bleibt dabei erhalten. Fuer eine vollstaendige Entfernung zusaetzlich das lokale Image entfernen und den Projektordner `/mnt/docker/loxevo` nur loeschen, wenn die Einstellungen nicht mehr gebraucht werden. Wenn der optionale Discovery-Helper installiert wurde, zusaetzlich `loxevo-discovery-helper.service` deaktivieren und `/usr/local/sbin/loxevo-discovery-helper` entfernen.
 
 ## Erster Test
 

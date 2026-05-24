@@ -19,6 +19,11 @@ const alexaBridgeEnabled = document.querySelector('#alexaBridgeEnabled');
 const alexaBridgeName = document.querySelector('#alexaBridgeName');
 const alexaBridgeAdvertiseIp = document.querySelector('#alexaBridgeAdvertiseIp');
 const alexaBridgeAdvertisePort = document.querySelector('#alexaBridgeAdvertisePort');
+const discoveryStatus = document.querySelector('#discoveryStatus');
+const discoveryHelpBtn = document.querySelector('#discoveryHelpBtn');
+const discoveryHelpText = document.querySelector('#discoveryHelpText');
+const startDiscoveryBtn = document.querySelector('#startDiscoveryBtn');
+const stopDiscoveryBtn = document.querySelector('#stopDiscoveryBtn');
 const ttsEnabled = document.querySelector('#ttsEnabled');
 const ttsCookieFile = document.querySelector('#ttsCookieFile');
 const ttsAmazonPage = document.querySelector('#ttsAmazonPage');
@@ -65,6 +70,7 @@ let ttsStatus = null;
 let setupStatus = null;
 let dependencyInfo = null;
 let alexaBridgeInfo = null;
+let discoveryInfo = null;
 let ttsDevices = [];
 
 load();
@@ -88,6 +94,9 @@ exportBackupBtn?.addEventListener('click', () => exportBackup(exportBackupBtn));
 importBackupBtn?.addEventListener('click', () => importBackup(importBackupBtn));
 backupHelpBtn?.addEventListener('click', () => toggleBackupHelp());
 ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
+discoveryHelpBtn?.addEventListener('click', () => toggleDiscoveryHelp());
+startDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('start', startDiscoveryBtn));
+stopDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('stop', stopDiscoveryBtn));
 refreshTtsDevicesBtn?.addEventListener('click', () => loadTtsDevices(refreshTtsDevicesBtn));
 ttsDefaultVolume?.addEventListener('input', () => {
   updateTtsVolumeLabels();
@@ -116,6 +125,7 @@ async function load() {
     await loadTtsStatus();
     await loadTtsDevices();
     await loadAlexaBridgeStatus();
+    await loadDiscoveryStatus();
     await loadSetupStatus();
     loadDependencyStatus();
     renderCommands();
@@ -183,6 +193,7 @@ async function saveConfig(button) {
     await loadTtsStatus();
     await loadTtsDevices();
     await loadAlexaBridgeStatus();
+    await loadDiscoveryStatus();
     await loadSetupStatus();
     renderIntegrations();
     setButtonFeedback(button, 'success', 'Gespeichert');
@@ -207,6 +218,7 @@ async function saveJsonConfig(button) {
     await loadTtsStatus();
     await loadTtsDevices();
     await loadAlexaBridgeStatus();
+    await loadDiscoveryStatus();
     await loadSetupStatus();
     renderIntegrations();
     setButtonFeedback(button, 'success', 'Gespeichert');
@@ -323,6 +335,7 @@ async function importBackup(button) {
     await loadTtsStatus();
     await loadTtsDevices();
     await loadAlexaBridgeStatus();
+    await loadDiscoveryStatus();
     await loadSetupStatus();
     await loadDependencyStatus();
     renderIntegrations();
@@ -598,6 +611,16 @@ function renderAlexaBridgeStatus() {
     alexaBridgeStatus.textContent = 'Virtuelle Alexa-Geräte sind deaktiviert.';
     alexaBridgeStatus.className = 'service-status disabled';
     renderAlexaDevices();
+    renderDiscoveryStatus();
+    renderSystemNotice();
+    return;
+  }
+
+  if (status.discoveryPaused) {
+    alexaBridgeStatus.textContent = status.discoveryPauseReason || 'Alexa-Geraetesuche ist deaktiviert. Vorhandene Geraete koennen weiter funktionieren.';
+    alexaBridgeStatus.className = 'service-status disabled';
+    renderAlexaDevices();
+    renderDiscoveryStatus();
     renderSystemNotice();
     return;
   }
@@ -606,6 +629,7 @@ function renderAlexaBridgeStatus() {
     alexaBridgeStatus.textContent = humanizeAlexaBridgeError(status.error);
     alexaBridgeStatus.className = 'service-status error';
     renderAlexaDevices();
+    renderDiscoveryStatus();
     renderSystemNotice();
     return;
   }
@@ -614,6 +638,7 @@ function renderAlexaBridgeStatus() {
     alexaBridgeStatus.textContent = status.bridgeHttp.error;
     alexaBridgeStatus.className = 'service-status error';
     renderAlexaDevices();
+    renderDiscoveryStatus();
     renderSystemNotice();
     return;
   }
@@ -624,7 +649,91 @@ function renderAlexaBridgeStatus() {
   alexaBridgeStatus.textContent = `Bereit: ${devices.length} virtuelle Geräte auf ${status.ip}:${status.port}${ssdpText}${bridgeHttpText}${modeText}.`;
   alexaBridgeStatus.className = 'service-status ready';
   renderAlexaDevices();
+  renderDiscoveryStatus();
   renderSystemNotice();
+}
+
+async function loadDiscoveryStatus() {
+  if (!discoveryStatus) return;
+  try {
+    const response = await fetch(`/api/discovery/status?ts=${Date.now()}`, { cache: 'no-store' });
+    await ensureOk(response);
+    discoveryInfo = await response.json();
+    if (discoveryInfo?.alexaBridge) {
+      alexaBridgeInfo = discoveryInfo.alexaBridge;
+    }
+    renderDiscoveryStatus();
+  } catch (error) {
+    discoveryInfo = { helper: { available: false, error: error.message }, alexaBridge: alexaBridgeInfo };
+    renderDiscoveryStatus();
+  }
+}
+
+function renderDiscoveryStatus() {
+  if (!discoveryStatus) return;
+  const bridge = discoveryInfo?.alexaBridge || alexaBridgeInfo || {};
+  const helper = discoveryInfo?.helper || {};
+  const enabled = bridge.enabled ?? config?.alexaBridge?.enabled;
+
+  if (startDiscoveryBtn) startDiscoveryBtn.disabled = true;
+  if (stopDiscoveryBtn) stopDiscoveryBtn.disabled = true;
+
+  if (!enabled) {
+    discoveryStatus.textContent = 'Geraetesuche ist deaktiviert, weil virtuelle Alexa-Geraete deaktiviert sind.';
+    discoveryStatus.className = 'service-status disabled';
+    return;
+  }
+
+  if (bridge.ready) {
+    discoveryStatus.textContent = 'Geraetesuche aktiv. Alexa kann neue virtuelle Geraete finden.';
+    discoveryStatus.className = 'service-status ready';
+    if (stopDiscoveryBtn) stopDiscoveryBtn.disabled = !helper.available;
+    return;
+  }
+
+  if (bridge.discoveryPaused) {
+    discoveryStatus.textContent = 'Geraetesuche ist deaktiviert. Vorhandene Alexa-Geraete koennen weiter funktionieren.';
+    discoveryStatus.className = 'service-status disabled';
+    if (startDiscoveryBtn) startDiscoveryBtn.disabled = !helper.available;
+    return;
+  }
+
+  if (!helper.available) {
+    discoveryStatus.textContent = helper.error || 'Discovery-Host-Helper ist nicht erreichbar.';
+    discoveryStatus.className = 'service-status error';
+    return;
+  }
+
+  discoveryStatus.textContent = 'Geraetesuche ist nicht aktiv. Mit dem Button kann LoxEvo den LoxBerry-SSDP-Dienst kurz pausieren und die Suche starten.';
+  discoveryStatus.className = 'service-status error';
+  if (startDiscoveryBtn) startDiscoveryBtn.disabled = false;
+}
+
+async function runDiscoveryAction(action, button) {
+  const successLabel = action === 'start' ? 'Aktiviert' : 'Beendet';
+  setButtonFeedback(button, 'pending', action === 'start' ? 'Aktiviert' : 'Beendet');
+  try {
+    const response = await fetch(`/api/discovery/${action}`, { method: 'POST' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || `HTTP ${response.status}`);
+    }
+    discoveryInfo = payload.discovery || null;
+    if (!discoveryInfo) {
+      await loadDiscoveryStatus();
+    }
+    if (discoveryInfo?.alexaBridge) {
+      alexaBridgeInfo = discoveryInfo.alexaBridge;
+    }
+    renderAlexaBridgeStatus();
+    await loadEvents();
+    setButtonFeedback(button, 'success', successLabel);
+    showToast(action === 'start' ? 'Geraetesuche aktiviert' : 'Geraetesuche beendet', 'ok');
+  } catch (error) {
+    await loadDiscoveryStatus();
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
 }
 
 function renderSystemNotice() {
@@ -638,7 +747,7 @@ function renderSystemNotice() {
     });
   }
 
-  if (alexaBridgeInfo?.enabled && (!alexaBridgeInfo.ready || alexaBridgeInfo.bridgeHttp?.error)) {
+  if (alexaBridgeInfo?.enabled && !alexaBridgeInfo.discoveryPaused && (!alexaBridgeInfo.ready || alexaBridgeInfo.bridgeHttp?.error)) {
     const bridgeText = alexaBridgeInfo.bridgeHttp?.error || humanizeAlexaBridgeError(alexaBridgeInfo.error);
     issues.push({
       title: 'Alexa-Gerätesuche ist nicht bereit',
@@ -683,6 +792,9 @@ function humanizeAlexaBridgeError(errorText = '') {
   const text = String(errorText || '');
   const lower = text.toLowerCase();
   if ((lower.includes('eaddrinuse') || lower.includes('bind udp 1900 failed')) && lower.includes('1900')) {
+    return 'Virtuelle Alexa-Geraete sind aktiviert, aber SSDP/UDP 1900 ist belegt. Vorhandene Geraete koennen weiter funktionieren; fuer neue Geraete die Geraetesuche ueber den Button aktivieren.';
+  }
+  if ((lower.includes('eaddrinuse') || lower.includes('bind udp 1900 failed')) && lower.includes('1900')) {
     return 'Virtuelle Alexa-Geräte sind aktiviert, aber SSDP/UDP 1900 konnte nicht geöffnet werden. LoxEvo versucht den SSDP-Start automatisch erneut. Wenn die Meldung bleibt, blockiert vermutlich LoxBerry-ssdpd oder ein anderer Dienst die Gerätesuche.';
   }
   return `Alexa-Geräte sind aktiviert, aber noch nicht bereit: ${text || 'Status unbekannt'}`;
@@ -700,6 +812,13 @@ function toggleBackupHelp() {
   const nextHidden = !backupHelpText.hidden;
   backupHelpText.hidden = nextHidden;
   backupHelpBtn.setAttribute('aria-expanded', String(!nextHidden));
+}
+
+function toggleDiscoveryHelp() {
+  if (!discoveryHelpBtn || !discoveryHelpText) return;
+  const nextHidden = !discoveryHelpText.hidden;
+  discoveryHelpText.hidden = nextHidden;
+  discoveryHelpBtn.setAttribute('aria-expanded', String(!nextHidden));
 }
 
 function showView(viewId) {

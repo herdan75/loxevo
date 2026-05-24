@@ -107,7 +107,17 @@ Eine normale Deinstallation entfernt den Container:
 docker compose down
 ```
 
-Damit bleiben `data/config.json`, `data/Node.txt` und lokal installierte Wartungspakete bewusst erhalten. Fuer eine vollstaendige Entfernung danach den Projektordner `/mnt/docker/loxevo` loeschen und bei Bedarf das lokale Image `loxevo:local` sowie ungenutzten Docker-Build-Cache entfernen. LoxEvo installiert keinen systemd-Dienst und keinen SSDP-Helper direkt auf dem Host; der SSDP-Helper steckt nur im Docker-Image.
+Damit bleiben `data/config.json`, `data/Node.txt` und lokal installierte Wartungspakete bewusst erhalten. Fuer eine vollstaendige Entfernung danach den Projektordner `/mnt/docker/loxevo` loeschen und bei Bedarf das lokale Image `loxevo:local` sowie ungenutzten Docker-Build-Cache entfernen.
+
+Wenn der optionale Discovery-Helper installiert wurde, kann er so entfernt werden:
+
+```bash
+sudo systemctl disable --now loxevo-discovery-helper.service
+sudo rm -f /etc/systemd/system/loxevo-discovery-helper.service
+sudo rm -f /usr/local/sbin/loxevo-discovery-helper
+sudo rm -f /etc/loxevo-discovery-helper.env
+sudo systemctl daemon-reload
+```
 
 Echte Loxone-Requests aktivieren:
 
@@ -165,8 +175,17 @@ Wenn `alexaBridge.enabled` aktiv ist, bietet LoxEvo jeden aktiven Befehl als vir
 Technisch ist das ein lokaler Hue-kompatibler V1-Bridge-Eingang nur fuer Alexa-Discovery und Ein/Aus-Befehle. Es wird keine Hue-Bridge und keine Hue-Lampe benoetigt; LoxEvo nutzt nur das lokale Discovery/API-Verhalten, damit Alexa ohne eigene Cloud-Skill-Entwicklung virtuelle Geraete finden kann.
 
 Fuer die Geraetesuche muss LoxEvo im gleichen LAN wie die Echo-Geraete erreichbar sein. Im Docker/LoxBerry-Betrieb ist `network_mode: host` deshalb der empfohlene Modus, weil SSDP/UDP 1900 sonst oft nicht sauber bis in den Container gelangt.
-Das Docker-Image enthaelt dafuer einen kleinen Linux-SSDP-Helper. Er nutzt Linux-Socket-Optionen fuer gemeinsam nutzbare UDP-Ports und kann dadurch neben dem LoxBerry-`ssdpd` laufen, ohne dessen Dienst abschalten zu muessen.
 Fuer neuere Echo-Geraete sollte die Alexa-Bridge ueber Port 80 erreichbar sein. Die Web-UI kann weiter auf Port 8080 laufen; LoxEvo startet bei abweichendem `alexaBridge.advertisePort` einen zusaetzlichen Alexa/Hue-HTTP-Listener.
+SSDP/UDP 1900 wird nur fuer die Suche neuer Alexa-Geraete gebraucht. Bereits gefundene Geraete koennen danach normalerweise weiter ueber den Alexa/Hue-HTTP-Port bedient werden. Wenn LoxBerry-`ssdpd` den Port 1900 belegt, zeigt LoxEvo deshalb eine klare Meldung: vorhandene Geraete koennen weiter funktionieren, neue Geraete werden aber wahrscheinlich nicht gefunden.
+
+Optional kann auf dem LoxBerry-Host ein enger Discovery-Helper installiert werden. Er pausiert fuer die Geraetesuche nur die Dienste `ssdpd` und `lbssdpd` und startet sie danach wieder. Der Helper fuehrt keine freien Shell-Befehle aus.
+
+```bash
+cd /mnt/docker/loxevo
+sudo sh tools/install-discovery-helper.sh
+```
+
+Danach kann die Geraetesuche in der Web-UI unter `Konfiguration -> Alexa Geraete` per Button aktiviert und wieder beendet werden.
 
 Typischer Ablauf:
 

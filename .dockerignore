@@ -4,6 +4,9 @@ config.json
 Node.txt
 .git
 .gitignore
+.tmp
+__pycache__
+*.pyc
 *.log
 *.pid
 .env

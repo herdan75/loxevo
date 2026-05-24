@@ -104,6 +104,19 @@ Die Dateien in `data/` bleiben dabei erhalten.
 
 Die installierte `alexa-remote2`-Version, der Installationspfad und verfuegbare Versionen sind in der Web-UI unter "Wartung" sichtbar.
 
+## Optional: Alexa-Geraetesuche per Button
+
+Neue Alexa-Geraete werden ueber SSDP/UDP 1900 gesucht. Auf LoxBerry ist dieser Port oft durch den Dienst `ssdpd` oder `lbssdpd` belegt. Vorhandene Alexa-Geraete koennen trotzdem weiter funktionieren, neue Geraete werden dann aber meist nicht gefunden.
+
+Fuer eine einfache Bedienung per Web-UI kann einmalig ein enger Host-Helper installiert werden:
+
+```bash
+cd /mnt/docker/loxevo
+sudo sh tools/install-discovery-helper.sh
+```
+
+Der Helper laeuft nur auf `127.0.0.1` und kennt nur drei Aktionen: Status lesen, Geraetesuche starten und Geraetesuche beenden. Dabei werden nur `ssdpd` und `lbssdpd` kurz gestoppt und danach wieder gestartet. Danach stehen die Buttons unter `Konfiguration -> Alexa Geraete` zur Verfuegung.
+
 ## Backup und Wiederherstellung
 
 In der Web-UI unter `Wartung` kann ein Backup der Einstellungen exportiert werden. Der normale Export enthaelt die LoxEvo-Konfiguration aus `data/config.json`. Die Alexa-Cookie-Datei `data/Node.txt` wird nur exportiert, wenn der Haken dafuer gesetzt ist. Backup-Dateien koennen sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten.
@@ -149,7 +162,17 @@ Fuer eine vollstaendige Entfernung:
 docker compose down --rmi local
 ```
 
-Danach den Projektordner `/mnt/docker/loxevo` nur dann loeschen, wenn `data/config.json` und `data/Node.txt` nicht mehr gebraucht werden oder vorher gesichert wurden. LoxEvo installiert keinen systemd-Dienst und keinen Helper direkt auf dem Host; der SSDP-Helper laeuft nur innerhalb des Containers.
+Danach den Projektordner `/mnt/docker/loxevo` nur dann loeschen, wenn `data/config.json` und `data/Node.txt` nicht mehr gebraucht werden oder vorher gesichert wurden.
+
+Falls der optionale Discovery-Helper installiert wurde:
+
+```bash
+sudo systemctl disable --now loxevo-discovery-helper.service
+sudo rm -f /etc/systemd/system/loxevo-discovery-helper.service
+sudo rm -f /usr/local/sbin/loxevo-discovery-helper
+sudo rm -f /etc/loxevo-discovery-helper.env
+sudo systemctl daemon-reload
+```
 
 ## Typische Probleme
 

@@ -6,7 +6,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "check": "node --check src/index.js && node --check src/config.js && node --check src/command-utils.js && node --check src/alexa-bridge.js && node --check src/loxone.js && node --check src/tts.js && node --check public/app.js"
+    "check": "node --check src/index.js && node --check src/config.js && node --check src/command-utils.js && node --check src/discovery-control.js && node --check src/alexa-bridge.js && node --check src/loxone.js && node --check src/tts.js && node --check public/app.js"
   },
   "engines": {
     "node": ">=20"

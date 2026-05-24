@@ -763,17 +763,27 @@ function renderSystemNotice() {
     });
   }
 
-  if (alexaBridgeInfo?.enabled && !alexaBridgeInfo.discoveryPaused && (!alexaBridgeInfo.ready || alexaBridgeInfo.bridgeHttp?.error)) {
+  if (alexaBridgeInfo?.enabled) {
     const discoveryPortIssue = !alexaBridgeInfo.ready && isDiscoveryPortIssue(alexaBridgeInfo.error);
-    const bridgeText = alexaBridgeInfo.bridgeHttp?.error || humanizeAlexaBridgeError(alexaBridgeInfo.error);
-    const bridgeDetail = bridgeText.includes('Vorhandene Geräte')
-      ? bridgeText
-      : `${bridgeText} Bereits gefundene Geräte können weiter funktionieren; neue Geräte werden so aber wahrscheinlich nicht gefunden.`;
-    issues.push({
-      level: discoveryPortIssue ? 'info' : 'error',
-      title: 'Alexa-Gerätesuche ist nicht bereit',
-      text: bridgeDetail
-    });
+    if (alexaBridgeInfo.bridgeHttp?.error) {
+      issues.push({
+        level: 'error',
+        title: 'Alexa-Geräte sind nicht bereit',
+        text: alexaBridgeInfo.bridgeHttp.error
+      });
+    } else if (alexaBridgeInfo.discoveryPaused || discoveryPortIssue) {
+      issues.push({
+        level: 'info',
+        title: '',
+        text: 'Virtuelle Alexa-Geräte sind aktiviert und funktionsfähig. SSDP/UDP 1900 ist aktuell aber belegt. Für das Suchen und Hinzufügen neuer Geräte unter Konfiguration -> Alexa-Gerätesuche aktivieren.'
+      });
+    } else if (!alexaBridgeInfo.ready) {
+      issues.push({
+        level: 'error',
+        title: 'Alexa-Gerätesuche ist nicht bereit',
+        text: humanizeAlexaBridgeError(alexaBridgeInfo.error)
+      });
+    }
   }
 
   if (!issues.length) {
@@ -783,9 +793,9 @@ function renderSystemNotice() {
   }
 
   systemNotice.hidden = false;
-  systemNotice.className = issues.some((issue) => issue.level === 'error') ? 'system-notice error' : 'system-notice info';
+  systemNotice.className = issues.some((issue) => issue.level === 'error') ? 'system-notice error wide' : 'system-notice info wide';
   systemNotice.innerHTML = issues.map((issue) => (
-    `<div><strong>${escapeHtml(issue.title)}</strong><p>${escapeHtml(issue.text)}</p></div>`
+    `<div>${issue.title ? `<strong>${escapeHtml(issue.title)}</strong>` : ''}<p>${escapeHtml(issue.text)}</p></div>`
   )).join('');
 }
 

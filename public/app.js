@@ -898,14 +898,14 @@ async function loadPreflightStatus(button) {
     const response = await fetch(`/api/preflight?ts=${Date.now()}`, { cache: 'no-store' });
     await ensureOk(response);
     const payload = await response.json();
-    preflightInfo = isValidPreflightPayload(payload) ? payload : buildClientPreflightStatus('Server lieferte keine Detaildaten.');
+    preflightInfo = isValidPreflightPayload(payload) ? payload : buildClientPreflightStatus();
     renderPreflightStatus();
     if (button) {
       setButtonFeedback(button, 'success', 'Geprüft');
       showToast('Systemprüfung aktualisiert', 'ok');
     }
   } catch (error) {
-    const fallback = buildClientPreflightStatus(error.message);
+    const fallback = buildClientPreflightStatus();
     if (fallback) {
       preflightInfo = fallback;
       renderPreflightStatus();
@@ -930,7 +930,7 @@ function isValidPreflightPayload(payload) {
   return Boolean(payload && Array.isArray(payload.sections) && payload.sections.length);
 }
 
-function buildClientPreflightStatus(reason) {
+function buildClientPreflightStatus() {
   if (!config) return null;
   const activeCommandCount = Object.keys(getRunnableCommands()).length;
   const tts = ttsStatus || { enabled: Boolean(config.tts?.enabled), ready: false };
@@ -940,7 +940,6 @@ function buildClientPreflightStatus(reason) {
     {
       title: 'LoxEvo',
       checks: [
-        preflightRow('warning', 'Server-Systemprüfung', `Detaildaten wurden lokal aus dem Browserstatus aufgebaut. Grund: ${reason}`),
         preflightRow('info', 'Web-UI und API', `Web-UI läuft auf Port ${config.server?.port || 8080}.`)
       ]
     },
@@ -980,7 +979,10 @@ function buildClientPreflightStatus(reason) {
   ];
   return {
     checkedAt: new Date().toISOString(),
-    summary: summarizePreflightForClient(sections),
+    summary: {
+      ...summarizePreflightForClient(sections),
+      text: 'Systemprüfung mit lokalen Statusdaten geladen.'
+    },
     sections
   };
 }
@@ -1032,7 +1034,7 @@ function renderPreflightStatus() {
   sections.forEach((section) => {
     const card = document.createElement('details');
     card.className = 'preflight-section';
-    card.open = sectionHasAction(section);
+    card.open = false;
 
     const summaryEl = document.createElement('summary');
     const title = document.createElement('strong');
@@ -1069,10 +1071,6 @@ function renderPreflightStatus() {
     card.append(summaryEl, body);
     preflightChecks.append(card);
   });
-}
-
-function sectionHasAction(section) {
-  return (section.checks || []).some((check) => ['error', 'warning'].includes(check.level));
 }
 
 function sectionStatusText(section) {

@@ -137,6 +137,32 @@ h2 {
   color: inherit;
 }
 
+.system-notice-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.system-notice-main {
+  min-width: 0;
+}
+
+.system-notice-info-button {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+
+.system-notice-help {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-left: 3px solid #b9d0d2;
+  border-radius: 4px;
+  background: #f8fcfd;
+}
+
 .status-help-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

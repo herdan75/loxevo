@@ -789,7 +789,8 @@ function renderSystemNotice() {
       issues.push({
         level: 'info',
         title: '',
-        text: 'Virtuelle Alexa-Geräte sind aktiviert und funktionsfähig. SSDP/UDP 1900 ist aktuell aber belegt. Für das Suchen und Hinzufügen neuer Geräte unter Konfiguration -> Alexa-Gerätesuche aktivieren.'
+        text: 'Virtuelle Alexa-Geräte sind aktiviert und funktionsfähig. SSDP/UDP 1900 ist aktuell aber belegt. Für das Suchen und Hinzufügen neuer Geräte unter Konfiguration -> Alexa-Gerätesuche aktivieren.',
+        help: 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Für den normalen Betrieb und für bereits gefundene Geräte ist ein belegter Port 1900 kein Problem. Wenn neue Geräte hinzugefügt werden sollen: Konfiguration -> Alexa-Gerätesuche öffnen, Gerätesuche aktivieren, in der Alexa-App Geräte suchen und danach die Gerätesuche wieder beenden. So wird der Zugriff auf SSDP/UDP 1900 nur temporär genutzt und anschließend wieder an die andere Anwendung zurückgegeben.'
       });
     } else if (!alexaBridgeInfo.ready) {
       issues.push({
@@ -808,9 +809,47 @@ function renderSystemNotice() {
 
   systemNotice.hidden = false;
   systemNotice.className = issues.some((issue) => issue.level === 'error') ? 'system-notice error wide' : 'system-notice info wide';
-  systemNotice.innerHTML = issues.map((issue) => (
-    `<div>${issue.title ? `<strong>${escapeHtml(issue.title)}</strong>` : ''}<p>${escapeHtml(issue.text)}</p></div>`
-  )).join('');
+  systemNotice.innerHTML = '';
+  issues.forEach((issue) => {
+    const item = document.createElement('div');
+    item.className = 'system-notice-item';
+
+    const main = document.createElement('div');
+    main.className = 'system-notice-main';
+    if (issue.title) {
+      const title = document.createElement('strong');
+      title.textContent = issue.title;
+      main.append(title);
+    }
+    const text = document.createElement('p');
+    text.textContent = issue.text || '';
+    main.append(text);
+    item.append(main);
+
+    if (issue.help) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'info-button system-notice-info-button';
+      button.textContent = 'i';
+      button.title = 'Hinweis erklären';
+      button.setAttribute('aria-label', 'Hinweis erklären');
+      button.setAttribute('aria-expanded', 'false');
+
+      const help = document.createElement('p');
+      help.className = 'system-notice-help';
+      help.textContent = issue.help;
+      help.hidden = true;
+
+      button.addEventListener('click', () => {
+        help.hidden = !help.hidden;
+        button.setAttribute('aria-expanded', String(!help.hidden));
+      });
+
+      item.append(button, help);
+    }
+
+    systemNotice.append(item);
+  });
 }
 
 function humanizeTtsStatusError(errorText = '') {

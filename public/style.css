@@ -258,8 +258,13 @@ h2 {
 }
 
 .setup-check.optional.open .setup-marker {
-  background: #eef2f6;
-  color: var(--muted);
+  background: #fff4db;
+  color: #835500;
+}
+
+.setup-check.optional.open {
+  border-color: #edd29a;
+  background: #fffaf0;
 }
 
 .setup-check p {

@@ -107,7 +107,7 @@ async function handleRequest(req, res, { bridgeOnly = false } = {}) {
     }
 
     // Loxone-TTS-Kurzpfad: POST /<cmd>
-    // Beispiele: /geschirrspueler -> TTS, /alarm -> Alarm, /lautstaerke -> Lautstaerke.
+    // Beispiele: /geschirrspueler -> TTS, /alarm -> Alarm, /lautstaerke -> Lautstärke.
     if (req.method === 'POST' && pathParts.length === 1 && isLoxoneTtsCompatPath(pathParts[0])) {
       const body = await readBody(req);
       return await handleLoxoneTtsShortPath(res, url, pathParts[0], body);
@@ -413,12 +413,12 @@ async function handleLoxoneTtsShortPath(res, url, commandName, body) {
   const payload = parseTtsPayloadWithQuery(body, url.searchParams);
 
   if ((cmd === 'lautstaerke' || cmd === 'volume') && !Number.isFinite(Number(payload.volume ?? payload.text))) {
-    return sendJson(res, { ok: false, error: `Ungueltige Lautstaerke fuer "${cmd}".` }, 400);
+    return sendJson(res, { ok: false, error: `Ungültige Lautstärke für "${cmd}".` }, 400);
   }
 
   if (cmd !== 'lautstaerke' && cmd !== 'volume' && payload.text !== '0' && !containsSpeechText(payload.text)) {
     addEvent({ type: 'tts-speak', status: 'ignored', key: cmd, text: payload.text, compat: 'loxone-short-path' });
-    return sendJson(res, { ok: false, error: `Kein gueltiger TTS-Text fuer "${cmd}" im Request-Body.` }, 400);
+    return sendJson(res, { ok: false, error: `Kein gültiger TTS-Text für "${cmd}" im Request-Body.` }, 400);
   }
 
   addEvent({ type: 'tts-short-path', status: 'accepted', key: cmd, text: payload.text, volume: payload.volume, compat: 'loxone-short-path' });
@@ -556,7 +556,7 @@ function getSetupStatus() {
     },
     {
       id: 'alexa-bridge',
-      label: 'Optional: Alexa Geräte aktivieren',
+      label: 'Optional: Alexa-Geräte aktivieren',
       ok: !config.alexaBridge?.enabled || alexaBridgeStatus.ready,
       optional: true,
       detail: alexaBridgeDetail(alexaBridgeStatus)
@@ -806,9 +806,22 @@ function alexaBridgeDetail(status) {
     return status.bridgeHttp.error;
   }
   if (status.error) {
+    if (isDiscoveryPortIssue(status.error)) {
+      return 'SSDP/UDP-Port 1900 konnte nicht geöffnet werden. Der Port ist vermutlich durch LoxBerry-ssdpd oder einen anderen SSDP-Dienst belegt. Vorhandene Alexa-Geräte funktionieren weiter; für neue Geräte muss die Gerätesuche kurz aktiviert werden.';
+    }
     return status.error;
   }
   return `${status.deviceCount} virtuelle Geräte für Alexa bereit.`;
+}
+
+function isDiscoveryPortIssue(errorText = '') {
+  const lower = String(errorText || '').toLowerCase();
+  return lower.includes('1900') && (
+    lower.includes('eaddrinuse') ||
+    lower.includes('bind udp 1900 failed') ||
+    lower.includes('address in use') ||
+    lower.includes('ssdp/udp-port 1900')
+  );
 }
 
 function isCommandConfigured(command) {
@@ -958,7 +971,7 @@ async function restartBridgeHttpServer() {
     bridgeHttpStatus.ready = true;
     console.log(`Alexa-Bridge HTTP lauscht auf Port ${port}`);
   } catch (error) {
-    bridgeHttpStatus.error = `Alexa-Bridge HTTP Port ${port} konnte nicht geoeffnet werden: ${error.message}`;
+    bridgeHttpStatus.error = `Alexa-Bridge HTTP Port ${port} konnte nicht geöffnet werden: ${error.message}`;
     console.warn(bridgeHttpStatus.error);
     addEvent({ type: 'alexa-bridge-http', status: 'error', text: bridgeHttpStatus.error });
     await stopBridgeHttpServer();

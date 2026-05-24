@@ -823,7 +823,7 @@ function humanizeTtsStatusError(errorText = '') {
 function humanizeAlexaBridgeError(errorText = '') {
   const text = String(errorText || '');
   if (isDiscoveryPortIssue(text)) {
-    return 'Virtuelle Alexa-Geräte sind aktiviert, aber SSDP/UDP 1900 ist belegt. Vorhandene Geräte können weiter funktionieren; für neue Geräte die Gerätesuche unter Konfiguration -> Alexa-Gerätesuche aktivieren.';
+    return 'SSDP/UDP-Port 1900 konnte nicht geöffnet werden. Der Port ist vermutlich durch LoxBerry-ssdpd oder einen anderen SSDP-Dienst belegt. Vorhandene Alexa-Geräte funktionieren weiter; für neue Geräte muss die Gerätesuche kurz aktiviert werden.';
   }
   return `Alexa-Geräte sind aktiviert, aber noch nicht bereit: ${text || 'Status unbekannt'}`;
 }
@@ -1306,13 +1306,13 @@ function createTtsEndpointCards(baseUrl) {
       title: 'Loxone Kurzpfad',
       method: 'POST',
       url: `${baseUrl}/meldung`,
-      body: 'Geschirrspueler ist fertig.',
-      note: 'Loxone-Kurzpfad: POST /<name> mit Text im Body spricht auf den Standard-Geraeten. Die HTTP-Antwort kommt sofort, die Ausgabe laeuft im Hintergrund.',
+      body: 'Geschirrspüler ist fertig.',
+      note: 'Loxone-Kurzpfad: POST /<name> mit Text im Body spricht auf den Standard-Geräten. Die HTTP-Antwort kommt sofort, die Ausgabe läuft im Hintergrund.',
       testLabel: 'Kurzpfad testen',
       testAction: (button) => testEndpoint({
         method: 'POST',
         url: `${baseUrl}/meldung`,
-        body: 'Geschirrspueler ist fertig.',
+        body: 'Geschirrspüler ist fertig.',
         contentType: 'text/plain',
         successText: 'TTS Kurzpfad'
       }, button)
@@ -1336,13 +1336,13 @@ function createTtsEndpointCards(baseUrl) {
       title: 'Alarm Kurzpfad',
       method: 'POST',
       url: `${baseUrl}/alarm`,
-      body: 'Achtung, Alarm wurde ausgeloest.',
-      note: 'Loxone-Kurzpfad: POST /alarm nutzt die Alarm-Geraete und die Alarm-Lautstaerke.',
+      body: 'Achtung, Alarm wurde ausgelöst.',
+      note: 'Loxone-Kurzpfad: POST /alarm nutzt die Alarm-Geräte und die Alarm-Lautstärke.',
       testLabel: 'Alarm Kurzpfad',
       testAction: (button) => testEndpoint({
         method: 'POST',
         url: `${baseUrl}/alarm`,
-        body: 'Achtung, Alarm wurde ausgeloest.',
+        body: 'Achtung, Alarm wurde ausgelöst.',
         contentType: 'text/plain',
         successText: 'Alarm Kurzpfad'
       }, button)
@@ -1363,18 +1363,18 @@ function createTtsEndpointCards(baseUrl) {
       }, button)
     }),
     createEndpointCard({
-      title: 'Lautstaerke Kurzpfad',
+      title: 'Lautstärke Kurzpfad',
       method: 'POST',
       url: `${baseUrl}/lautstaerke`,
       body: String(ttsDefaultVolume?.value || 40),
-      note: 'Loxone-Kurzpfad: POST /lautstaerke mit Zahl im Body setzt die Lautstaerke der Alle-Geraete, sonst der Standard-Geraete.',
+      note: 'Loxone-Kurzpfad: POST /lautstaerke mit Zahl im Body setzt die Lautstärke der Alle-Geräte, sonst der Standard-Geräte.',
       testLabel: 'Kurzpfad setzen',
       testAction: (button) => testEndpoint({
         method: 'POST',
         url: `${baseUrl}/lautstaerke`,
         body: String(ttsDefaultVolume?.value || 40),
         contentType: 'text/plain',
-        successText: 'Lautstaerke Kurzpfad'
+        successText: 'Lautstärke Kurzpfad'
       }, button)
     }),
     createEndpointCard({

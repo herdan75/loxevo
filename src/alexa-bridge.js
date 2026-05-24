@@ -637,15 +637,14 @@ function isUsableLanAddress(value) {
   return Boolean(ip && ip !== '127.0.0.1' && ip !== '0.0.0.0' && !ip.startsWith('169.254.'));
 }
 
-function friendlySsdpError(error, lanAddress) {
+function friendlySsdpError(error) {
   const message = String(error?.message || '');
   const lower = message.toLowerCase();
   if (error?.code === 'EADDRINUSE' || message.includes('EADDRINUSE') || lower.includes('bind udp 1900 failed')) {
     return new Error(
-      `SSDP/UDP-Port 1900 konnte nicht geoeffnet werden. ` +
+      `SSDP/UDP-Port 1900 konnte nicht geöffnet werden. ` +
       `Der Port ist vermutlich durch LoxBerry-ssdpd oder einen anderen SSDP-Dienst belegt. ` +
-      `Vorhandene Alexa-Geräte können weiter funktionieren; für neue Geräte muss die Gerätesuche kurz aktiviert werden. ` +
-      `Gepruefte Adresse: ${lanAddress || '0.0.0.0'}. Originalfehler: ${message}`
+      `Vorhandene Alexa-Geräte funktionieren weiter; für neue Geräte muss die Gerätesuche kurz aktiviert werden.`
     );
   }
   return error;

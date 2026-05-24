@@ -304,7 +304,7 @@ export class TtsService {
       throw new Error(`Alexa-Befehl "${type}" konnte an kein Geraet gesendet werden. ${failures.join(' | ')}`);
     }
     if (failures.length) {
-      console.warn(`TTS ${type}: einzelne Geraete fehlgeschlagen: ${failures.join(' | ')}`);
+      console.warn(`TTS ${type}: einzelne Geräte fehlgeschlagen: ${failures.join(' | ')}`);
     }
   }
 

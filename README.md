@@ -281,14 +281,14 @@ Beispiel:
 
 ```text
 Adresse:
-http://192.168.178.5:8080/
+http://<loxberry-ip>:8080/
 ```
 
-Die Web-UI von LoxEvo laeuft standardmaessig auf Port `8080`. Der Alexa/Hue-Port `80` ist nur fuer die virtuelle Alexa-Geraetesuche relevant, nicht fuer diese Loxone-TTS-Aufrufe.
+Die Web-UI von LoxEvo läuft standardmäßig auf Port `8080`. Der Alexa/Hue-Port `80` ist nur für die virtuelle Alexa-Gerätesuche relevant, nicht für diese Loxone-TTS-Aufrufe.
 
 ### Normale Sprachausgabe
 
-Fuer jede Meldung einen virtuellen Ausgangsbefehl unter dem LoxEvo-Ausgang anlegen.
+Für jede Meldung einen virtuellen Ausgangsbefehl unter dem LoxEvo-Ausgang anlegen.
 
 ```text
 Befehl bei EIN:
@@ -307,14 +307,14 @@ Befehl bei AUS:
 leer lassen
 ```
 
-Der Pfad nach dem Slash ist frei waehlbar. LoxEvo nutzt ihn als Namen im Protokoll. Gesprochen wird der Text aus `HTTP body bei EIN`.
-Alternativ kann in `Befehl bei EIN` auch die komplette URL stehen, zum Beispiel `http://192.168.178.5:8080/hinweis`. Uebersichtlicher ist aber der zentrale virtuelle Ausgang mit kurzer Pfadangabe.
+Der Pfad nach dem Slash ist frei wählbar. LoxEvo nutzt ihn als Namen im Protokoll. Gesprochen wird der Text aus `HTTP body bei EIN`.
+Alternativ kann in `Befehl bei EIN` auch die komplette URL stehen, zum Beispiel `http://<loxberry-ip>:8080/hinweis`. Übersichtlicher ist aber der zentrale virtuelle Ausgang mit kurzer Pfadangabe.
 
 Weitere rein beispielhafte Meldungen:
 
 ```text
 Befehl bei EIN: /luefter_dusche_manuell_aus
-HTTP body bei EIN: Luefter Dusche wurde manuell ausgeschaltet. Bitte Luefter wieder einschalten oder Fenster oeffnen.
+HTTP body bei EIN: Lüfter Dusche wurde manuell ausgeschaltet. Bitte Lüfter wieder einschalten oder Fenster öffnen.
 
 Befehl bei EIN: /abwesenheit_aktiv
 HTTP body bei EIN: Abwesenheitsmodus aktiviert. Alle Fenster sind geschlossen.

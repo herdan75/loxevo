@@ -101,10 +101,19 @@ h2 {
   display: grid;
   gap: 10px;
   padding: 14px 18px;
-  border: 1px solid #e8b8b2;
   border-radius: 8px;
+}
+
+.system-notice.error {
+  border: 1px solid #e8b8b2;
   background: #fff0ee;
   color: var(--danger);
+}
+
+.system-notice.info {
+  border: 1px solid #bfd7dc;
+  background: #f1f8fa;
+  color: #315b64;
 }
 
 .system-notice[hidden] {

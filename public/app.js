@@ -627,7 +627,7 @@ function renderAlexaBridgeStatus() {
 
   if (!status.ready) {
     alexaBridgeStatus.textContent = humanizeAlexaBridgeError(status.error);
-    alexaBridgeStatus.className = 'service-status error';
+    alexaBridgeStatus.className = isDiscoveryPortIssue(status.error) ? 'service-status disabled' : 'service-status error';
     renderAlexaDevices();
     renderDiscoveryStatus();
     renderSystemNotice();
@@ -685,7 +685,7 @@ function renderDiscoveryStatus() {
   }
 
   if (bridge.ready) {
-    discoveryStatus.textContent = 'Gerätesuche aktiv. Alexa kann neue virtuelle Geräte finden.';
+    discoveryStatus.textContent = 'Gerätesuche aktiv. Alexa kann neue virtuelle Geräte finden. Nach der Suche bitte wieder beenden.';
     discoveryStatus.className = 'service-status ready';
     if (stopDiscoveryBtn) stopDiscoveryBtn.disabled = !helper.available;
     return;
@@ -700,12 +700,12 @@ function renderDiscoveryStatus() {
 
   if (!helper.available) {
     discoveryStatus.textContent = 'Host-Helper ist nicht installiert oder nicht erreichbar. Nur für neue Gerätesuche bei belegtem UDP 1900 nötig; der Info-Button zeigt den einmaligen Installationsbefehl.';
-    discoveryStatus.className = 'service-status error';
+    discoveryStatus.className = 'service-status disabled';
     return;
   }
 
   discoveryStatus.textContent = 'Gerätesuche ist nicht aktiv. Mit dem Button kann LoxEvo den LoxBerry-SSDP-Dienst kurz pausieren und die Suche starten.';
-  discoveryStatus.className = 'service-status error';
+  discoveryStatus.className = 'service-status disabled';
   if (startDiscoveryBtn) startDiscoveryBtn.disabled = false;
 }
 
@@ -742,17 +742,20 @@ function renderSystemNotice() {
   const issues = [];
   if (ttsStatus?.enabled && !ttsStatus.ready) {
     issues.push({
+      level: 'error',
       title: 'Alexa TTS ist nicht bereit',
       text: humanizeTtsStatusError(ttsStatus.error)
     });
   }
 
   if (alexaBridgeInfo?.enabled && !alexaBridgeInfo.discoveryPaused && (!alexaBridgeInfo.ready || alexaBridgeInfo.bridgeHttp?.error)) {
+    const discoveryPortIssue = !alexaBridgeInfo.ready && isDiscoveryPortIssue(alexaBridgeInfo.error);
     const bridgeText = alexaBridgeInfo.bridgeHttp?.error || humanizeAlexaBridgeError(alexaBridgeInfo.error);
     const bridgeDetail = bridgeText.includes('Vorhandene Geräte')
       ? bridgeText
       : `${bridgeText} Bereits gefundene Geräte können weiter funktionieren; neue Geräte werden so aber wahrscheinlich nicht gefunden.`;
     issues.push({
+      level: discoveryPortIssue ? 'info' : 'error',
       title: 'Alexa-Gerätesuche ist nicht bereit',
       text: bridgeDetail
     });
@@ -765,6 +768,7 @@ function renderSystemNotice() {
   }
 
   systemNotice.hidden = false;
+  systemNotice.className = issues.some((issue) => issue.level === 'error') ? 'system-notice error' : 'system-notice info';
   systemNotice.innerHTML = issues.map((issue) => (
     `<div><strong>${escapeHtml(issue.title)}</strong><p>${escapeHtml(issue.text)}</p></div>`
   )).join('');
@@ -793,11 +797,20 @@ function humanizeTtsStatusError(errorText = '') {
 
 function humanizeAlexaBridgeError(errorText = '') {
   const text = String(errorText || '');
-  const lower = text.toLowerCase();
-  if ((lower.includes('eaddrinuse') || lower.includes('bind udp 1900 failed')) && lower.includes('1900')) {
+  if (isDiscoveryPortIssue(text)) {
     return 'Virtuelle Alexa-Geräte sind aktiviert, aber SSDP/UDP 1900 ist belegt. Vorhandene Geräte können weiter funktionieren; für neue Geräte die Gerätesuche unter Konfiguration -> Alexa-Gerätesuche aktivieren.';
   }
   return `Alexa-Geräte sind aktiviert, aber noch nicht bereit: ${text || 'Status unbekannt'}`;
+}
+
+function isDiscoveryPortIssue(errorText = '') {
+  const lower = String(errorText || '').toLowerCase();
+  return lower.includes('1900') && (
+    lower.includes('eaddrinuse') ||
+    lower.includes('bind udp 1900 failed') ||
+    lower.includes('address in use') ||
+    lower.includes('ssdp/udp-port 1900')
+  );
 }
 
 function toggleTtsHelp() {

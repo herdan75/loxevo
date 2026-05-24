@@ -295,6 +295,13 @@ Content-Type: application/json
             <h2>Backup</h2>
             <p>Einstellungen exportieren oder aus einer Backup-Datei wiederherstellen.</p>
           </div>
+          <button id="backupHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="backupHelpText" aria-label="Backup-Hilfe anzeigen">i</button>
+        </div>
+        <div id="backupHelpText" class="help-box" hidden>
+          <p>Gesichert wird die LoxEvo-Konfiguration aus <code>data/config.json</code>: Loxone-Zugang, Befehle, Rubriken, Alexa-Bridge, TTS-Einstellungen, Geräte-Seriennummern und Lautstärken.</p>
+          <p>Die Alexa-Cookie-Datei <code>data/Node.txt</code> wird nur exportiert, wenn der Haken gesetzt ist. Das Backup kann sensible Daten enthalten und sollte privat bleiben.</p>
+          <p>Nicht im Backup enthalten sind installierte Pakete wie <code>alexa-remote2</code>, Docker-Images, Logs und temporäre Dateien. Ein normaler Container-Neustart behält diese Daten, solange der Datenordner erhalten bleibt. Bei einer frischen Installation oder gelöschtem Datenordner muss <code>alexa-remote2</code> im Register Wartung erneut installiert werden.</p>
+          <p>Beim Import legt LoxEvo zuerst automatisch eine Sicherung der aktuellen Konfiguration im Datenordner an und spielt danach die Backup-Datei ein.</p>
         </div>
         <div class="backup-grid">
           <div class="backup-card">

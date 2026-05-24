@@ -57,6 +57,8 @@ const backupIncludeCookie = document.querySelector('#backupIncludeCookie');
 const exportBackupBtn = document.querySelector('#exportBackupBtn');
 const importBackupFile = document.querySelector('#importBackupFile');
 const importBackupBtn = document.querySelector('#importBackupBtn');
+const backupHelpBtn = document.querySelector('#backupHelpBtn');
+const backupHelpText = document.querySelector('#backupHelpText');
 
 let config = null;
 let ttsStatus = null;
@@ -84,6 +86,7 @@ setupConfigBtn.addEventListener('click', () => showView('configView'));
 refreshMaintenanceBtn.addEventListener('click', () => loadDependencyStatus(refreshMaintenanceBtn));
 exportBackupBtn?.addEventListener('click', () => exportBackup(exportBackupBtn));
 importBackupBtn?.addEventListener('click', () => importBackup(importBackupBtn));
+backupHelpBtn?.addEventListener('click', () => toggleBackupHelp());
 ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
 refreshTtsDevicesBtn?.addEventListener('click', () => loadTtsDevices(refreshTtsDevicesBtn));
 ttsDefaultVolume?.addEventListener('input', () => {
@@ -690,6 +693,13 @@ function toggleTtsHelp() {
   const nextHidden = !ttsHelpText.hidden;
   ttsHelpText.hidden = nextHidden;
   ttsHelpBtn.setAttribute('aria-expanded', String(!nextHidden));
+}
+
+function toggleBackupHelp() {
+  if (!backupHelpBtn || !backupHelpText) return;
+  const nextHidden = !backupHelpText.hidden;
+  backupHelpText.hidden = nextHidden;
+  backupHelpBtn.setAttribute('aria-expanded', String(!nextHidden));
 }
 
 function showView(viewId) {

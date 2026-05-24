@@ -174,7 +174,7 @@
                 </div>
                 <div id="discoveryHelpText" class="help-box" hidden>
                   <p>Die Alexa-Gerätesuche braucht SSDP/UDP 1900. Auf LoxBerry ist dieser Port oft durch den LoxBerry-SSDP-Dienst belegt. Vorhandene Alexa-Geräte können trotzdem weiter funktionieren; neue Geräte werden dann aber meist nicht gefunden.</p>
-                  <p>Mit <strong>Gerätesuche aktivieren</strong> pausiert der optionale LoxEvo-Host-Helper kurz den LoxBerry-SSDP-Dienst und startet die LoxEvo-Suche. Nach der Suche in der Alexa-App sollte <strong>Gerätesuche beenden</strong> geklickt werden, damit der vorher aktive Dienst wieder gestartet wird und LoxEvo den SSDP-Port freigibt.</p>
+                  <p>Mit <strong>Gerätesuche aktivieren</strong> pausiert der optionale LoxEvo-Host-Helper kurz den LoxBerry-SSDP-Dienst und startet die LoxEvo-Suche. Nach der Suche in der Alexa-App sollte <strong>Gerätesuche beenden</strong> geklickt werden, damit der vorher aktive Dienst wieder gestartet wird. Der Status zeigt danach wieder an, dass UDP 1900 nicht mehr für LoxEvo-Gerätesuche frei ist.</p>
                   <p>Wenn der Host-Helper noch nicht installiert ist, den folgenden Befehl einmalig auf dem LoxBerry ausführen. Das ist nur nötig, wenn UDP 1900 belegt ist und neue Alexa-Geräte gesucht werden sollen.</p>
                   <pre><code>cd /mnt/docker/loxevo
 sudo sh tools/install-discovery-helper.sh</code></pre>

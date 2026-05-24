@@ -692,7 +692,8 @@ function renderDiscoveryStatus() {
   }
 
   if (bridge.discoveryPaused) {
-    discoveryStatus.textContent = 'Gerätesuche ist deaktiviert. Vorhandene Alexa-Geräte können weiter funktionieren.';
+    const portText = describeDiscoveryPortOwner(helper.portOwner);
+    discoveryStatus.textContent = `Gerätesuche ist beendet. ${portText} Vorhandene Alexa-Geräte können weiter funktionieren.`;
     discoveryStatus.className = 'service-status disabled';
     if (startDiscoveryBtn) startDiscoveryBtn.disabled = !helper.available;
     return;
@@ -707,6 +708,20 @@ function renderDiscoveryStatus() {
   discoveryStatus.textContent = 'Gerätesuche ist nicht aktiv. Mit dem Button kann LoxEvo den LoxBerry-SSDP-Dienst kurz pausieren und die Suche starten.';
   discoveryStatus.className = 'service-status disabled';
   if (startDiscoveryBtn) startDiscoveryBtn.disabled = false;
+}
+
+function describeDiscoveryPortOwner(portOwner = '') {
+  const text = String(portOwner || '').toLowerCase();
+  if (!text) {
+    return 'UDP 1900 ist aktuell nicht durch LoxEvo reserviert.';
+  }
+  if (text.includes('loxevo-ssdp')) {
+    return 'UDP 1900 ist aktuell durch LoxEvo belegt.';
+  }
+  if (text.includes('ssdpd') || text.includes('lbssdpd') || text.includes('/opt/loxberry/sbin/ssdpd') || text.includes('perl')) {
+    return 'UDP 1900 ist wieder durch den LoxBerry-SSDP-Dienst belegt.';
+  }
+  return 'UDP 1900 ist durch einen anderen SSDP-Dienst belegt.';
 }
 
 async function runDiscoveryAction(action, button) {

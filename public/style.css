@@ -97,6 +97,29 @@ h2 {
   color: var(--danger);
 }
 
+.system-notice {
+  display: grid;
+  gap: 10px;
+  padding: 14px 18px;
+  border: 1px solid #e8b8b2;
+  border-radius: 8px;
+  background: #fff0ee;
+  color: var(--danger);
+}
+
+.system-notice[hidden] {
+  display: none;
+}
+
+.system-notice strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.system-notice p {
+  color: inherit;
+}
+
 .status-help-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -10,6 +10,7 @@ const dryRunToggle = document.querySelector('#dryRunToggle');
 const modeBanner = document.querySelector('#modeBanner');
 const modeTitle = document.querySelector('#modeTitle');
 const modeText = document.querySelector('#modeText');
+const systemNotice = document.querySelector('#systemNotice');
 const loxoneBaseUrl = document.querySelector('#loxoneBaseUrl');
 const loxoneUsername = document.querySelector('#loxoneUsername');
 const loxonePassword = document.querySelector('#loxonePassword');
@@ -433,14 +434,13 @@ async function loadTtsStatus() {
 
 function renderTtsStatus() {
   const targets = [ttsStatusCard, ttsConfigStatus].filter(Boolean);
-  if (!targets.length) return;
-
   const { text, className } = ttsStatusView();
 
   targets.forEach((target) => {
     target.textContent = text;
     target.className = className;
   });
+  renderSystemNotice();
 }
 
 function ttsStatusView() {
@@ -595,6 +595,7 @@ function renderAlexaBridgeStatus() {
     alexaBridgeStatus.textContent = 'Virtuelle Alexa-Geräte sind deaktiviert.';
     alexaBridgeStatus.className = 'service-status disabled';
     renderAlexaDevices();
+    renderSystemNotice();
     return;
   }
 
@@ -602,6 +603,7 @@ function renderAlexaBridgeStatus() {
     alexaBridgeStatus.textContent = humanizeAlexaBridgeError(status.error);
     alexaBridgeStatus.className = 'service-status error';
     renderAlexaDevices();
+    renderSystemNotice();
     return;
   }
 
@@ -609,6 +611,7 @@ function renderAlexaBridgeStatus() {
     alexaBridgeStatus.textContent = status.bridgeHttp.error;
     alexaBridgeStatus.className = 'service-status error';
     renderAlexaDevices();
+    renderSystemNotice();
     return;
   }
 
@@ -618,6 +621,38 @@ function renderAlexaBridgeStatus() {
   alexaBridgeStatus.textContent = `Bereit: ${devices.length} virtuelle Geräte auf ${status.ip}:${status.port}${ssdpText}${bridgeHttpText}${modeText}.`;
   alexaBridgeStatus.className = 'service-status ready';
   renderAlexaDevices();
+  renderSystemNotice();
+}
+
+function renderSystemNotice() {
+  if (!systemNotice) return;
+
+  const issues = [];
+  if (ttsStatus?.enabled && !ttsStatus.ready) {
+    issues.push({
+      title: 'Alexa TTS ist nicht bereit',
+      text: humanizeTtsStatusError(ttsStatus.error)
+    });
+  }
+
+  if (alexaBridgeInfo?.enabled && (!alexaBridgeInfo.ready || alexaBridgeInfo.bridgeHttp?.error)) {
+    const bridgeText = alexaBridgeInfo.bridgeHttp?.error || humanizeAlexaBridgeError(alexaBridgeInfo.error);
+    issues.push({
+      title: 'Alexa-Gerätesuche ist nicht bereit',
+      text: `${bridgeText} Bereits gefundene Geräte können weiter funktionieren; neue Geräte werden so aber wahrscheinlich nicht gefunden.`
+    });
+  }
+
+  if (!issues.length) {
+    systemNotice.hidden = true;
+    systemNotice.innerHTML = '';
+    return;
+  }
+
+  systemNotice.hidden = false;
+  systemNotice.innerHTML = issues.map((issue) => (
+    `<div><strong>${escapeHtml(issue.title)}</strong><p>${escapeHtml(issue.text)}</p></div>`
+  )).join('');
 }
 
 function humanizeTtsStatusError(errorText = '') {

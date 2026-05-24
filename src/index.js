@@ -660,7 +660,7 @@ async function getPreflightStatus() {
           : 'Es gibt noch keine aktiven Befehle, die Alexa als Geräte finden kann.'),
         preflightCheck(config.alexaBridge?.enabled ? discoveryHelperLevel(discoveryStatus) : 'optional', 'Discovery-Helper', discoveryHelperDetail(discoveryStatus)),
         preflightCheck(config.alexaBridge?.enabled ? 'info' : 'optional', 'Bridge-Info', describeBridgeInfo(alexaBridgeStatus)),
-        preflightCheck(lastAlexaEvent ? eventLevel(lastAlexaEvent) : 'info', 'Letzte Alexa-Aktion', describeEvent(lastAlexaEvent, 'Seit dem letzten Start wurde noch keine Alexa-Geräteaktion protokolliert.'))
+        preflightCheck(lastAlexaEvent ? alexaEventLevel(lastAlexaEvent) : 'info', 'Letzte Alexa-Aktion', describeEvent(lastAlexaEvent, 'Seit dem letzten Start wurde noch keine Alexa-Geräteaktion protokolliert.'))
       ]
     },
     {
@@ -788,6 +788,15 @@ function eventLevel(event) {
   if (event.status === 'error') return 'error';
   if (event.status === 'warning' || event.status === 'ignored') return 'warning';
   return 'info';
+}
+
+function alexaEventLevel(event) {
+  if (!event) return 'info';
+  const text = [event.text, event.error, event.label, event.key].filter(Boolean).join(' ');
+  if ((event.status === 'error' || event.status === 'warning') && isDiscoveryPortIssue(text)) {
+    return 'optional';
+  }
+  return eventLevel(event);
 }
 
 function describeEvent(event, emptyText) {

@@ -1155,7 +1155,7 @@ function preflightHelpText(sectionTitle = '', check = {}) {
     'Alexa TTS|TTS-Sequenzen': 'Zeigt, ob LoxEvo native Alexa-Sequenzen nutzt. Dieser Modus ist für schnelle Sprachausgabe mit Lautstärke wichtig.',
     'Alexa TTS|Letzte TTS-Aktion': 'Zeigt die letzte TTS-, Alarm- oder Lautstärkeaktion seit dem letzten Start.',
     'Virtuelle Alexa-Geräte|Alexa/Hue-HTTP': 'Prüft, ob der lokale Hue-kompatible HTTP-Endpunkt für Alexa läuft. Neuere Echo-Geräte erwarten dafür meist Port 80.',
-    'Virtuelle Alexa-Geräte|Gerätesuche': 'Prüft den SSDP/UDP-1900-Status. Dieser ist vor allem für das Finden neuer Geräte wichtig; bereits gefundene Geräte können weiter funktionieren.',
+    'Virtuelle Alexa-Geräte|Gerätesuche': 'Prüft den SSDP/UDP-1900-Status. Dieser Port wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Für den normalen Betrieb und für bereits gefundene Geräte ist ein belegter Port 1900 kein Problem. Wenn neue Geräte hinzugefügt werden sollen: unter Konfiguration -> Alexa-Gerätesuche kurz aktivieren, in der Alexa-App Geräte suchen und danach die Gerätesuche wieder beenden. Dadurch wird der Zugriff auf SSDP/UDP 1900 nur temporär genutzt und anschließend wieder an die andere Anwendung zurückgegeben.',
     'Virtuelle Alexa-Geräte|Virtuelle Geräte': 'Zeigt, wie viele aktive LoxEvo-Befehle Alexa als virtuelle Geräte angeboten werden.',
     'Virtuelle Alexa-Geräte|Discovery-Helper': 'Prüft, ob der optionale Host-Helper für die Gerätesuche erreichbar ist. Er wird nur benötigt, wenn UDP 1900 durch LoxBerry oder einen anderen Dienst belegt ist.',
     'Virtuelle Alexa-Geräte|Bridge-Info': 'Zeigt technische Basisdaten der lokalen Hue-Bridge-Emulation, zum Beispiel Bridge-ID, Description-URL und Ports.',

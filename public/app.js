@@ -300,7 +300,11 @@ async function exportBackup(button) {
   try {
     const response = await fetch(url, { cache: 'no-store' });
     await ensureOk(response);
-    const blob = await response.blob();
+    const backupPayload = await response.json();
+    if (!isLoxEvoBackupPayload(backupPayload)) {
+      throw new Error('Die Serverantwort ist keine gültige LoxEvo-Backup-Datei. Bitte LoxEvo aktualisieren und erneut exportieren.');
+    }
+    const blob = new Blob([`${JSON.stringify(backupPayload, null, 2)}\n`], { type: 'application/json' });
     downloadBlob(blob, filenameFromResponse(response) || `loxevo-backup-${timestampForFile(new Date())}.json`);
     await loadEvents();
     setButtonFeedback(button, 'success', 'Exportiert');
@@ -372,6 +376,14 @@ function filenameFromResponse(response) {
   const disposition = response.headers.get('content-disposition') || '';
   const match = disposition.match(/filename="([^"]+)"/i);
   return match ? match[1] : '';
+}
+
+function isLoxEvoBackupPayload(payload) {
+  return Boolean(payload && payload.app && payload.formatVersion && payload.exportedAt && isLoxEvoConfigPayload(payload.config));
+}
+
+function isLoxEvoConfigPayload(payload) {
+  return Boolean(payload && typeof payload === 'object' && payload.loxone && (payload.commands || payload.rooms));
 }
 
 function timestampForFile(date) {

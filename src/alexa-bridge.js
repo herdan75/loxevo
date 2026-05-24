@@ -145,6 +145,7 @@ export class AlexaBridgeService {
     if (pathParts[0] !== 'api') return false;
     const reservedApiRoots = new Set([
       'alexa-bridge',
+      'backup',
       'command',
       'config',
       'dependencies',
@@ -152,6 +153,7 @@ export class AlexaBridgeService {
       'dry-run',
       'events',
       'light',
+      'preflight',
       'setup-status',
       'system',
       'tts'

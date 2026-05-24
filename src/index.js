@@ -280,12 +280,19 @@ async function restoreBackup(res, backupPayload) {
 
 function readBackupConfig(payload) {
   if (isPlainObject(payload?.config)) {
+    if (!looksLikeLoxEvoConfig(payload.config)) {
+      throw new Error('Backup enthält keine gültige LoxEvo-Konfiguration.');
+    }
     return structuredClone(payload.config);
   }
-  if (isPlainObject(payload?.server) && isPlainObject(payload?.loxone)) {
+  if (looksLikeLoxEvoConfig(payload)) {
     return structuredClone(payload);
   }
   throw new Error('Backup enthaelt keine gueltige LoxEvo-Konfiguration.');
+}
+
+function looksLikeLoxEvoConfig(value) {
+  return isPlainObject(value) && isPlainObject(value.loxone) && (isPlainObject(value.commands) || isPlainObject(value.rooms));
 }
 
 async function writeCurrentConfigBackup() {

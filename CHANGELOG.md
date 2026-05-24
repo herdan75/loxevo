@@ -9,6 +9,7 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 - Backup-Export und -Import für LoxEvo-Einstellungen ergänzt.
 - Hinweise zur sauberen Deinstallation und zum Erhalt des Datenordners ergänzt.
 - Optionalen Host-Helper für die Alexa-Gerätesuche per Web-UI-Button ergänzt.
+- Lokale Systemprüfung im Register `Wartung` ergänzt.
 - Globale Hinweisleiste für TTS- und Alexa-Gerätesuche-Probleme ergänzt.
 - LAN-IP-Fallback und Port-80-Hinweise für die Alexa-Gerätesuche ergänzt.
 - Doku und UI-Hinweise für den aktuellen Discovery-/TTS-Stand nachgezogen.

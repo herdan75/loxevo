@@ -97,6 +97,12 @@ h2 {
   color: var(--danger);
 }
 
+.service-status.warning {
+  border-color: #edd29a;
+  background: #fff8e8;
+  color: #725000;
+}
+
 .system-notice {
   display: grid;
   gap: 4px;
@@ -271,6 +277,101 @@ h2 {
   margin-top: 4px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.preflight-list {
+  display: grid;
+  gap: 10px;
+}
+
+.preflight-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.preflight-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 14px;
+  cursor: pointer;
+  color: var(--accent-strong);
+}
+
+.preflight-section > summary::marker {
+  color: var(--muted);
+}
+
+.preflight-section-body {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.preflight-check {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfd;
+}
+
+.preflight-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: #eef2f6;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.preflight-check.ok .preflight-marker {
+  background: #ecf8f1;
+  color: #247143;
+}
+
+.preflight-check.error {
+  border-color: #e8b8b2;
+  background: #fff7f6;
+}
+
+.preflight-check.error .preflight-marker {
+  background: #fff0ee;
+  color: var(--danger);
+}
+
+.preflight-check.warning,
+.preflight-check.optional {
+  border-color: #edd29a;
+  background: #fffaf0;
+}
+
+.preflight-check.warning .preflight-marker,
+.preflight-check.optional .preflight-marker {
+  background: #fff4db;
+  color: #835500;
+}
+
+.preflight-check.info .preflight-marker {
+  background: #edf6f8;
+  color: #315b64;
+}
+
+.preflight-check p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .maintenance-list {
@@ -1114,6 +1215,7 @@ pre {
   .form-row.three,
   .form-row.four,
   .backup-grid,
+  .preflight-check,
   .device-card,
   .view,
   .scene-row {

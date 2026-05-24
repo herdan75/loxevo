@@ -304,13 +304,27 @@ Content-Type: application/json
       <section class="panel wide">
         <div class="section-head">
           <div>
+            <h2>Systemprüfung</h2>
+            <p>Aktueller Kurzcheck der lokalen LoxEvo-Installation. Wird nur auf Abruf ausgeführt.</p>
+          </div>
+          <button id="refreshPreflightBtn" type="button" class="secondary">Systemprüfung aktualisieren</button>
+        </div>
+        <div id="preflightSummary" class="service-status">Systemprüfung noch nicht geladen.</div>
+        <div id="preflightChecks" class="preflight-list"></div>
+      </section>
+
+      <section class="panel wide">
+        <div class="section-head">
+          <div>
             <h2>Wartung</h2>
             <p>Versionen prüfen und Updates für LoxEvo-Komponenten verwalten.</p>
           </div>
           <button id="refreshMaintenanceBtn" type="button" class="secondary">Versionen prüfen</button>
         </div>
 
-        <div id="dependencyStatus" class="maintenance-list"></div>
+        <div id="dependencyStatus" class="maintenance-list">
+          <p class="empty">Versionen werden erst geprüft, wenn du den Button klickst.</p>
+        </div>
       </section>
 
       <section class="panel wide">

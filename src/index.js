@@ -1,5 +1,6 @@
 import http from 'node:http';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
@@ -131,6 +132,10 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
 
   if (req.method === 'GET' && pathParts[1] === 'setup-status') {
     return sendJson(res, getSetupStatus());
+  }
+
+  if (req.method === 'GET' && pathParts[1] === 'preflight') {
+    return sendJson(res, await getPreflightStatus());
   }
 
   if (req.method === 'GET' && pathParts[1] === 'tts' && pathParts[2] === 'status') {
@@ -572,6 +577,195 @@ function getSetupStatus() {
     openRequired: openRequired.length,
     checks
   };
+}
+
+async function getPreflightStatus() {
+  const ttsStatus = tts.getStatus();
+  const alexaBridgeStatus = getAlexaBridgeStatus();
+  const discoveryStatus = config.alexaBridge?.enabled
+    ? await getDiscoveryStatus()
+    : { helper: { available: false, ready: false }, alexaBridge: alexaBridgeStatus };
+  const configPath = getConfigPath();
+  const configReadError = await accessError(configPath, constants.R_OK);
+  const configWriteError = await accessError(getConfigDir(), constants.W_OK);
+  const alexaRemoteVersion = await getInstalledPackageVersion('alexa-remote2');
+
+  const sections = [
+    {
+      title: 'LoxEvo',
+      checks: [
+        preflightCheck('ok', 'Web-UI und API', `Läuft auf Port ${config.server?.port || 8080}.`),
+        preflightCheck(configReadError ? 'error' : 'ok', 'Konfiguration lesbar', configReadError || `Datei: ${configPath}`),
+        preflightCheck(configWriteError ? 'error' : 'ok', 'Datenordner beschreibbar', configWriteError || 'Konfiguration, Backup und Cookie-Datei können im Datenordner geschrieben werden.'),
+        preflightCheck('info', 'Betriebsmodus', config.loxone?.dryRun !== false
+          ? 'Dry-Run ist aktiv. Loxone-Befehle werden nur protokolliert.'
+          : 'Live-Modus ist aktiv. Loxone-Befehle werden wirklich an den Miniserver gesendet.')
+      ]
+    },
+    {
+      title: 'Loxone',
+      checks: [
+        preflightCheck(isConfiguredUrl(config.loxone?.baseUrl) ? 'ok' : 'error', 'Miniserver URL', isConfiguredUrl(config.loxone?.baseUrl)
+          ? 'Eine Miniserver-URL ist konfiguriert.'
+          : 'Die Miniserver-URL fehlt oder enthält noch einen Platzhalter.'),
+        preflightCheck(isConfiguredSecret(config.loxone?.username) && isConfiguredSecret(config.loxone?.password) ? 'ok' : 'error', 'Zugangsdaten', isConfiguredSecret(config.loxone?.username) && isConfiguredSecret(config.loxone?.password)
+          ? 'Benutzer und Passwort sind eingetragen.'
+          : 'Benutzer oder Passwort fehlen noch.'),
+        preflightCheck(commandsConfigured(config.commands) || roomsConfigured(config.rooms) ? 'ok' : 'error', 'Befehle', commandsConfigured(config.commands) || roomsConfigured(config.rooms)
+          ? 'Aktive Befehle haben gültige Loxone-Ziele.'
+          : 'Es sind noch keine vollständig konfigurierten aktiven Befehle vorhanden.')
+      ]
+    },
+    {
+      title: 'Alexa TTS',
+      checks: [
+        preflightCheck(config.tts?.enabled ? (ttsStatus.ready ? 'ok' : 'error') : 'optional', 'Alexa-Verbindung', ttsPreflightDetail(ttsStatus)),
+        preflightCheck(config.tts?.enabled ? (alexaRemoteVersion ? 'ok' : 'warning') : 'optional', 'alexa-remote2', alexaRemoteVersion
+          ? `Installiert: ${alexaRemoteVersion}.`
+          : 'Nicht lokal gefunden. Wenn TTS genutzt wird, im Register Wartung installieren.'),
+        preflightCheck(config.tts?.enabled ? (configuredCount(ttsStatus.defaultDevices) > 0 ? 'ok' : 'warning') : 'optional', 'Standard-Geräte', configuredCount(ttsStatus.defaultDevices) > 0
+          ? `${configuredCount(ttsStatus.defaultDevices)} Standard-Gerät(e) konfiguriert.`
+          : 'Für normale TTS-Ausgaben ist kein Standard-Gerät ausgewählt.'),
+        preflightCheck(config.tts?.enabled ? (configuredCount(ttsStatus.alarmDevices) > 0 ? 'ok' : 'info') : 'optional', 'Alarm-Geräte', configuredCount(ttsStatus.alarmDevices) > 0
+          ? `${configuredCount(ttsStatus.alarmDevices)} Alarm-Gerät(e) konfiguriert.`
+          : 'Keine eigenen Alarm-Geräte konfiguriert; LoxEvo nutzt dann die vorhandene Geräteauswahl als Fallback.'),
+        preflightCheck(config.tts?.enabled ? 'info' : 'optional', 'Lautstärke', `Standard ${ttsStatus.defaultVolume ?? config.tts?.defaultVolume ?? 40}%, Alarm ${ttsStatus.alarmVolume ?? config.tts?.alarmVolume ?? 100}%.`)
+      ]
+    },
+    {
+      title: 'Virtuelle Alexa-Geräte',
+      checks: [
+        preflightCheck(config.alexaBridge?.enabled ? bridgeHttpLevel(alexaBridgeStatus) : 'optional', 'Alexa/Hue-HTTP', bridgeHttpDetail(alexaBridgeStatus)),
+        preflightCheck(config.alexaBridge?.enabled ? bridgeDiscoveryLevel(alexaBridgeStatus) : 'optional', 'Gerätesuche', bridgeDiscoveryDetail(alexaBridgeStatus)),
+        preflightCheck(config.alexaBridge?.enabled ? (Number(alexaBridgeStatus.deviceCount) > 0 ? 'ok' : 'warning') : 'optional', 'Virtuelle Geräte', Number(alexaBridgeStatus.deviceCount) > 0
+          ? `${alexaBridgeStatus.deviceCount} aktive Befehle werden Alexa als Geräte angeboten.`
+          : 'Es gibt noch keine aktiven Befehle, die Alexa als Geräte finden kann.'),
+        preflightCheck(config.alexaBridge?.enabled ? discoveryHelperLevel(discoveryStatus) : 'optional', 'Discovery-Helper', discoveryHelperDetail(discoveryStatus))
+      ]
+    },
+    {
+      title: 'Backup',
+      checks: [
+        preflightCheck(configWriteError ? 'error' : 'ok', 'Export und Import', configWriteError || 'Backups können exportiert und Import-Sicherungen im Datenordner angelegt werden.'),
+        preflightCheck('info', 'Alexa-Cookie', 'Die Cookie-Datei wird nur exportiert, wenn der Haken beim Backup gesetzt ist.')
+      ]
+    }
+  ];
+
+  return {
+    checkedAt: new Date().toISOString(),
+    summary: summarizePreflight(sections),
+    sections
+  };
+}
+
+function preflightCheck(level, label, detail) {
+  return { level, label, detail };
+}
+
+async function accessError(path, mode) {
+  try {
+    await access(path, mode);
+    return null;
+  } catch (error) {
+    return error.message;
+  }
+}
+
+function summarizePreflight(sections) {
+  const checks = sections.flatMap((section) => section.checks || []);
+  const counts = checks.reduce((result, check) => {
+    result[check.level] = (result[check.level] || 0) + 1;
+    return result;
+  }, {});
+  const level = counts.error ? 'error' : counts.warning ? 'warning' : 'ok';
+  const text = counts.error
+    ? `${counts.error} kritische Prüfung(en) offen.`
+    : counts.warning
+      ? `${counts.warning} Hinweis(e) prüfen. Grundfunktionen können trotzdem laufen.`
+      : 'Alle wichtigen Prüfungen sind in Ordnung.';
+
+  return { level, text, counts, total: checks.length };
+}
+
+function ttsPreflightDetail(status) {
+  if (!config.tts?.enabled) {
+    return 'TTS ist deaktiviert und muss nur eingerichtet werden, wenn Alexa-Sprachausgabe genutzt wird.';
+  }
+  if (status.ready) {
+    return status.nativeSequences
+      ? 'TTS ist bereit und nutzt native Sequenzen für schnelle Sprachausgabe.'
+      : 'TTS ist bereit.';
+  }
+  return status.error || 'TTS ist aktiviert, aber noch nicht bereit.';
+}
+
+function bridgeHttpLevel(status) {
+  if (status.bridgeHttp?.error) return 'error';
+  if (status.bridgeHttp?.ready || Number(status.port) === Number(config.server?.port)) return 'ok';
+  return 'warning';
+}
+
+function bridgeHttpDetail(status) {
+  if (!status.enabled) {
+    return 'Virtuelle Alexa-Geräte sind deaktiviert.';
+  }
+  if (status.bridgeHttp?.error) {
+    return status.bridgeHttp.error;
+  }
+  if (status.bridgeHttp?.ready) {
+    return `Alexa/Hue-HTTP läuft auf Port ${status.bridgeHttp.port}.`;
+  }
+  if (Number(status.port) === Number(config.server?.port)) {
+    return `Alexa/Hue nutzt denselben Port wie die Web-UI/API (${status.port}).`;
+  }
+  return 'Alexa/Hue-HTTP ist noch nicht bereit.';
+}
+
+function bridgeDiscoveryLevel(status) {
+  if (status.ready) return 'ok';
+  if (status.discoveryPaused || isDiscoveryPortIssue(status.error)) return 'optional';
+  if (status.error) return 'error';
+  return 'warning';
+}
+
+function bridgeDiscoveryDetail(status) {
+  if (!status.enabled) {
+    return 'Virtuelle Alexa-Geräte sind deaktiviert.';
+  }
+  if (status.ready) {
+    return 'SSDP/UDP 1900 ist für die Gerätesuche aktiv. Nach der Alexa-Suche bitte wieder beenden.';
+  }
+  if (status.discoveryPaused || isDiscoveryPortIssue(status.error)) {
+    return 'SSDP/UDP 1900 ist aktuell nicht für LoxEvo frei. Vorhandene Geräte funktionieren weiter; neue Geräte werden erst nach Aktivieren der Gerätesuche gefunden.';
+  }
+  return status.error || 'Gerätesuche ist noch nicht bereit.';
+}
+
+function discoveryHelperLevel(status) {
+  const helper = status?.helper || {};
+  const bridge = status?.alexaBridge || {};
+  if (bridge.ready) return 'ok';
+  if (helper.available) return 'ok';
+  return 'optional';
+}
+
+function discoveryHelperDetail(status) {
+  const helper = status?.helper || {};
+  const bridge = status?.alexaBridge || {};
+  if (bridge.ready) {
+    return 'Gerätesuche ist aktuell aktiv.';
+  }
+  if (helper.available) {
+    return helper.portOwner
+      ? `Host-Helper ist erreichbar. UDP 1900: ${helper.portOwner}.`
+      : 'Host-Helper ist erreichbar und kann die Gerätesuche starten.';
+  }
+  return helper.error || 'Host-Helper ist nicht installiert oder nicht erreichbar. Das ist nur für neue Alexa-Gerätesuche bei belegtem UDP 1900 nötig.';
+}
+
+function configuredCount(values) {
+  return Array.isArray(values) ? values.filter(isConfiguredValue).length : 0;
 }
 
 async function getDependencyStatus(name) {

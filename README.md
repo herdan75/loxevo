@@ -60,7 +60,8 @@ Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCoo
 Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen lokalen Login-Proxy. LoxEvo setzt dafür automatisch die LAN-IP des LoxBerry; bei Bedarf kann `tts.proxyOwnIp` und `tts.proxyPort` in der Web-UI angepasst werden.
 Für den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
-Die Web-UI zeigt unter `Wartung` die installierte `alexa-remote2`-Version, verfügbare npm-Versionen und kann Installation oder Update im laufenden Container anstoßen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
+Die Web-UI zeigt unter `Wartung` eine lokale Systemprüfung für Konfiguration, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Diese Prüfung läuft nur beim Öffnen des Registers oder per Button und erzeugt keine dauernde Hintergrundlast.
+Im gleichen Register kann LoxEvo per Button die installierte `alexa-remote2`-Version und verfügbare npm-Versionen prüfen und Installation oder Update im laufenden Container anstoßen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
 Im gleichen Register können die Einstellungen als Backup exportiert und später wieder importiert werden. Der Export enthält standardmäßig die LoxEvo-Konfiguration; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden.
 Backup-Dateien können sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten und sollten deshalb privat bleiben.
 
@@ -89,7 +90,7 @@ Die Oberfläche ist in klare Bereiche gegliedert:
 - `Testen`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI prüfen
 - `Externe Aufrufe`: fertige URLs für Alexa-Routinen, Loxone und optionale externe Tools testen und kopieren
 - `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
-- `Wartung`: Paketversionen prüfen, `alexa-remote2` verwalten, Backup exportieren und Backup importieren
+- `Wartung`: Systemprüfung ausführen, Paketversionen prüfen, `alexa-remote2` verwalten, Backup exportieren und Backup importieren
 - `Protokoll`: zuletzt simulierte oder gesendete Aktionen ansehen
 
 Die JSON-Ansicht bleibt als Expertenmodus erhalten.

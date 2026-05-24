@@ -58,6 +58,9 @@ const setupChecks = document.querySelector('#setupChecks');
 const setupConfigBtn = document.querySelector('#setupConfigBtn');
 const refreshMaintenanceBtn = document.querySelector('#refreshMaintenanceBtn');
 const dependencyStatus = document.querySelector('#dependencyStatus');
+const refreshPreflightBtn = document.querySelector('#refreshPreflightBtn');
+const preflightSummary = document.querySelector('#preflightSummary');
+const preflightChecks = document.querySelector('#preflightChecks');
 const backupIncludeCookie = document.querySelector('#backupIncludeCookie');
 const exportBackupBtn = document.querySelector('#exportBackupBtn');
 const importBackupFile = document.querySelector('#importBackupFile');
@@ -69,6 +72,7 @@ let config = null;
 let ttsStatus = null;
 let setupStatus = null;
 let dependencyInfo = null;
+let preflightInfo = null;
 let alexaBridgeInfo = null;
 let discoveryInfo = null;
 let ttsDevices = [];
@@ -90,6 +94,7 @@ refreshIntegrationsBtn.addEventListener('click', () => {
 });
 setupConfigBtn.addEventListener('click', () => showView('configView'));
 refreshMaintenanceBtn.addEventListener('click', () => loadDependencyStatus(refreshMaintenanceBtn));
+refreshPreflightBtn?.addEventListener('click', () => loadPreflightStatus(refreshPreflightBtn));
 exportBackupBtn?.addEventListener('click', () => exportBackup(exportBackupBtn));
 importBackupBtn?.addEventListener('click', () => importBackup(importBackupBtn));
 backupHelpBtn?.addEventListener('click', () => toggleBackupHelp());
@@ -127,7 +132,6 @@ async function load() {
     await loadAlexaBridgeStatus();
     await loadDiscoveryStatus();
     await loadSetupStatus();
-    loadDependencyStatus();
     renderCommands();
     renderCommandEditor();
     renderIntegrations();
@@ -337,7 +341,7 @@ async function importBackup(button) {
     await loadAlexaBridgeStatus();
     await loadDiscoveryStatus();
     await loadSetupStatus();
-    await loadDependencyStatus();
+    await loadPreflightStatus();
     renderIntegrations();
     await loadEvents();
     if (importBackupFile) importBackupFile.value = '';
@@ -870,8 +874,106 @@ function showView(viewId) {
     loadEvents();
   }
   if (viewId === 'maintenanceView') {
-    loadDependencyStatus();
+    loadPreflightStatus();
   }
+}
+
+async function loadPreflightStatus(button) {
+  if (!preflightSummary || !preflightChecks) return;
+  if (button) setButtonFeedback(button, 'pending', 'Prüft');
+  preflightSummary.textContent = 'Systemprüfung läuft...';
+  preflightSummary.className = 'service-status';
+  try {
+    const response = await fetch(`/api/preflight?ts=${Date.now()}`, { cache: 'no-store' });
+    await ensureOk(response);
+    preflightInfo = await response.json();
+    renderPreflightStatus();
+    if (button) {
+      setButtonFeedback(button, 'success', 'Geprüft');
+      showToast('Systemprüfung aktualisiert', 'ok');
+    }
+  } catch (error) {
+    preflightInfo = null;
+    preflightSummary.textContent = `Systemprüfung konnte nicht geladen werden: ${error.message}`;
+    preflightSummary.className = 'service-status error';
+    preflightChecks.innerHTML = '';
+    if (button) {
+      setButtonFeedback(button, 'error', 'Fehler');
+      showToast(error.message, 'error');
+    }
+  }
+}
+
+function renderPreflightStatus() {
+  if (!preflightSummary || !preflightChecks || !preflightInfo) return;
+  const summary = preflightInfo.summary || {};
+  const counts = summary.counts || {};
+  const countText = [
+    `${counts.ok || 0} OK`,
+    `${counts.warning || 0} prüfen`,
+    `${counts.optional || 0} optional`,
+    `${counts.error || 0} Fehler`
+  ].join(' · ');
+
+  preflightSummary.textContent = `${summary.text || 'Systemprüfung abgeschlossen.'} ${countText}. Geprüft: ${formatDateTime(preflightInfo.checkedAt)}.`;
+  preflightSummary.className = `service-status ${preflightServiceClass(summary.level)}`;
+  preflightChecks.innerHTML = '';
+
+  (preflightInfo.sections || []).forEach((section) => {
+    const card = document.createElement('details');
+    card.className = 'preflight-section';
+    card.open = sectionHasAction(section);
+
+    const summaryEl = document.createElement('summary');
+    const title = document.createElement('strong');
+    title.textContent = section.title || 'Prüfung';
+    const badge = document.createElement('span');
+    badge.className = 'count-badge';
+    badge.textContent = String((section.checks || []).length);
+    summaryEl.append(title, badge);
+
+    const body = document.createElement('div');
+    body.className = 'preflight-section-body';
+    (section.checks || []).forEach((check) => {
+      const row = document.createElement('div');
+      row.className = `preflight-check ${check.level || 'info'}`;
+
+      const marker = document.createElement('span');
+      marker.className = 'preflight-marker';
+      marker.textContent = preflightLevelLabel(check.level);
+
+      const content = document.createElement('div');
+      const label = document.createElement('strong');
+      label.textContent = check.label || 'Prüfung';
+      const detail = document.createElement('p');
+      detail.textContent = check.detail || '';
+      content.append(label, detail);
+
+      row.append(marker, content);
+      body.append(row);
+    });
+
+    card.append(summaryEl, body);
+    preflightChecks.append(card);
+  });
+}
+
+function sectionHasAction(section) {
+  return (section.checks || []).some((check) => ['error', 'warning'].includes(check.level));
+}
+
+function preflightServiceClass(level) {
+  if (level === 'error') return 'error';
+  if (level === 'warning') return 'warning';
+  return 'ready';
+}
+
+function preflightLevelLabel(level) {
+  if (level === 'ok') return 'OK';
+  if (level === 'error') return 'Fehler';
+  if (level === 'warning') return 'Prüfen';
+  if (level === 'optional') return 'Optional';
+  return 'Info';
 }
 
 async function loadDependencyStatus(button) {

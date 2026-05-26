@@ -52,6 +52,18 @@ Web-UI:
 http://<loxberry>:8080
 ```
 
+Optionaler Admin-Zugriffsschutz:
+
+```yaml
+environment:
+  LOXEVO_ADMIN_TOKEN: "bitte-aendern"
+```
+
+Wenn `LOXEVO_ADMIN_TOKEN` gesetzt ist, schützt LoxEvo sensible Admin-Funktionen wie Konfiguration, Backup, Restore, Dependency-Update, Neustart und Dry-Run-Umschaltung. Loxone-Befehle, TTS, Health, Events, Setup-Status, Preflight und die Alexa/Hue-Bridge bleiben bewusst offen, damit bestehende Automationen weiter funktionieren.
+
+Alternativ kann der Schutz in der lokalen `config.json` über `security.adminTokenEnabled` und `security.adminToken` aktiviert werden. Ein gesetztes `LOXEVO_ADMIN_TOKEN` aus der Docker-Umgebung hat Vorrang.
+
+
 In `data/config.json` ist `loxone.dryRun` standardmäßig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie im Protokoll, sendet aber noch nichts an Loxone.
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 

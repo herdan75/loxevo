@@ -1,3 +1,35 @@
+const ADMIN_TOKEN_STORAGE_KEY = 'loxevoAdminToken';
+const ADMIN_TOKEN_HEADER = 'X-LoxEvo-Admin-Token';
+const originalFetch = window.fetch.bind(window);
+
+window.fetch = async function loxevoFetch(input, init = {}) {
+  let response = await originalFetch(input, withAdminToken(init));
+  if (response.status !== 401 || response.headers.get('x-loxevo-admin-token') !== 'required') {
+    return response;
+  }
+
+  const token = window.prompt('Admin-Token erforderlich:');
+  if (!token) return response;
+
+  localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token.trim());
+  response = await originalFetch(input, withAdminToken(init));
+  if (response.status === 401) {
+    localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+  }
+  return response;
+};
+
+function withAdminToken(init = {}) {
+  const token = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+  if (!token) return init;
+
+  const next = { ...init };
+  const headers = new Headers(next.headers || {});
+  headers.set(ADMIN_TOKEN_HEADER, token);
+  next.headers = headers;
+  return next;
+}
+
 const roomsEl = document.querySelector('#rooms');
 const configEditor = document.querySelector('#configEditor');
 const ttsText = document.querySelector('#ttsText');

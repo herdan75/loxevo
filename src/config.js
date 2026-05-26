@@ -113,4 +113,7 @@ function normalizeConfig(config) {
   config.discovery.helperUrl ||= 'http://127.0.0.1:18091';
   config.discovery.helperToken ||= '';
   config.discovery.helperTimeoutMs = Number(config.discovery.helperTimeoutMs || 5000);
+  config.security ||= {};
+  config.security.adminTokenEnabled = config.security.adminTokenEnabled === true;
+  config.security.adminToken = String(config.security.adminToken || '');
 }

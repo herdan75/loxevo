@@ -8,5 +8,8 @@ services:
     environment:
       CONFIG_PATH: /config/config.json
       TZ: Europe/Zurich
+      # Optional: schützt Admin-Funktionen wie Konfiguration, Backup, Restore und Neustart.
+      # Leer oder nicht gesetzt = Schutz aus, gesetzt = Schutz ein.
+      # LOXEVO_ADMIN_TOKEN: "bitte-aendern
     volumes:
       - ./data:/config

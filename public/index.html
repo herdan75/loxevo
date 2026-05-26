@@ -336,8 +336,19 @@ Content-Type: application/json
           <button id="adminSecurityHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="adminSecurityHelpText" aria-label="Admin-Schutz-Hilfe anzeigen">i</button>
         </div>
         <div id="adminSecurityHelpText" class="help-box" hidden>
-          <p>Der Admin-Schutz betrifft Konfiguration, Backup/Restore, Neustart, <code>alexa-remote2</code>-Update und Dry-Run-Umschaltung. Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Aufrufe, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Automationen weiter funktionieren.</p>
-          <p>Wenn der Schutz in der Web-UI aktiviert wird, speichert LoxEvo nur einen Hash im Datenordner. Der Token selbst wird nicht in <code>config.json</code> gespeichert und nicht im normalen Backup exportiert. Ein gesetztes <code>LOXEVO_ADMIN_TOKEN</code> aus Docker hat Vorrang und kann nur dort geändert werden.</p>
+          <p><strong>Wichtig:</strong> Die Web-UI lädt beim Öffnen automatisch die Konfiguration über <code>/api/config</code>. Deshalb wird bei aktivem Admin-Schutz bereits beim Öffnen der Web-UI der Admin-Token abgefragt.</p>
+
+           <p>Geschützt sind unter anderem:
+          Konfiguration, Backup/Restore, Neustart, <code>alexa-remote2</code>-Update, Dry-Run-Umschaltung und die Admin-Token-Verwaltung.</p>
+
+          <p>Der Token wird absichtlich nur temporär im aktuellen Browser-Tab gespeichert (<code>sessionStorage</code>). Nach Schließen des Tabs oder Browsers muss der Token erneut eingegeben werden. Der Token wird nicht dauerhaft im Browser gespeichert und nicht an Alexa, Loxone oder andere externe Systeme weitergegeben.</p>
+
+          <p>Bewusst weiterhin ohne Admin-Token erreichbar bleiben:
+          Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Aufrufe, <code>/health</code>, Protokoll, Einrichtung und Systemprüfung. Dadurch funktionieren bestehende Alexa-, Loxone-, Home-Assistant- oder Node-RED-Automationen weiterhin ohne zusätzliche Anpassungen.</p>
+
+          <p>Wenn der Schutz über die Web-UI aktiviert wird, speichert LoxEvo nur einen kryptographischen Hash im Datenordner. Der eigentliche Token wird nicht im Klartext gespeichert und nicht im normalen Backup exportiert.</p>
+
+          <p>Ein gesetztes <code>LOXEVO_ADMIN_TOKEN</code> aus Docker oder der Container-Umgebung hat Vorrang und kann ausschließlich dort geändert oder entfernt werden.</p>
         </div>
         <div id="adminSecurityStatus" class="service-status">Admin-Schutz wird geladen...</div>
         <div class="backup-grid admin-security-grid">

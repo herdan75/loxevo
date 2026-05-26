@@ -67,6 +67,13 @@ const importBackupFile = document.querySelector('#importBackupFile');
 const importBackupBtn = document.querySelector('#importBackupBtn');
 const backupHelpBtn = document.querySelector('#backupHelpBtn');
 const backupHelpText = document.querySelector('#backupHelpText');
+const adminSecurityStatus = document.querySelector('#adminSecurityStatus');
+const adminSecurityHelpBtn = document.querySelector('#adminSecurityHelpBtn');
+const adminSecurityHelpText = document.querySelector('#adminSecurityHelpText');
+const adminTokenInput = document.querySelector('#adminTokenInput');
+const adminTokenRepeatInput = document.querySelector('#adminTokenRepeatInput');
+const saveAdminTokenBtn = document.querySelector('#saveAdminTokenBtn');
+const disableAdminTokenBtn = document.querySelector('#disableAdminTokenBtn');
 
 let config = null;
 let ttsStatus = null;
@@ -76,6 +83,7 @@ let preflightInfo = null;
 let alexaBridgeInfo = null;
 let discoveryInfo = null;
 let ttsDevices = [];
+let adminSecurityInfo = null;
 const ADMIN_TOKEN_STORAGE_KEY = 'loxevoAdminToken';
 
 load();
@@ -99,6 +107,9 @@ refreshPreflightBtn?.addEventListener('click', () => loadPreflightStatus(refresh
 exportBackupBtn?.addEventListener('click', () => exportBackup(exportBackupBtn));
 importBackupBtn?.addEventListener('click', () => importBackup(importBackupBtn));
 backupHelpBtn?.addEventListener('click', () => toggleBackupHelp());
+adminSecurityHelpBtn?.addEventListener('click', () => toggleAdminSecurityHelp());
+saveAdminTokenBtn?.addEventListener('click', () => saveAdminToken(saveAdminTokenBtn));
+disableAdminTokenBtn?.addEventListener('click', () => disableAdminToken(disableAdminTokenBtn));
 ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
 discoveryHelpBtn?.addEventListener('click', () => toggleDiscoveryHelp());
 startDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('start', startDiscoveryBtn));
@@ -134,6 +145,7 @@ async function load() {
     await loadAlexaBridgeStatus();
     await loadDiscoveryStatus();
     await loadSetupStatus();
+    await loadAdminSecurityStatus();
     await loadDependencyStatus();
     renderCommands();
     renderCommandEditor();
@@ -363,6 +375,100 @@ async function importBackup(button) {
   }
 }
 
+async function loadAdminSecurityStatus() {
+  if (!adminSecurityStatus) return;
+  try {
+    const response = await fetch('/api/admin/status', { cache: 'no-store' });
+    await ensureOk(response);
+    adminSecurityInfo = await response.json();
+    renderAdminSecurityStatus();
+  } catch (error) {
+    adminSecurityInfo = null;
+    adminSecurityStatus.className = 'service-status error';
+    adminSecurityStatus.textContent = `Admin-Schutz konnte nicht geladen werden: ${error.message}`;
+  }
+}
+
+function renderAdminSecurityStatus() {
+  if (!adminSecurityStatus) return;
+  const status = adminSecurityInfo || {};
+  adminSecurityStatus.className = status.enabled ? 'service-status ready' : 'service-status disabled';
+  adminSecurityStatus.textContent = status.message || 'Admin-Schutz-Status unbekannt.';
+
+  const envManaged = status.enabled && status.source === 'environment';
+  if (saveAdminTokenBtn) {
+    saveAdminTokenBtn.disabled = Boolean(envManaged);
+    saveAdminTokenBtn.textContent = status.enabled ? 'Token ändern' : 'Admin-Schutz aktivieren';
+  }
+  if (disableAdminTokenBtn) {
+    disableAdminTokenBtn.disabled = Boolean(!status.enabled || envManaged);
+  }
+  if (adminTokenInput) adminTokenInput.disabled = Boolean(envManaged);
+  if (adminTokenRepeatInput) adminTokenRepeatInput.disabled = Boolean(envManaged);
+}
+
+async function saveAdminToken(button) {
+  const token = String(adminTokenInput?.value || '').trim();
+  const repeat = String(adminTokenRepeatInput?.value || '').trim();
+  if (token.length < 8) {
+    showToast('Der Admin-Token muss mindestens 8 Zeichen lang sein.', 'error');
+    return;
+  }
+  if (token !== repeat) {
+    showToast('Die eingegebenen Tokens stimmen nicht überein.', 'error');
+    return;
+  }
+
+  setButtonFeedback(button, 'pending', 'Speichert');
+  try {
+    const response = await adminFetch('/api/admin/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    await ensureOk(response);
+    const result = await response.json();
+    adminSecurityInfo = result.status;
+    sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+    if (adminTokenInput) adminTokenInput.value = '';
+    if (adminTokenRepeatInput) adminTokenRepeatInput.value = '';
+    renderAdminSecurityStatus();
+    await loadPreflightStatus();
+    await loadEvents();
+    setButtonFeedback(button, 'success', 'Gespeichert');
+    showToast('Admin-Schutz gespeichert', 'ok');
+  } catch (error) {
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
+}
+
+async function disableAdminToken(button) {
+  if (!window.confirm('Admin-Schutz deaktivieren? Sensible Web-UI-Aktionen sind danach ohne Token erreichbar.')) {
+    return;
+  }
+  setButtonFeedback(button, 'pending', 'Deaktiviert');
+  try {
+    const response = await adminFetch('/api/admin/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ enabled: false })
+    });
+    await ensureOk(response);
+    const result = await response.json();
+    adminSecurityInfo = result.status;
+    sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+    renderAdminSecurityStatus();
+    await loadPreflightStatus();
+    await loadEvents();
+    setButtonFeedback(button, 'success', 'Deaktiviert');
+    showToast('Admin-Schutz deaktiviert', 'ok');
+  } catch (error) {
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -405,7 +511,7 @@ async function adminFetch(url, options = {}) {
   const payload = await response.clone().json().catch(() => ({}));
   if (payload.code !== 'admin_token_required') return response;
 
-  const token = window.prompt('Admin-Token erforderlich. Bitte LOXEVO_ADMIN_TOKEN eingeben:');
+  const token = window.prompt('Admin-Token erforderlich. Bitte den LoxEvo Admin-Token eingeben:');
   if (!token) return response;
 
   sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token.trim());
@@ -946,6 +1052,13 @@ function toggleBackupHelp() {
   backupHelpBtn.setAttribute('aria-expanded', String(!nextHidden));
 }
 
+function toggleAdminSecurityHelp() {
+  if (!adminSecurityHelpBtn || !adminSecurityHelpText) return;
+  const nextHidden = !adminSecurityHelpText.hidden;
+  adminSecurityHelpText.hidden = nextHidden;
+  adminSecurityHelpBtn.setAttribute('aria-expanded', String(!nextHidden));
+}
+
 function toggleDiscoveryHelp() {
   if (!discoveryHelpBtn || !discoveryHelpText) return;
   const nextHidden = !discoveryHelpText.hidden;
@@ -965,6 +1078,7 @@ function showView(viewId) {
   }
   if (viewId === 'maintenanceView') {
     loadPreflightStatus();
+    loadAdminSecurityStatus();
     loadDependencyStatus();
   }
 }
@@ -1022,7 +1136,8 @@ function buildClientPreflightStatus() {
       checks: [
         preflightRow('info', 'Web-UI und API', `Web-UI läuft auf Port ${config.server?.port || 8080}.`),
         preflightRow('info', 'Diagnosequelle', 'Server-Details konnten nicht geladen werden; diese Ansicht nutzt den lokalen Browserstatus.'),
-        preflightRow('info', 'Ports', `Web-UI/API ${config.server?.port || 8080}, Alexa/Hue ${config.alexaBridge?.advertisePort || 80}.`)
+        preflightRow('info', 'Ports', `Web-UI/API ${config.server?.port || 8080}, Alexa/Hue ${config.alexaBridge?.advertisePort || 80}.`),
+        preflightRow(adminSecurityInfo?.enabled ? 'ok' : 'info', 'Admin-Schutz', adminSecurityInfo?.message || 'Admin-Schutz-Status wurde noch nicht geladen.')
       ]
     },
     {
@@ -1218,6 +1333,7 @@ function preflightHelpText(sectionTitle = '', check = {}) {
     'LoxEvo|Laufzeit': 'Zeigt, seit wann der aktuelle Prozess läuft und mit welcher Node.js-Version er gestartet wurde. Nach einem Neustart beginnt diese Laufzeit neu.',
     'LoxEvo|Konfiguration lesbar': 'Prüft, ob LoxEvo die gespeicherte Konfigurationsdatei lesen kann. Ohne diese Datei kann die Oberfläche keine Einstellungen laden.',
     'LoxEvo|Datenordner beschreibbar': 'Prüft, ob LoxEvo im Datenordner schreiben darf. Das ist nötig für Speichern, Backup, Import-Sicherung und Cookie-Dateien.',
+    'LoxEvo|Admin-Schutz': 'Zeigt, ob sensible Web-UI-Aktionen durch einen Admin-Token geschützt sind. Alexa-/Hue-Bridge, Loxone-Befehle und TTS-Aufrufe bleiben bewusst offen, damit bestehende Automationen weiter funktionieren.',
     'LoxEvo|Datenhaltung': 'Erklärt, wo LoxEvo seine persistenten Daten erwartet. Docker-Neustarts sind unkritisch, solange dieser Datenordner erhalten bleibt.',
     'LoxEvo|Diagnosequelle': 'Dieser Hinweis erscheint nur, wenn Detaildaten vom Server nicht geladen wurden und die Weboberfläche auf lokale Browserdaten zurückfällt.',
     'LoxEvo|Ports': 'Zeigt die wichtigsten Ports aus der Konfiguration: Web-UI/API und den separaten Alexa/Hue-Port für virtuelle Geräte.',

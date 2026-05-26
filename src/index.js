@@ -1,8 +1,8 @@
 import http from 'node:http';
 import { constants } from 'node:fs';
-import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { timingSafeEqual } from 'node:crypto';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,7 +28,8 @@ let bridgeHttpStatus = { enabled: false, ready: false, error: null, port: null }
 const events = [];
 const startedAt = new Date();
 const MAX_REQUEST_BODY_SIZE = 1024 * 1024 * 2;
-const ADMIN_TOKEN = String(process.env.LOXEVO_ADMIN_TOKEN || '').trim();
+const ENV_ADMIN_TOKEN = String(process.env.LOXEVO_ADMIN_TOKEN || '').trim();
+let adminSecurity = await loadAdminSecurity();
 const LOXONE_TTS_RESERVED_PATHS = new Set([
   'admin',
   'api',
@@ -149,6 +150,18 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
     return sendJson(res, await getPreflightStatus());
   }
 
+  if (req.method === 'GET' && pathParts[1] === 'admin' && pathParts[2] === 'status') {
+    return sendJson(res, getAdminSecurityStatus());
+  }
+
+  if (req.method === 'POST' && pathParts[1] === 'admin' && pathParts[2] === 'token') {
+    try {
+      return await updateAdminToken(res, parseJson(await readRequestBody()));
+    } catch (error) {
+      return sendJson(res, { ok: false, error: error.message }, 400);
+    }
+  }
+
   if (req.method === 'GET' && pathParts[1] === 'tts' && pathParts[2] === 'status') {
     return sendJson(res, tts.getStatus());
   }
@@ -239,13 +252,14 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
 }
 
 function requiresAdminToken(req, pathParts) {
-  if (!ADMIN_TOKEN) return false;
+  if (!isAdminProtectionEnabled()) return false;
 
   const method = String(req.method || '').toUpperCase();
   const resource = pathParts[1] || '';
   const action = pathParts[2] || '';
   const subAction = pathParts[3] || '';
 
+  if (method === 'POST' && resource === 'admin' && action === 'token') return true;
   if (method === 'GET' && resource === 'config') return true;
   if (method === 'PUT' && resource === 'config') return true;
   if (method === 'GET' && resource === 'backup') return true;
@@ -260,7 +274,8 @@ function requiresAdminToken(req, pathParts) {
 function isAdminAuthorized(req) {
   const token = readAdminToken(req);
   if (!token) return false;
-  return safeTokenEquals(token, ADMIN_TOKEN);
+  if (ENV_ADMIN_TOKEN) return safeTokenEquals(token, ENV_ADMIN_TOKEN);
+  return verifyStoredAdminToken(token);
 }
 
 function readAdminToken(req) {
@@ -281,6 +296,112 @@ function safeTokenEquals(actual, expected) {
   const expectedBuffer = Buffer.from(String(expected));
   if (actualBuffer.length !== expectedBuffer.length) return false;
   return timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function isAdminProtectionEnabled() {
+  return Boolean(ENV_ADMIN_TOKEN || adminSecurity?.enabled);
+}
+
+function getAdminSecurityStatus() {
+  const source = ENV_ADMIN_TOKEN ? 'environment' : adminSecurity?.enabled ? 'ui' : 'none';
+  return {
+    enabled: isAdminProtectionEnabled(),
+    source,
+    manageable: !ENV_ADMIN_TOKEN,
+    message: describeAdminSecurity(source)
+  };
+}
+
+function describeAdminSecurity(source) {
+  if (source === 'environment') {
+    return 'Admin-Schutz ist über LOXEVO_ADMIN_TOKEN aktiv und wird außerhalb der Web-UI verwaltet.';
+  }
+  if (source === 'ui') {
+    return 'Admin-Schutz ist aktiv und wird über die Web-UI verwaltet.';
+  }
+  return 'Admin-Schutz ist deaktiviert. Sensible Web-UI-Aktionen sind ohne Token erreichbar.';
+}
+
+async function updateAdminToken(res, payload) {
+  if (ENV_ADMIN_TOKEN) {
+    return sendJson(res, {
+      ok: false,
+      error: 'Admin-Schutz wird über LOXEVO_ADMIN_TOKEN verwaltet und kann in der Web-UI nicht geändert werden.'
+    }, 409);
+  }
+
+  if (payload?.enabled === false || payload?.action === 'disable') {
+    await removeAdminToken();
+    adminSecurity = { enabled: false };
+    sessionAdminEvent('disabled');
+    return sendJson(res, { ok: true, status: getAdminSecurityStatus() });
+  }
+
+  const token = String(payload?.token || '').trim();
+  if (token.length < 8) {
+    throw new Error('Der Admin-Token muss mindestens 8 Zeichen lang sein.');
+  }
+
+  adminSecurity = createAdminTokenRecord(token);
+  await writeAdminSecurity(adminSecurity);
+  sessionAdminEvent('updated');
+  return sendJson(res, { ok: true, status: getAdminSecurityStatus() });
+}
+
+function sessionAdminEvent(status) {
+  addEvent({
+    type: 'admin-security',
+    status,
+    text: status === 'disabled'
+      ? 'Admin-Schutz wurde deaktiviert.'
+      : 'Admin-Schutz wurde aktualisiert.'
+  });
+}
+
+async function loadAdminSecurity() {
+  try {
+    const payload = JSON.parse(await readFile(getAdminTokenPath(), 'utf8'));
+    if (payload?.version === 1 && payload?.salt && payload?.key) {
+      return { enabled: true, ...payload };
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.warn(`Admin-Schutz konnte nicht gelesen werden: ${error.message}`);
+    }
+  }
+  return { enabled: false };
+}
+
+async function writeAdminSecurity(record) {
+  const tokenPath = getAdminTokenPath();
+  await mkdir(dirname(tokenPath), { recursive: true });
+  await writeFile(tokenPath, `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+}
+
+async function removeAdminToken() {
+  await rm(getAdminTokenPath(), { force: true });
+}
+
+function createAdminTokenRecord(token) {
+  const salt = randomBytes(16).toString('hex');
+  return {
+    enabled: true,
+    version: 1,
+    algorithm: 'scrypt',
+    salt,
+    key: hashAdminToken(token, salt),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function verifyStoredAdminToken(token) {
+  if (!adminSecurity?.enabled || !adminSecurity.salt || !adminSecurity.key) return false;
+  const actual = hashAdminToken(token, adminSecurity.salt);
+  return safeTokenEquals(actual, adminSecurity.key);
+}
+
+function hashAdminToken(token, salt) {
+  return scryptSync(String(token), String(salt), 32).toString('hex');
 }
 
 async function exportBackup(res, includeCookie) {
@@ -393,6 +514,10 @@ function getConfigPath() {
 
 function getConfigDir() {
   return dirname(getConfigPath());
+}
+
+function getAdminTokenPath() {
+  return resolve(process.env.LOXEVO_ADMIN_TOKEN_FILE || join(getConfigDir(), 'admin-token.json'));
 }
 
 function isInsideDirectory(path, directory) {
@@ -663,6 +788,7 @@ async function getPreflightStatus() {
         preflightCheck('info', 'Laufzeit', `Gestartet: ${formatDateTimeForDetail(startedAt.toISOString())}. Laufzeit: ${formatDuration(process.uptime())}. Node.js ${process.version}.`),
         preflightCheck(configReadError ? 'error' : 'ok', 'Konfiguration lesbar', configReadError || `Datei: ${configPath}`),
         preflightCheck(configWriteError ? 'error' : 'ok', 'Datenordner beschreibbar', configWriteError || `Ordner: ${configDir}`),
+        preflightCheck(isAdminProtectionEnabled() ? 'ok' : 'info', 'Admin-Schutz', getAdminSecurityStatus().message),
         preflightCheck('info', 'Datenhaltung', 'Konfiguration, Backup und Cookie-Datei liegen im Datenordner. Alexa-Cookies werden nur bei bewusst gesetztem Backup-Haken exportiert.')
       ]
     },

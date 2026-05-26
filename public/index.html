@@ -330,6 +330,41 @@ Content-Type: application/json
       <section class="panel wide">
         <div class="section-head">
           <div>
+            <h2>Admin-Schutz</h2>
+            <p>Optionaler Zugriffsschutz für sensible Web-UI-Aktionen.</p>
+          </div>
+          <button id="adminSecurityHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="adminSecurityHelpText" aria-label="Admin-Schutz-Hilfe anzeigen">i</button>
+        </div>
+        <div id="adminSecurityHelpText" class="help-box" hidden>
+          <p>Der Admin-Schutz betrifft Konfiguration, Backup/Restore, Neustart, <code>alexa-remote2</code>-Update und Dry-Run-Umschaltung. Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Aufrufe, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Automationen weiter funktionieren.</p>
+          <p>Wenn der Schutz in der Web-UI aktiviert wird, speichert LoxEvo nur einen Hash im Datenordner. Der Token selbst wird nicht in <code>config.json</code> gespeichert und nicht im normalen Backup exportiert. Ein gesetztes <code>LOXEVO_ADMIN_TOKEN</code> aus Docker hat Vorrang und kann nur dort geändert werden.</p>
+        </div>
+        <div id="adminSecurityStatus" class="service-status">Admin-Schutz wird geladen...</div>
+        <div class="backup-grid admin-security-grid">
+          <div class="backup-card">
+            <h3>Token setzen oder ändern</h3>
+            <p>Mindestens 8 Zeichen. Bei aktivem Schutz fragt die Web-UI zuerst den aktuellen Token ab.</p>
+            <label>
+              Neuer Admin-Token
+              <input id="adminTokenInput" type="password" autocomplete="new-password">
+            </label>
+            <label>
+              Admin-Token wiederholen
+              <input id="adminTokenRepeatInput" type="password" autocomplete="new-password">
+            </label>
+            <button id="saveAdminTokenBtn" type="button">Admin-Schutz aktivieren</button>
+          </div>
+          <div class="backup-card">
+            <h3>Schutz deaktivieren</h3>
+            <p>Entfernt den über die Web-UI gesetzten Token. Ein Docker-Token aus <code>LOXEVO_ADMIN_TOKEN</code> kann hier nicht entfernt werden.</p>
+            <button id="disableAdminTokenBtn" type="button" class="secondary">Admin-Schutz deaktivieren</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel wide">
+        <div class="section-head">
+          <div>
             <h2>Backup</h2>
             <p>Einstellungen exportieren oder aus einer Backup-Datei wiederherstellen.</p>
           </div>
@@ -338,7 +373,7 @@ Content-Type: application/json
         <div id="backupHelpText" class="help-box" hidden>
           <p>Gesichert wird die LoxEvo-Konfiguration aus <code>data/config.json</code>: Loxone-Zugang, Befehle, Rubriken, Alexa-Bridge, TTS-Einstellungen, Geräte-Seriennummern und Lautstärken.</p>
           <p>Die Alexa-Cookie-Datei <code>data/Node.txt</code> wird nur exportiert, wenn der Haken gesetzt ist. Das Backup kann sensible Daten enthalten und sollte privat bleiben.</p>
-          <p>Nicht im Backup enthalten sind installierte Pakete wie <code>alexa-remote2</code>, Docker-Images, Logs und temporäre Dateien. Ein normaler Container-Neustart behält diese Daten, solange der Datenordner erhalten bleibt. Bei einer frischen Installation oder gelöschtem Datenordner muss <code>alexa-remote2</code> im Register Wartung erneut installiert werden.</p>
+          <p>Nicht im Backup enthalten sind der Admin-Token-Hash, installierte Pakete wie <code>alexa-remote2</code>, Docker-Images, Logs und temporäre Dateien. Ein normaler Container-Neustart behält diese Daten, solange der Datenordner erhalten bleibt. Bei einer frischen Installation oder gelöschtem Datenordner muss <code>alexa-remote2</code> im Register Wartung erneut installiert werden.</p>
           <p>Beim Import legt LoxEvo zuerst automatisch eine Sicherung der aktuellen Konfiguration im Datenordner an und spielt danach die Backup-Datei ein.</p>
         </div>
         <div class="backup-grid">

@@ -76,14 +76,11 @@ Bei einer Neuinstallation reicht es normalerweise, den Ordner `data/` zu sichern
 
 Wichtig für Live-Tests: Die Web-UI zeigt und speichert Loxone-Zugangsdaten. LoxEvo sollte deshalb nur im eigenen LAN oder per VPN erreichbar sein und nicht direkt ins Internet freigegeben werden.
 
-Optional kann ein einfacher Admin-Token für sensible API-Bereiche gesetzt werden. Dafür `LOXEVO_ADMIN_TOKEN` als Umgebungsvariable oder in einer lokalen `.env`-Datei setzen und den Container neu erstellen:
-
-```bash
-LOXEVO_ADMIN_TOKEN='ein-langes-eigenes-token' docker compose up -d --build --force-recreate
-```
+Optional kann in der Web-UI unter `Wartung` ein Admin-Token für sensible Bereiche aktiviert werden.
 
 Wenn der Token gesetzt ist, verlangt LoxEvo für Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update und Dry-Run-Umschaltung den Header `X-LoxEvo-Admin-Token`. Die Web-UI fragt den Token bei Bedarf ab und merkt ihn nur für die aktuelle Browser-Sitzung. Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Endpunkte, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Alexa- und Loxone-Aufrufe nicht brechen.
-Zum Deaktivieren den Wert wieder entfernen oder leer lassen und den Container neu erstellen.
+
+Der über die Web-UI gesetzte Token wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab. Der normale Backup-Export enthält diesen Hash nicht. Alternativ kann der Schutz weiterhin per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser Wert hat Vorrang und wird außerhalb der Web-UI verwaltet.
 
 Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell können dort gepflegt werden:
 
@@ -115,7 +112,7 @@ Empfohlener Ablauf für neue Installationen:
 
 ## Backup und Deinstallation
 
-Backups werden in der Web-UI unter `Wartung` erstellt. Der normale Export enthält `config.json` mit Loxone-, Alexa-Bridge-, Befehls- und TTS-Einstellungen. Die Alexa-Cookie-Datei `Node.txt` wird nur exportiert, wenn der entsprechende Haken gesetzt ist, weil diese Datei Zugriffsdaten für das Amazon-Konto enthalten kann. Backup-Dateien enthalten private Installationsdaten und sollten nicht veröffentlicht werden.
+Backups werden in der Web-UI unter `Wartung` erstellt. Der normale Export enthält `config.json` mit Loxone-, Alexa-Bridge-, Befehls- und TTS-Einstellungen. Die Alexa-Cookie-Datei `Node.txt` wird nur exportiert, wenn der entsprechende Haken gesetzt ist, weil diese Datei Zugriffsdaten für das Amazon-Konto enthalten kann. Der Admin-Token-Hash wird nicht im normalen Backup exportiert. Backup-Dateien enthalten private Installationsdaten und sollten nicht veröffentlicht werden.
 
 Beim Import legt LoxEvo zuerst eine Sicherung der aktuellen Konfiguration im lokalen Datenordner an und schreibt danach die importierte Konfiguration. Wenn im Backup ein Cookie enthalten ist, wird es ebenfalls in den konfigurierten Cookie-Pfad geschrieben.
 Installierte npm-Pakete wie `alexa-remote2` werden nicht in die Backup-Datei aufgenommen. Wenn der komplette Ordner `data/` erhalten bleibt, bleiben sie lokal vorhanden; nach einer frischen Wiederherstellung können sie im Register `Wartung` erneut installiert werden.

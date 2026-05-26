@@ -144,6 +144,7 @@ export class AlexaBridgeService {
     if (req.method === 'GET' && url.pathname === '/description.xml') return true;
     if (pathParts[0] !== 'api') return false;
     const reservedApiRoots = new Set([
+      'admin',
       'alexa-bridge',
       'backup',
       'command',

@@ -1,5 +1,6 @@
 node_modules/
 config.json
+admin-token.json
 Node.txt
 data/*
 !data/.gitkeep

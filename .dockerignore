@@ -1,6 +1,7 @@
 node_modules
 data
 config.json
+admin-token.json
 Node.txt
 .git
 .gitignore

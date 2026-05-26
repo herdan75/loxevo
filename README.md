@@ -52,18 +52,6 @@ Web-UI:
 http://<loxberry>:8080
 ```
 
-Optionaler Admin-Zugriffsschutz:
-
-```yaml
-environment:
-  LOXEVO_ADMIN_TOKEN: "bitte-aendern"
-```
-
-Wenn `LOXEVO_ADMIN_TOKEN` gesetzt ist, schützt LoxEvo sensible Admin-Funktionen wie Konfiguration, Backup, Restore, Dependency-Update, Neustart und Dry-Run-Umschaltung. Loxone-Befehle, TTS, Health, Events, Setup-Status, Preflight und die Alexa/Hue-Bridge bleiben bewusst offen, damit bestehende Automationen weiter funktionieren.
-
-Alternativ kann der Schutz in der lokalen `config.json` über `security.adminTokenEnabled` und `security.adminToken` aktiviert werden. Ein gesetztes `LOXEVO_ADMIN_TOKEN` aus der Docker-Umgebung hat Vorrang.
-
-
 In `data/config.json` ist `loxone.dryRun` standardmäßig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie im Protokoll, sendet aber noch nichts an Loxone.
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
@@ -87,6 +75,15 @@ Alle privaten Werte werden nach der Installation über die Web-UI oder direkt in
 Bei einer Neuinstallation reicht es normalerweise, den Ordner `data/` zu sichern und später wieder in den Projektordner zu legen.
 
 Wichtig für Live-Tests: Die Web-UI zeigt und speichert Loxone-Zugangsdaten. LoxEvo sollte deshalb nur im eigenen LAN oder per VPN erreichbar sein und nicht direkt ins Internet freigegeben werden.
+
+Optional kann ein einfacher Admin-Token für sensible API-Bereiche gesetzt werden. Dafür `LOXEVO_ADMIN_TOKEN` als Umgebungsvariable oder in einer lokalen `.env`-Datei setzen und den Container neu erstellen:
+
+```bash
+LOXEVO_ADMIN_TOKEN='ein-langes-eigenes-token' docker compose up -d --build --force-recreate
+```
+
+Wenn der Token gesetzt ist, verlangt LoxEvo für Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update und Dry-Run-Umschaltung den Header `X-LoxEvo-Admin-Token`. Die Web-UI fragt den Token bei Bedarf ab und merkt ihn nur für die aktuelle Browser-Sitzung. Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Endpunkte, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Alexa- und Loxone-Aufrufe nicht brechen.
+Zum Deaktivieren den Wert wieder entfernen oder leer lassen und den Container neu erstellen.
 
 Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell können dort gepflegt werden:
 

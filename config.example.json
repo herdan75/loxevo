@@ -107,9 +107,5 @@
     "defaultDevices": [],
     "allDevices": [],
     "alarmDevices": []
-  },
-  "security": {
-    "adminTokenEnabled": false,
-    "adminToken": ""
   }
 }

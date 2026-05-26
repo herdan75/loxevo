@@ -31,6 +31,27 @@ http://<loxberry-ip>:8080
 
 Die Web-UI ist für das eigene LAN gedacht. Port `8080` sollte nicht direkt ins Internet freigegeben werden, weil darüber Loxone-Zugangsdaten und Steuerbefehle konfiguriert werden.
 
+Optional kann ein Admin-Token für sensible Web-UI-Aktionen aktiviert werden. Dazu im Projektordner eine lokale `.env`-Datei anlegen:
+
+```bash
+cd /mnt/docker/loxevo
+nano .env
+```
+
+Inhalt:
+
+```text
+LOXEVO_ADMIN_TOKEN=ein-langes-eigenes-token
+```
+
+Danach den Container neu erstellen:
+
+```bash
+docker compose up -d --build --force-recreate
+```
+
+Ohne diesen Wert läuft LoxEvo wie bisher ohne Token. Mit gesetztem Token fragt die Web-UI bei Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update und Dry-Run-Umschaltung nach dem Token. Loxone-Befehle, TTS-Aufrufe und virtuelle Alexa-Geräte bleiben weiterhin ohne Token erreichbar.
+
 ## Ersteinrichtung in der Web-UI
 
 1. Web-UI öffnen.

@@ -2,6 +2,7 @@ import http from 'node:http';
 import { constants } from 'node:fs';
 import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { timingSafeEqual } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,16 +28,7 @@ let bridgeHttpStatus = { enabled: false, ready: false, error: null, port: null }
 const events = [];
 const startedAt = new Date();
 const MAX_REQUEST_BODY_SIZE = 1024 * 1024 * 2;
-const ADMIN_TOKEN_HEADER = 'x-loxevo-admin-token';
-const ADMIN_PROTECTED_API_ROUTES = [
-  ['GET', 'config'],
-  ['PUT', 'config'],
-  ['GET', 'backup'],
-  ['POST', 'backup/restore'],
-  ['POST', 'dependencies/alexa-remote2/update'],
-  ['POST', 'system/restart'],
-  ['PUT', 'dry-run']
-];
+const ADMIN_TOKEN = String(process.env.LOXEVO_ADMIN_TOKEN || '').trim();
 const LOXONE_TTS_RESERVED_PATHS = new Set([
   'admin',
   'api',
@@ -133,8 +125,12 @@ async function handleRequest(req, res, { bridgeOnly = false } = {}) {
 }
 
 async function handleApi(req, res, pathParts, readRequestBody, url) {
-  if (isAdminProtectedApiRequest(req, pathParts) && !isAdminAuthorized(req)) {
-    return sendAdminUnauthorized(res);
+  if (requiresAdminToken(req, pathParts) && !isAdminAuthorized(req)) {
+    return sendJson(res, {
+      ok: false,
+      code: 'admin_token_required',
+      error: 'Admin-Token erforderlich.'
+    }, 401);
   }
 
   if (req.method === 'GET' && pathParts[1] === 'config') {
@@ -242,48 +238,49 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
   return sendJson(res, { error: 'not found' }, 404);
 }
 
-function adminToken() {
-  const envToken = String(process.env.LOXEVO_ADMIN_TOKEN || '').trim();
-  if (envToken) return envToken;
+function requiresAdminToken(req, pathParts) {
+  if (!ADMIN_TOKEN) return false;
 
-  if (config.security?.adminTokenEnabled === true) {
-    return String(config.security?.adminToken || '').trim();
+  const method = String(req.method || '').toUpperCase();
+  const resource = pathParts[1] || '';
+  const action = pathParts[2] || '';
+  const subAction = pathParts[3] || '';
+
+  if (method === 'GET' && resource === 'config') return true;
+  if (method === 'PUT' && resource === 'config') return true;
+  if (method === 'GET' && resource === 'backup') return true;
+  if (method === 'POST' && resource === 'backup' && action === 'restore') return true;
+  if (method === 'POST' && resource === 'dependencies' && action === 'alexa-remote2' && subAction === 'update') return true;
+  if (method === 'POST' && resource === 'system' && action === 'restart') return true;
+  if (method === 'PUT' && resource === 'dry-run') return true;
+
+  return false;
+}
+
+function isAdminAuthorized(req) {
+  const token = readAdminToken(req);
+  if (!token) return false;
+  return safeTokenEquals(token, ADMIN_TOKEN);
+}
+
+function readAdminToken(req) {
+  const directHeader = req.headers['x-loxevo-admin-token'];
+  if (Array.isArray(directHeader)) return String(directHeader[0] || '').trim();
+  if (directHeader) return String(directHeader).trim();
+
+  const authorization = String(req.headers.authorization || '').trim();
+  if (authorization.toLowerCase().startsWith('bearer ')) {
+    return authorization.slice(7).trim();
   }
 
   return '';
 }
 
-function isAdminProtectionEnabled() {
-  return Boolean(adminToken());
-}
-
-function isAdminProtectedApiRequest(req, pathParts) {
-  if (!isAdminProtectionEnabled()) return false;
-  const route = pathParts.slice(1).join('/');
-  return ADMIN_PROTECTED_API_ROUTES.some(([method, protectedRoute]) => (
-    req.method === method && route === protectedRoute
-  ));
-}
-
-function isAdminAuthorized(req) {
-  const expected = adminToken();
-  if (!expected) return true;
-
-  const headerToken = String(req.headers[ADMIN_TOKEN_HEADER] || '').trim();
-  const authHeader = String(req.headers.authorization || '').trim();
-  const bearerToken = authHeader.toLowerCase().startsWith('bearer ')
-    ? authHeader.slice(7).trim()
-    : '';
-
-  return headerToken === expected || bearerToken === expected;
-}
-
-function sendAdminUnauthorized(res) {
-  res.setHeader('x-loxevo-admin-token', 'required');
-  return sendJson(res, {
-    error: 'Admin-Token erforderlich.',
-    adminTokenRequired: true
-  }, 401);
+function safeTokenEquals(actual, expected) {
+  const actualBuffer = Buffer.from(String(actual));
+  const expectedBuffer = Buffer.from(String(expected));
+  if (actualBuffer.length !== expectedBuffer.length) return false;
+  return timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
 async function exportBackup(res, includeCookie) {

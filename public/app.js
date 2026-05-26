@@ -1,35 +1,3 @@
-const ADMIN_TOKEN_STORAGE_KEY = 'loxevoAdminToken';
-const ADMIN_TOKEN_HEADER = 'X-LoxEvo-Admin-Token';
-const originalFetch = window.fetch.bind(window);
-
-window.fetch = async function loxevoFetch(input, init = {}) {
-  let response = await originalFetch(input, withAdminToken(init));
-  if (response.status !== 401 || response.headers.get('x-loxevo-admin-token') !== 'required') {
-    return response;
-  }
-
-  const token = window.prompt('Admin-Token erforderlich:');
-  if (!token) return response;
-
-  localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token.trim());
-  response = await originalFetch(input, withAdminToken(init));
-  if (response.status === 401) {
-    localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-  }
-  return response;
-};
-
-function withAdminToken(init = {}) {
-  const token = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
-  if (!token) return init;
-
-  const next = { ...init };
-  const headers = new Headers(next.headers || {});
-  headers.set(ADMIN_TOKEN_HEADER, token);
-  next.headers = headers;
-  return next;
-}
-
 const roomsEl = document.querySelector('#rooms');
 const configEditor = document.querySelector('#configEditor');
 const ttsText = document.querySelector('#ttsText');
@@ -108,6 +76,7 @@ let preflightInfo = null;
 let alexaBridgeInfo = null;
 let discoveryInfo = null;
 let ttsDevices = [];
+const ADMIN_TOKEN_STORAGE_KEY = 'loxevoAdminToken';
 
 load();
 
@@ -155,7 +124,8 @@ tabButtons.forEach((button) => {
 
 async function load() {
   try {
-    const response = await fetch('/api/config');
+    const response = await adminFetch('/api/config');
+    await ensureOk(response);
     config = await response.json();
     populateForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
@@ -316,7 +286,7 @@ async function postJson(url, payload) {
 }
 
 async function putJson(url, payload) {
-  const response = await fetch(url, {
+  const response = await adminFetch(url, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload)
@@ -330,7 +300,7 @@ async function exportBackup(button) {
   const url = `/api/backup?includeCookie=${includeCookie ? 'true' : 'false'}`;
   setButtonFeedback(button, 'pending', 'Exportiert');
   try {
-    const response = await fetch(url, { cache: 'no-store' });
+    const response = await adminFetch(url, { cache: 'no-store' });
     await ensureOk(response);
     const backupPayload = await response.json();
     if (!isLoxEvoBackupPayload(backupPayload)) {
@@ -359,7 +329,7 @@ async function importBackup(button) {
 
   setButtonFeedback(button, 'pending', 'Importiert');
   try {
-    const response = await fetch('/api/backup/restore', {
+    const response = await adminFetch('/api/backup/restore', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: await file.text()
@@ -426,6 +396,33 @@ async function ensureOk(response) {
   if (response.ok) return;
   const payload = await response.json().catch(() => ({}));
   throw new Error(payload.error || `HTTP ${response.status}`);
+}
+
+async function adminFetch(url, options = {}) {
+  let response = await fetchWithAdminToken(url, options);
+  if (response.status !== 401) return response;
+
+  const payload = await response.clone().json().catch(() => ({}));
+  if (payload.code !== 'admin_token_required') return response;
+
+  const token = window.prompt('Admin-Token erforderlich. Bitte LOXEVO_ADMIN_TOKEN eingeben:');
+  if (!token) return response;
+
+  sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token.trim());
+  response = await fetchWithAdminToken(url, options);
+  if (response.status === 401) {
+    sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+  }
+  return response;
+}
+
+function fetchWithAdminToken(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  const token = sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+  if (token && !headers.has('X-LoxEvo-Admin-Token')) {
+    headers.set('X-LoxEvo-Admin-Token', token);
+  }
+  return fetch(url, { ...options, headers });
 }
 
 function setButtonFeedback(button, state, label) {
@@ -1366,7 +1363,7 @@ function renderDependencyStatus() {
 async function updateDependency(name, version, button) {
   setButtonFeedback(button, 'pending', 'Installiert');
   try {
-    const response = await fetch(`/api/dependencies/${encodeURIComponent(name)}/update`, {
+    const response = await adminFetch(`/api/dependencies/${encodeURIComponent(name)}/update`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ version })
@@ -1387,7 +1384,7 @@ async function updateDependency(name, version, button) {
 async function restartSystem(button) {
   setButtonFeedback(button, 'pending', 'Startet neu');
   try {
-    const response = await fetch('/api/system/restart', { method: 'POST' });
+    const response = await adminFetch('/api/system/restart', { method: 'POST' });
     await ensureOk(response);
     showToast('LoxEvo startet neu', 'ok');
   } catch (error) {

@@ -88,7 +88,7 @@
 
         <div class="integration-sections">
           <details class="config-section endpoint-block" open>
-            <summary>Befehle</summary>
+            <summary><span class="summary-label">Befehle</span><span id="integrationCommandsCount" class="count-badge">0</span></summary>
             <div class="config-section-body">
               <p>Wenn ein externes System diese URL aufruft, sendet LoxEvo den passenden Loxone-Befehl.</p>
               <div id="lightEndpoints" class="endpoint-list"></div>
@@ -96,7 +96,7 @@
           </details>
 
           <details class="config-section endpoint-block">
-            <summary>Alexa-Geräte</summary>
+            <summary><span class="summary-label">Alexa-Geräte</span><span id="integrationAlexaDevicesCount" class="count-badge">0</span></summary>
             <div class="config-section-body">
               <p>Diese Namen werden Alexa als virtuelle Geräte angeboten. Gesprochen wird typischerweise: „Alexa, &lt;Gerätename&gt; an”.</p>
               <div id="alexaDevices" class="endpoint-list"></div>
@@ -119,7 +119,7 @@
 
         <div class="config-sections">
           <details class="config-section">
-            <summary>Loxone</summary>
+            <summary><span class="summary-label">Loxone</span></summary>
             <div class="config-section-body">
             <label>
               Miniserver URL
@@ -139,7 +139,7 @@
           </details>
 
           <details class="config-section">
-            <summary>Alexa-Geräte</summary>
+            <summary><span class="summary-label">Alexa-Geräte</span></summary>
             <div class="config-section-body">
             <div id="alexaBridgeStatus" class="service-status">Alexa-Geräte-Status wird geladen...</div>
             <label class="checkbox-row">
@@ -165,7 +165,7 @@
           </details>
 
           <details class="config-section">
-            <summary>Alexa-Gerätesuche</summary>
+            <summary><span class="summary-label">Alexa-Gerätesuche</span></summary>
             <div class="config-section-body">
               <div class="discovery-control">
                 <div class="status-help-row">
@@ -189,7 +189,7 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
           </details>
 
           <details class="config-section">
-            <summary>Alexa TTS</summary>
+            <summary><span class="summary-label">Alexa TTS</span></summary>
             <div class="config-section-body">
             <div class="status-help-row">
               <div id="ttsConfigStatus" class="service-status">TTS-Status wird geladen...</div>
@@ -245,7 +245,7 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
         </div>
 
         <details class="config-section wide-fieldset">
-          <summary>Befehle und Sprachnamen</summary>
+          <summary><span class="summary-label">Befehle und Sprachnamen</span><span id="configCommandsCount" class="count-badge">0</span></summary>
           <div class="config-section-body">
           <div id="roomEditor" class="room-editor"></div>
           <button id="addRoomBtn" type="button" class="secondary">Befehl hinzufügen</button>
@@ -253,7 +253,7 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
         </details>
 
         <details class="config-section wide-fieldset">
-          <summary>TTS-Geräte</summary>
+          <summary><span class="summary-label">TTS-Geräte</span><span id="configTtsDevicesCount" class="count-badge">0</span></summary>
           <div class="config-section-body">
           <div class="section-head compact">
             <p>Echo-Geräte aus Alexa laden und bei Standard, Alle oder Alarm anhaken. Die Seriennummern werden automatisch in die Felder übernommen.</p>
@@ -278,7 +278,7 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
         </details>
 
         <details class="config-section expert-json">
-          <summary>Expertenansicht JSON</summary>
+          <summary><span class="summary-label">Expertenansicht JSON</span></summary>
           <div class="config-section-body">
           <p>Nur nutzen, wenn du direkt in die komplette Konfiguration eingreifen willst. <code>server.port</code> ist die Web-UI/API, <code>alexaBridge.advertisePort</code> ist der Alexa/Hue-Port.</p>
           <div class="actions">

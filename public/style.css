@@ -320,17 +320,13 @@ h2 {
 
 .preflight-section > summary {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) auto auto;
+  grid-template-columns: auto minmax(160px, 1fr) auto auto;
   align-items: center;
   gap: 12px;
   min-height: 44px;
   padding: 0 14px;
   cursor: pointer;
   color: var(--accent-strong);
-}
-
-.preflight-section > summary::marker {
-  color: var(--muted);
 }
 
 .preflight-section-meta {
@@ -655,9 +651,10 @@ legend {
   background: #fbfcfd;
 }
 
-.config-section summary {
+.config-section > summary {
   display: flex;
   align-items: center;
+  gap: 10px;
   min-height: 46px;
   padding: 0 14px;
   cursor: pointer;
@@ -665,12 +662,12 @@ legend {
   font-weight: 700;
 }
 
-.config-section summary::marker {
-  color: var(--muted);
+.config-section[open] > summary {
+  border-bottom: 1px solid var(--line);
 }
 
-.config-section[open] summary {
-  border-bottom: 1px solid var(--line);
+.summary-label {
+  min-width: 0;
 }
 
 .config-section-body {
@@ -876,10 +873,6 @@ input[type='range'] {
   font-weight: 700;
 }
 
-.category-summary::marker {
-  color: var(--muted);
-}
-
 .count-badge {
   display: inline-flex;
   align-items: center;
@@ -891,6 +884,56 @@ input[type='range'] {
   background: #e8f2f3;
   color: var(--accent-strong);
   font-size: 12px;
+}
+
+.config-section > summary::marker,
+.category-summary::marker,
+.preflight-section > summary::marker,
+.room-card-head::marker {
+  content: '';
+}
+
+.config-section > summary::before,
+.category-summary::before,
+.preflight-section > summary::before,
+.room-card-head::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid var(--muted);
+  transition: transform 140ms ease, border-left-color 140ms ease;
+}
+
+.config-section[open] > summary::before,
+.category-group[open] > .category-summary::before,
+.preflight-section[open] > summary::before,
+.room-card[open] > .room-card-head::before {
+  transform: rotate(90deg);
+  border-left-color: var(--accent);
+}
+
+.config-section > summary:hover,
+.category-summary:hover,
+.preflight-section > summary:hover,
+.room-card-head:hover {
+  background: #f3f8f9;
+}
+
+.config-section > summary:focus-visible,
+.category-summary:focus-visible,
+.preflight-section > summary:focus-visible,
+.room-card-head:focus-visible {
+  outline: 2px solid rgba(37, 111, 116, 0.2);
+  outline-offset: -2px;
+}
+
+.config-section > summary .count-badge,
+.category-summary .count-badge,
+.preflight-section > summary .count-badge {
+  margin-left: auto;
 }
 
 .category-group > .scene-grid,
@@ -925,21 +968,6 @@ input[type='range'] {
 .room-card-head strong {
   justify-self: start;
   text-align: left;
-}
-
-.room-card-head::marker {
-  content: '';
-}
-
-.room-card-head::before {
-  content: '>';
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.room-card[open] .room-card-head::before {
-  content: 'v';
 }
 
 .room-card[open] {

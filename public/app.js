@@ -48,6 +48,10 @@ const views = document.querySelectorAll('.view');
 const refreshIntegrationsBtn = document.querySelector('#refreshIntegrationsBtn');
 const lightEndpoints = document.querySelector('#lightEndpoints');
 const alexaDevices = document.querySelector('#alexaDevices');
+const integrationCommandsCount = document.querySelector('#integrationCommandsCount');
+const integrationAlexaDevicesCount = document.querySelector('#integrationAlexaDevicesCount');
+const configCommandsCount = document.querySelector('#configCommandsCount');
+const configTtsDevicesCount = document.querySelector('#configTtsDevicesCount');
 const ttsStatusCard = document.querySelector('#ttsStatusCard');
 const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
 const ttsHelpBtn = document.querySelector('#ttsHelpBtn');
@@ -126,6 +130,7 @@ ttsAlarmVolume?.addEventListener('input', () => {
 [ttsDefaultDevices, ttsAllDevices, ttsAlarmDevices].forEach((textarea) => {
   textarea?.addEventListener('input', () => {
     renderTtsDevices();
+    updateConfigSectionCounts();
     syncJsonFromForms();
   });
 });
@@ -662,6 +667,7 @@ async function loadTtsDevices(button) {
 
 function renderTtsDevices(errorText = '') {
   if (!ttsDeviceList) return;
+  updateConfigSectionCounts();
 
   if (errorText) {
     ttsDeviceList.innerHTML = `<div class="service-status error">${escapeHtml(errorText)}</div>`;
@@ -735,6 +741,7 @@ function updateTtsDeviceSelection(group, serial, enabled) {
   const values = linesToList(textarea.value).filter((value) => value !== serial && !value.includes('replace-with'));
   if (enabled) values.push(serial);
   textarea.value = listToLines([...new Set(values)]);
+  updateConfigSectionCounts();
   syncConfigFromForms();
 }
 
@@ -1210,6 +1217,26 @@ function deviceListCount(values) {
   return Array.isArray(values) ? values.filter((value) => value && !String(value).includes('replace-with')).length : 0;
 }
 
+function setCountBadge(element, count) {
+  if (!element) return;
+  const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : 0;
+  element.textContent = String(safeCount);
+  element.setAttribute('aria-label', `${safeCount} EintrÃ¤ge`);
+}
+
+function updateConfigSectionCounts() {
+  setCountBadge(configCommandsCount, Object.keys(getConfiguredCommands()).length);
+  setCountBadge(configTtsDevicesCount, uniqueTtsDeviceSelectionCount());
+}
+
+function uniqueTtsDeviceSelectionCount() {
+  return new Set([
+    ...linesToDeviceList(ttsDefaultDevices?.value || ''),
+    ...linesToDeviceList(ttsAllDevices?.value || ''),
+    ...linesToDeviceList(ttsAlarmDevices?.value || '')
+  ]).size;
+}
+
 function renderPreflightStatus() {
   if (!preflightSummary || !preflightChecks || !preflightInfo) return;
   const summary = preflightInfo.summary || {};
@@ -1622,6 +1649,7 @@ function renderCommandEditor() {
     });
     roomEditor.append(group);
   });
+  updateConfigSectionCounts();
 }
 
 function createCommandCard(commandKey, command) {
@@ -1770,7 +1798,10 @@ function renderIntegrations() {
     lightEndpoints.append(group);
   });
 
-  lightEndpoints.append(createTtsEndpointGroup(baseUrl, runnableCommands.length === 0));
+  const ttsGroup = createTtsEndpointGroup(baseUrl, runnableCommands.length === 0);
+  const ttsEndpointCount = Number(ttsGroup.querySelector('.count-badge')?.textContent || 0);
+  setCountBadge(integrationCommandsCount, runnableCommands.length + ttsEndpointCount);
+  lightEndpoints.append(ttsGroup);
 
   renderAlexaDevices();
 }
@@ -2350,6 +2381,7 @@ function renderAlexaDevices() {
   if (!alexaDevices) return;
   const status = alexaBridgeInfo || {};
   const devices = Array.isArray(status.devices) ? status.devices : [];
+  setCountBadge(integrationAlexaDevicesCount, status.enabled ? devices.length : 0);
 
   if (!status.enabled) {
     alexaDevices.innerHTML = '<p class="empty">Virtuelle Alexa-Geräte sind deaktiviert.</p>';

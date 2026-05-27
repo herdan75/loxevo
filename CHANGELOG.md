@@ -4,6 +4,8 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.1 - 2026-05-28
+
 - Startregister `Übersicht` mit kompakter Statuskontrolle für Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche, Backup, Admin-Schutz und Systemprüfung ergänzt.
 - Statuskontrolle optisch verdichtet und mit Info-Buttons pro Statuszeile ergänzt.
 - Protokoll um Filter, Suche und Leeren-Funktion ergänzt.
@@ -13,6 +15,8 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 - Überspringbaren Einrichtungsassistenten ergänzt, inklusive optionaler Alexa-Gerätesuche mit SSDP/UDP-1900-Hinweis.
 - Protokoll-Leeren unter Admin-Schutz gestellt und Dry-Run-Speichern ohne Loxone-Zugangsdaten erlaubt.
 - Deutsche Texte auf Schweizer Schreibweise ohne scharfes s vereinheitlicht.
+- Einrichtungsassistent dauerhaft über die Statuskontrolle erreichbar gemacht.
+- Admin-Token-Abfrage durch ein verdecktes Web-UI-Passwortfenster ersetzt; bei falschem Token bleibt die Eingabe offen.
 
 ## 1.0.0 - 2026-05-27
 

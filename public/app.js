@@ -1876,8 +1876,8 @@ function bindDashboardHelpButtons() {
 }
 
 function backupStateTitle() {
-  if (configDirty) return 'Änderungen offen';
-  return localStorage.getItem(LAST_BACKUP_EXPORT_KEY) ? 'Exportiert' : 'Noch kein Export';
+  if (configDirty) return 'Offen';
+  return localStorage.getItem(LAST_BACKUP_EXPORT_KEY) ? 'Exportiert' : 'Kein Export';
 }
 
 function backupReminderLevel() {

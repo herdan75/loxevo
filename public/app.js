@@ -349,11 +349,12 @@ function validateConfigBeforeSave(nextConfig) {
     errors.push('Bitte eine gültige Loxone-Miniserver-URL mit http:// oder https:// eintragen.');
     markInvalid(loxoneBaseUrl);
   }
-  if (!String(nextConfig.loxone?.username || '').trim()) {
+  const isLiveMode = nextConfig.loxone?.dryRun === false;
+  if (isLiveMode && !String(nextConfig.loxone?.username || '').trim()) {
     errors.push('Bitte den Loxone-Benutzer eintragen.');
     markInvalid(loxoneUsername);
   }
-  if (!String(nextConfig.loxone?.password || '').trim()) {
+  if (isLiveMode && !String(nextConfig.loxone?.password || '').trim()) {
     errors.push('Bitte das Loxone-Passwort eintragen.');
     markInvalid(loxonePassword);
   }
@@ -1422,7 +1423,7 @@ function setCountBadge(element, count) {
   if (!element) return;
   const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : 0;
   element.textContent = String(safeCount);
-  element.setAttribute('aria-label', `${safeCount} EintrÃ¤ge`);
+  element.setAttribute('aria-label', `${safeCount} Einträge`);
 }
 
 function updateConfigSectionCounts() {
@@ -2958,7 +2959,7 @@ async function clearEvents(button) {
   if (!window.confirm('Protokoll leeren? Die laufende Funktion von LoxEvo wird dadurch nicht verändert.')) return;
   setButtonFeedback(button, 'pending', 'Leert');
   try {
-    const response = await fetch('/api/events/clear', { method: 'POST' });
+    const response = await adminFetch('/api/events/clear', { method: 'POST' });
     await ensureOk(response);
     const payload = await response.json();
     allEvents = payload.events || [];

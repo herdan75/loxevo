@@ -275,6 +275,7 @@ function requiresAdminToken(req, pathParts) {
   if (method === 'GET' && resource === 'backup') return true;
   if (method === 'POST' && resource === 'backup' && action === 'restore') return true;
   if (method === 'GET' && resource === 'diagnostics') return true;
+  if (method === 'POST' && resource === 'events' && action === 'clear') return true;
   if (method === 'POST' && resource === 'dependencies' && action === 'alexa-remote2' && subAction === 'update') return true;
   if (method === 'POST' && resource === 'system' && action === 'restart') return true;
   if (method === 'PUT' && resource === 'dry-run') return true;

@@ -1,6 +1,6 @@
 # LoxBerry Docker Deployment
 
-> **Hinweis:** Diese Deployment-Anleitung beschreibt die lauffähige Entwicklungsversion. Neue Befehle und Live-Zugriffe sollten zuerst bewusst getestet werden.
+> **Hinweis:** Diese Deployment-Anleitung beschreibt LoxEvo ab Version 1.0.0. Neue Befehle und Live-Zugriffe sollten zuerst bewusst getestet werden.
 
 Diese Anleitung ist für den ersten Test von LoxEvo auf dem LoxBerry gedacht.
 

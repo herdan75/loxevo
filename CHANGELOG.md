@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+- Noch keine Änderungen.
+
+## 1.0.0 - 2026-05-27
+
+- Erste versionierte, lauffähige LoxEvo-Version.
 - GitHub Actions CI für Node-Syntaxcheck und Docker-Build ergänzt.
 - README-Badges für CI, Docker und Lizenz ergänzt.
 - Backup-Export und -Import für LoxEvo-Einstellungen ergänzt.

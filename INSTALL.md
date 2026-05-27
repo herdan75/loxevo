@@ -1,6 +1,6 @@
 # Installation
 
-> **Hinweis:** LoxEvo ist eine lauffähige Entwicklungsversion. Neue Installationen und neue Befehle sollten trotzdem zuerst bewusst getestet werden.
+> **Hinweis:** Diese Anleitung beschreibt LoxEvo ab Version 1.0.0. Neue Installationen und neue Befehle sollten trotzdem zuerst bewusst getestet werden.
 
 Diese Anleitung beschreibt den Docker-Weg. Private Daten werden erst nach der Installation lokal im Ordner `data/` angelegt oder über die Web-UI eingetragen.
 

@@ -71,9 +71,17 @@ const importBackupFile = document.querySelector('#importBackupFile');
 const importBackupBtn = document.querySelector('#importBackupBtn');
 const backupHelpBtn = document.querySelector('#backupHelpBtn');
 const backupHelpText = document.querySelector('#backupHelpText');
+const backupExportHelpBtn = document.querySelector('#backupExportHelpBtn');
+const backupExportHelpText = document.querySelector('#backupExportHelpText');
+const backupImportHelpBtn = document.querySelector('#backupImportHelpBtn');
+const backupImportHelpText = document.querySelector('#backupImportHelpText');
 const adminSecurityStatus = document.querySelector('#adminSecurityStatus');
 const adminSecurityHelpBtn = document.querySelector('#adminSecurityHelpBtn');
 const adminSecurityHelpText = document.querySelector('#adminSecurityHelpText');
+const adminTokenHelpBtn = document.querySelector('#adminTokenHelpBtn');
+const adminTokenHelpText = document.querySelector('#adminTokenHelpText');
+const adminDisableHelpBtn = document.querySelector('#adminDisableHelpBtn');
+const adminDisableHelpText = document.querySelector('#adminDisableHelpText');
 const adminTokenInput = document.querySelector('#adminTokenInput');
 const adminTokenRepeatInput = document.querySelector('#adminTokenRepeatInput');
 const saveAdminTokenBtn = document.querySelector('#saveAdminTokenBtn');
@@ -112,6 +120,10 @@ exportBackupBtn?.addEventListener('click', () => exportBackup(exportBackupBtn));
 importBackupBtn?.addEventListener('click', () => importBackup(importBackupBtn));
 backupHelpBtn?.addEventListener('click', () => toggleBackupHelp());
 adminSecurityHelpBtn?.addEventListener('click', () => toggleAdminSecurityHelp());
+backupExportHelpBtn?.addEventListener('click', () => toggleHelpBox(backupExportHelpBtn, backupExportHelpText));
+backupImportHelpBtn?.addEventListener('click', () => toggleHelpBox(backupImportHelpBtn, backupImportHelpText));
+adminTokenHelpBtn?.addEventListener('click', () => toggleHelpBox(adminTokenHelpBtn, adminTokenHelpText));
+adminDisableHelpBtn?.addEventListener('click', () => toggleHelpBox(adminDisableHelpBtn, adminDisableHelpText));
 saveAdminTokenBtn?.addEventListener('click', () => saveAdminToken(saveAdminTokenBtn));
 disableAdminTokenBtn?.addEventListener('click', () => disableAdminToken(disableAdminTokenBtn));
 ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
@@ -1046,31 +1058,26 @@ function isDiscoveryPortIssue(errorText = '') {
 }
 
 function toggleTtsHelp() {
-  if (!ttsHelpBtn || !ttsHelpText) return;
-  const nextHidden = !ttsHelpText.hidden;
-  ttsHelpText.hidden = nextHidden;
-  ttsHelpBtn.setAttribute('aria-expanded', String(!nextHidden));
+  toggleHelpBox(ttsHelpBtn, ttsHelpText);
 }
 
 function toggleBackupHelp() {
-  if (!backupHelpBtn || !backupHelpText) return;
-  const nextHidden = !backupHelpText.hidden;
-  backupHelpText.hidden = nextHidden;
-  backupHelpBtn.setAttribute('aria-expanded', String(!nextHidden));
+  toggleHelpBox(backupHelpBtn, backupHelpText);
 }
 
 function toggleAdminSecurityHelp() {
-  if (!adminSecurityHelpBtn || !adminSecurityHelpText) return;
-  const nextHidden = !adminSecurityHelpText.hidden;
-  adminSecurityHelpText.hidden = nextHidden;
-  adminSecurityHelpBtn.setAttribute('aria-expanded', String(!nextHidden));
+  toggleHelpBox(adminSecurityHelpBtn, adminSecurityHelpText);
 }
 
 function toggleDiscoveryHelp() {
-  if (!discoveryHelpBtn || !discoveryHelpText) return;
-  const nextHidden = !discoveryHelpText.hidden;
-  discoveryHelpText.hidden = nextHidden;
-  discoveryHelpBtn.setAttribute('aria-expanded', String(!nextHidden));
+  toggleHelpBox(discoveryHelpBtn, discoveryHelpText);
+}
+
+function toggleHelpBox(button, helpText) {
+  if (!button || !helpText) return;
+  const nextHidden = !helpText.hidden;
+  helpText.hidden = nextHidden;
+  button.setAttribute('aria-expanded', String(!nextHidden));
 }
 
 function showView(viewId) {

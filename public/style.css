@@ -512,6 +512,13 @@ h2 {
   max-width: 980px;
 }
 
+.maintenance-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
 .backup-card {
   display: grid;
   align-content: start;
@@ -520,6 +527,13 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
+}
+
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .backup-card h3 {
@@ -540,6 +554,19 @@ h2 {
 
 .backup-card input[type='file'] {
   max-width: 520px;
+}
+
+.info-button-small {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+}
+
+.compact-help {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
 }
 
 .version-select {
@@ -1297,6 +1324,12 @@ pre {
   font: 13px/1.4 Consolas, Monaco, monospace;
 }
 
+@media (max-width: 1100px) {
+  .maintenance-tools {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 760px) {
   header {
     align-items: flex-start;
@@ -1317,6 +1350,7 @@ pre {
   .form-row.three,
   .form-row.four,
   .backup-grid,
+  .maintenance-tools,
   .preflight-check,
   .device-card,
   .view,

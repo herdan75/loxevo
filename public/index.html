@@ -327,13 +327,14 @@ Content-Type: application/json
         </div>
       </section>
 
-      <section class="panel wide">
+      <div class="maintenance-tools wide">
+      <section class="panel">
         <div class="section-head">
           <div>
             <h2>Admin-Schutz</h2>
             <p>Optionaler Zugriffsschutz für sensible Web-UI-Aktionen.</p>
           </div>
-          <button id="adminSecurityHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="adminSecurityHelpText" aria-label="Admin-Schutz-Hilfe anzeigen">i</button>
+          <button id="adminSecurityHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="adminSecurityHelpText" aria-label="Admin-Schutz-Hilfe anzeigen" title="Erklärt, welche Web-UI-Aktionen geschützt werden.">i</button>
         </div>
         <div id="adminSecurityHelpText" class="help-box" hidden>
           <p><strong>Wichtig:</strong> Die Web-UI lädt beim Öffnen automatisch die Konfiguration über <code>/api/config</code>. Deshalb wird bei aktivem Admin-Schutz bereits beim Öffnen der Web-UI der Admin-Token abgefragt.</p>
@@ -353,7 +354,13 @@ Content-Type: application/json
         <div id="adminSecurityStatus" class="service-status">Admin-Schutz wird geladen...</div>
         <div class="backup-grid admin-security-grid">
           <div class="backup-card">
-            <h3>Token setzen oder ändern</h3>
+            <div class="card-title-row">
+              <h3>Token setzen oder ändern</h3>
+              <button id="adminTokenHelpBtn" type="button" class="info-button info-button-small" aria-expanded="false" aria-controls="adminTokenHelpText" aria-label="Hilfe zum Admin-Token anzeigen" title="Erklärt, wie der Admin-Token gespeichert und verwendet wird.">i</button>
+            </div>
+            <div id="adminTokenHelpText" class="help-box compact-help" hidden>
+              <p>Aktiviert oder ändert den Admin-Schutz für sensible Web-UI-Aktionen. LoxEvo speichert nur einen Hash des Tokens, nicht den Token im Klartext. Bei aktivem Schutz muss die aktuelle Browser-Sitzung zuerst mit dem bestehenden Token autorisiert sein.</p>
+            </div>
             <p>Mindestens 8 Zeichen. Bei aktivem Schutz fragt die Web-UI zuerst den aktuellen Token ab.</p>
             <label>
               Neuer Admin-Token
@@ -366,20 +373,26 @@ Content-Type: application/json
             <button id="saveAdminTokenBtn" type="button">Admin-Schutz aktivieren</button>
           </div>
           <div class="backup-card">
-            <h3>Schutz deaktivieren</h3>
+            <div class="card-title-row">
+              <h3>Schutz deaktivieren</h3>
+              <button id="adminDisableHelpBtn" type="button" class="info-button info-button-small" aria-expanded="false" aria-controls="adminDisableHelpText" aria-label="Hilfe zum Deaktivieren des Admin-Schutzes anzeigen" title="Erklärt, welcher Admin-Schutz entfernt werden kann.">i</button>
+            </div>
+            <div id="adminDisableHelpText" class="help-box compact-help" hidden>
+              <p>Entfernt nur den Admin-Schutz, der über diese Web-UI gesetzt wurde. Wenn der Schutz per Docker-Umgebungsvariable <code>LOXEVO_ADMIN_TOKEN</code> gesetzt ist, bleibt er aktiv und muss in der Docker-Konfiguration geändert werden.</p>
+            </div>
             <p>Entfernt den über die Web-UI gesetzten Token. Ein Docker-Token aus <code>LOXEVO_ADMIN_TOKEN</code> kann hier nicht entfernt werden.</p>
             <button id="disableAdminTokenBtn" type="button" class="secondary">Admin-Schutz deaktivieren</button>
           </div>
         </div>
       </section>
 
-      <section class="panel wide">
+      <section class="panel">
         <div class="section-head">
           <div>
             <h2>Backup</h2>
             <p>Einstellungen exportieren oder aus einer Backup-Datei wiederherstellen.</p>
           </div>
-          <button id="backupHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="backupHelpText" aria-label="Backup-Hilfe anzeigen">i</button>
+          <button id="backupHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="backupHelpText" aria-label="Backup-Hilfe anzeigen" title="Erklärt, was im Backup enthalten ist.">i</button>
         </div>
         <div id="backupHelpText" class="help-box" hidden>
           <p>Gesichert wird die LoxEvo-Konfiguration aus <code>data/config.json</code>: Loxone-Zugang, Befehle, Rubriken, Alexa-Bridge, TTS-Einstellungen, Geräte-Seriennummern und Lautstärken.</p>
@@ -389,7 +402,13 @@ Content-Type: application/json
         </div>
         <div class="backup-grid">
           <div class="backup-card">
-            <h3>Einstellungen exportieren</h3>
+            <div class="card-title-row">
+              <h3>Einstellungen exportieren</h3>
+              <button id="backupExportHelpBtn" type="button" class="info-button info-button-small" aria-expanded="false" aria-controls="backupExportHelpText" aria-label="Hilfe zum Backup-Export anzeigen" title="Erklärt, was beim Export gespeichert wird.">i</button>
+            </div>
+            <div id="backupExportHelpText" class="help-box compact-help" hidden>
+              <p>Lädt eine JSON-Backup-Datei mit der aktuellen LoxEvo-Konfiguration herunter. Die Alexa-Cookie-Datei wird nur mitgesichert, wenn der Haken gesetzt ist. Backup-Dateien können Zugangsdaten enthalten und sollten privat aufbewahrt werden.</p>
+            </div>
             <p>Exportiert die aktuelle LoxEvo-Konfiguration. Die Alexa-Cookie-Datei wird nur auf Wunsch eingeschlossen. Backup-Dateien bitte privat aufbewahren.</p>
             <label class="checkbox-row">
               <input id="backupIncludeCookie" type="checkbox">
@@ -398,13 +417,20 @@ Content-Type: application/json
             <button id="exportBackupBtn" type="button">Backup exportieren</button>
           </div>
           <div class="backup-card">
-            <h3>Einstellungen importieren</h3>
+            <div class="card-title-row">
+              <h3>Einstellungen importieren</h3>
+              <button id="backupImportHelpBtn" type="button" class="info-button info-button-small" aria-expanded="false" aria-controls="backupImportHelpText" aria-label="Hilfe zum Backup-Import anzeigen" title="Erklärt, was beim Import passiert.">i</button>
+            </div>
+            <div id="backupImportHelpText" class="help-box compact-help" hidden>
+              <p>Stellt eine LoxEvo-Backup-Datei wieder her. Vor dem Import legt LoxEvo automatisch eine Sicherung der aktuellen Konfiguration im Datenordner an. Danach sollte die Konfiguration kurz geprüft und LoxEvo bei Bedarf neu gestartet werden.</p>
+            </div>
             <p>Importiert ein LoxEvo-Backup. Vorher wird automatisch eine Sicherung der aktuellen Konfiguration im Datenordner angelegt.</p>
             <input id="importBackupFile" type="file" accept="application/json,.json">
             <button id="importBackupBtn" type="button" class="secondary">Backup importieren</button>
           </div>
         </div>
       </section>
+      </div>
       </section>
 
       <section id="eventsView" class="view wide">

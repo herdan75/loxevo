@@ -72,7 +72,6 @@ const integrationCommandsCount = document.querySelector('#integrationCommandsCou
 const integrationAlexaDevicesCount = document.querySelector('#integrationAlexaDevicesCount');
 const configCommandsCount = document.querySelector('#configCommandsCount');
 const configTtsDevicesCount = document.querySelector('#configTtsDevicesCount');
-const ttsStatusCard = document.querySelector('#ttsStatusCard');
 const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
 const ttsHelpBtn = document.querySelector('#ttsHelpBtn');
 const ttsHelpText = document.querySelector('#ttsHelpText');
@@ -801,7 +800,7 @@ async function loadTtsStatus() {
 }
 
 function renderTtsStatus() {
-  const targets = [ttsStatusCard, ttsConfigStatus].filter(Boolean);
+  const targets = [ttsConfigStatus].filter(Boolean);
   const { text, className } = ttsStatusView();
 
   targets.forEach((target) => {
@@ -2090,13 +2089,6 @@ function openConfigArea(label) {
     target.open = true;
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-}
-
-function findPreflightCheck(sectionTitle, label) {
-  return preflightInfo?.sections
-    ?.find((section) => section.title === sectionTitle)
-    ?.checks
-    ?.find((check) => check.label === label);
 }
 
 function populateForms() {

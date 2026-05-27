@@ -4,7 +4,11 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
-- Noch keine Änderungen.
+- Startregister `Übersicht` mit kompaktem Zustand für Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche, Backup, Admin-Schutz, Systemprüfung und Version ergänzt.
+- Protokoll um Filter, Suche und Leeren-Funktion ergänzt.
+- Diagnoseexport im Register `Wartung` ergänzt; sensible Werte werden dabei zusammengefasst oder maskiert.
+- Konfigurationsspeichern prüft wichtige Eingaben wie Loxone-URL, Zugangsdaten, Alexa/Hue-Port und TTS-Cookie-Pfad vor dem Schreiben.
+- Backup-Hinweis nach Konfigurationsänderungen ergänzt.
 
 ## 1.0.0 - 2026-05-27
 

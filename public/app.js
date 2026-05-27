@@ -6,11 +6,18 @@ const speakBtn = document.querySelector('#speakBtn');
 const alarmBtn = document.querySelector('#alarmBtn');
 const refreshEventsBtn = document.querySelector('#refreshEventsBtn');
 const eventsEl = document.querySelector('#events');
+const clearEventsBtn = document.querySelector('#clearEventsBtn');
+const eventSearch = document.querySelector('#eventSearch');
+const eventFilterButtons = document.querySelectorAll('.event-filter');
 const dryRunToggle = document.querySelector('#dryRunToggle');
 const modeBanner = document.querySelector('#modeBanner');
 const modeTitle = document.querySelector('#modeTitle');
 const modeText = document.querySelector('#modeText');
 const systemNotice = document.querySelector('#systemNotice');
+const dashboardCards = document.querySelector('#dashboardCards');
+const backupReminder = document.querySelector('#backupReminder');
+const refreshDashboardBtn = document.querySelector('#refreshDashboardBtn');
+const dashboardConfigBtn = document.querySelector('#dashboardConfigBtn');
 const loxoneBaseUrl = document.querySelector('#loxoneBaseUrl');
 const loxoneUsername = document.querySelector('#loxoneUsername');
 const loxonePassword = document.querySelector('#loxonePassword');
@@ -63,6 +70,7 @@ const setupConfigBtn = document.querySelector('#setupConfigBtn');
 const refreshMaintenanceBtn = document.querySelector('#refreshMaintenanceBtn');
 const dependencyStatus = document.querySelector('#dependencyStatus');
 const refreshPreflightBtn = document.querySelector('#refreshPreflightBtn');
+const exportDiagnosticsBtn = document.querySelector('#exportDiagnosticsBtn');
 const preflightSummary = document.querySelector('#preflightSummary');
 const preflightChecks = document.querySelector('#preflightChecks');
 const backupIncludeCookie = document.querySelector('#backupIncludeCookie');
@@ -96,7 +104,11 @@ let alexaBridgeInfo = null;
 let discoveryInfo = null;
 let ttsDevices = [];
 let adminSecurityInfo = null;
+let allEvents = [];
+let activeEventFilter = 'all';
+let configDirty = false;
 const ADMIN_TOKEN_STORAGE_KEY = 'loxevoAdminToken';
+const LAST_BACKUP_EXPORT_KEY = 'loxevoLastBackupExportAt';
 
 load();
 
@@ -106,7 +118,10 @@ reloadJsonBtn.addEventListener('click', () => regenerateJsonFromForms(reloadJson
 speakBtn.addEventListener('click', () => postTtsTest('speak', speakBtn));
 alarmBtn.addEventListener('click', () => postTtsTest('alarm', alarmBtn));
 refreshEventsBtn.addEventListener('click', () => loadEvents(refreshEventsBtn));
+clearEventsBtn?.addEventListener('click', () => clearEvents(clearEventsBtn));
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
+refreshDashboardBtn?.addEventListener('click', () => refreshDashboard(refreshDashboardBtn));
+dashboardConfigBtn?.addEventListener('click', () => showView('configView'));
 addRoomBtn.addEventListener('click', addRoom);
 refreshIntegrationsBtn.addEventListener('click', () => {
   renderIntegrations();
@@ -116,6 +131,7 @@ refreshIntegrationsBtn.addEventListener('click', () => {
 setupConfigBtn.addEventListener('click', () => showView('configView'));
 refreshMaintenanceBtn.addEventListener('click', () => loadDependencyStatus(refreshMaintenanceBtn));
 refreshPreflightBtn?.addEventListener('click', () => loadPreflightStatus(refreshPreflightBtn));
+exportDiagnosticsBtn?.addEventListener('click', () => exportDiagnostics(exportDiagnosticsBtn));
 exportBackupBtn?.addEventListener('click', () => exportBackup(exportBackupBtn));
 importBackupBtn?.addEventListener('click', () => importBackup(importBackupBtn));
 backupHelpBtn?.addEventListener('click', () => toggleBackupHelp());
@@ -131,6 +147,14 @@ discoveryHelpBtn?.addEventListener('click', () => toggleDiscoveryHelp());
 startDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('start', startDiscoveryBtn));
 stopDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('stop', stopDiscoveryBtn));
 refreshTtsDevicesBtn?.addEventListener('click', () => loadTtsDevices(refreshTtsDevicesBtn));
+eventSearch?.addEventListener('input', () => renderEvents(allEvents));
+eventFilterButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    activeEventFilter = button.dataset.eventFilter || 'all';
+    eventFilterButtons.forEach((item) => item.classList.toggle('active', item === button));
+    renderEvents(allEvents);
+  });
+});
 ttsDefaultVolume?.addEventListener('input', () => {
   updateTtsVolumeLabels();
   syncJsonFromForms();
@@ -146,6 +170,8 @@ ttsAlarmVolume?.addEventListener('input', () => {
     syncJsonFromForms();
   });
 });
+document.querySelector('#configView')?.addEventListener('input', () => markConfigDirty());
+document.querySelector('#configView')?.addEventListener('change', () => markConfigDirty());
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => showView(button.dataset.tabTarget));
 });
@@ -164,11 +190,14 @@ async function load() {
     await loadSetupStatus();
     await loadAdminSecurityStatus();
     await loadDependencyStatus();
+    await loadPreflightStatus();
     renderCommands();
     renderCommandEditor();
     renderIntegrations();
     syncJsonFromForms();
     await loadEvents();
+    markConfigClean();
+    renderDashboard();
   } catch (error) {
     showToast(error.message, 'error');
   }
@@ -216,9 +245,15 @@ async function sendCommand(commandKey, button) {
 }
 
 async function saveConfig(button) {
-  setButtonFeedback(button, 'pending', 'Speichert');
   try {
     const nextConfig = collectConfigFromForms();
+    const validation = validateConfigBeforeSave(nextConfig);
+    if (validation.length) {
+      showToast(validation[0], 'error');
+      focusConfigValidation(validation);
+      return;
+    }
+    setButtonFeedback(button, 'pending', 'Speichert');
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
     populateForms();
@@ -233,6 +268,8 @@ async function saveConfig(button) {
     await loadSetupStatus();
     await loadPreflightStatus();
     renderIntegrations();
+    markConfigClean();
+    renderDashboard();
     setButtonFeedback(button, 'success', 'Gespeichert');
     showToast('Konfiguration gespeichert', 'ok');
   } catch (error) {
@@ -245,6 +282,12 @@ async function saveJsonConfig(button) {
   setButtonFeedback(button, 'pending', 'Speichert');
   try {
     const nextConfig = JSON.parse(configEditor.value);
+    const validation = validateConfigBeforeSave(nextConfig);
+    if (validation.length) {
+      setButtonFeedback(button, 'error', 'Prüfen');
+      showToast(validation[0], 'error');
+      return;
+    }
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
     populateForms();
@@ -259,12 +302,98 @@ async function saveJsonConfig(button) {
     await loadSetupStatus();
     await loadPreflightStatus();
     renderIntegrations();
+    markConfigClean();
+    renderDashboard();
     setButtonFeedback(button, 'success', 'Gespeichert');
     showToast('JSON gespeichert', 'ok');
   } catch (error) {
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
   }
+}
+
+function validateConfigBeforeSave(nextConfig) {
+  clearFieldValidation();
+  const errors = [];
+  const loxoneUrl = String(nextConfig.loxone?.baseUrl || '').trim();
+  if (!isValidHttpUrl(loxoneUrl)) {
+    errors.push('Bitte eine gültige Loxone-Miniserver-URL mit http:// oder https:// eintragen.');
+    markInvalid(loxoneBaseUrl);
+  }
+  if (!String(nextConfig.loxone?.username || '').trim()) {
+    errors.push('Bitte den Loxone-Benutzer eintragen.');
+    markInvalid(loxoneUsername);
+  }
+  if (!String(nextConfig.loxone?.password || '').trim()) {
+    errors.push('Bitte das Loxone-Passwort eintragen.');
+    markInvalid(loxonePassword);
+  }
+  const commandKeys = Object.keys(nextConfig.commands || {});
+  const duplicateLabels = duplicateValues(commandKeys.map((key) => normalizeText(nextConfig.commands?.[key]?.voiceName || nextConfig.commands?.[key]?.label || key)));
+  if (duplicateLabels.length) {
+    errors.push(`Doppelte Sprach-/Befehlsnamen prüfen: ${duplicateLabels.slice(0, 3).join(', ')}.`);
+  }
+  if (nextConfig.alexaBridge?.enabled && !Number.isFinite(Number(nextConfig.alexaBridge?.advertisePort))) {
+    errors.push('Bitte einen gültigen Alexa/Hue-Port eintragen.');
+    markInvalid(alexaBridgeAdvertisePort);
+  }
+  if (nextConfig.tts?.enabled && !String(nextConfig.tts?.cookieFile || '').trim()) {
+    errors.push('Bitte eine Cookie-Datei für Alexa TTS eintragen oder TTS deaktivieren.');
+    markInvalid(ttsCookieFile);
+  }
+  return errors;
+}
+
+function clearFieldValidation() {
+  document.querySelectorAll('.field-invalid').forEach((element) => element.classList.remove('field-invalid'));
+}
+
+function markInvalid(element) {
+  element?.classList.add('field-invalid');
+}
+
+function focusConfigValidation(errors) {
+  const firstInvalid = document.querySelector('.field-invalid');
+  if (firstInvalid) {
+    showView('configView');
+    firstInvalid.closest('details')?.setAttribute('open', '');
+    firstInvalid.focus();
+  }
+}
+
+function isValidHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function duplicateValues(values) {
+  const seen = new Set();
+  const duplicates = new Set();
+  values.filter(Boolean).forEach((value) => {
+    if (seen.has(value)) duplicates.add(value);
+    seen.add(value);
+  });
+  return [...duplicates];
+}
+
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function markConfigDirty() {
+  if (!config) return;
+  configDirty = true;
+  renderBackupReminder();
+  renderDashboard();
+}
+
+function markConfigClean() {
+  configDirty = false;
+  renderBackupReminder();
 }
 
 async function postTtsTest(kind, button) {
@@ -337,9 +466,29 @@ async function exportBackup(button) {
     }
     const blob = new Blob([`${JSON.stringify(backupPayload, null, 2)}\n`], { type: 'application/json' });
     downloadBlob(blob, filenameFromResponse(response) || `loxevo-backup-${timestampForFile(new Date())}.json`);
+    localStorage.setItem(LAST_BACKUP_EXPORT_KEY, new Date().toISOString());
+    configDirty = false;
+    renderDashboard();
     await loadEvents();
     setButtonFeedback(button, 'success', 'Exportiert');
     showToast(includeCookie ? 'Backup mit Cookie exportiert' : 'Backup exportiert', 'ok');
+  } catch (error) {
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
+}
+
+async function exportDiagnostics(button) {
+  setButtonFeedback(button, 'pending', 'Exportiert');
+  try {
+    const response = await adminFetch('/api/diagnostics', { cache: 'no-store' });
+    await ensureOk(response);
+    const payload = await response.json();
+    const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: 'application/json' });
+    downloadBlob(blob, filenameFromResponse(response) || `loxevo-diagnostics-${timestampForFile(new Date())}.json`);
+    await loadEvents();
+    setButtonFeedback(button, 'success', 'Exportiert');
+    showToast('Diagnose exportiert', 'ok');
   } catch (error) {
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
@@ -383,6 +532,8 @@ async function importBackup(button) {
     renderIntegrations();
     await loadEvents();
     if (importBackupFile) importBackupFile.value = '';
+    markConfigClean();
+    renderDashboard();
 
     setButtonFeedback(button, 'success', 'Importiert');
     showToast(result.cookieRestored ? 'Backup mit Cookie importiert' : 'Backup importiert', 'ok');
@@ -919,6 +1070,7 @@ async function runDiscoveryAction(action, button) {
     await loadSetupStatus();
     await loadPreflightStatus();
     await loadEvents();
+    renderDashboard();
     setButtonFeedback(button, 'success', successLabel);
     showToast(action === 'start' ? 'Gerätesuche aktiviert' : 'Gerätesuche beendet', 'ok');
   } catch (error) {
@@ -1090,6 +1242,10 @@ function showView(viewId) {
   closeDetailsInView(viewId);
   if (viewId === 'eventsView') {
     loadEvents();
+  }
+  if (viewId === 'dashboardView') {
+    renderDashboard();
+    loadPreflightStatus();
   }
   if (viewId === 'maintenanceView') {
     loadPreflightStatus();
@@ -1334,6 +1490,7 @@ function renderPreflightStatus() {
     card.append(summaryEl, body);
     preflightChecks.append(card);
   });
+  renderDashboard();
 }
 
 function sectionStatusText(section) {
@@ -1618,6 +1775,97 @@ function renderSetupStatus(errorText) {
     row.append(marker, content);
     setupChecks.append(row);
   });
+}
+
+async function refreshDashboard(button) {
+  if (button) setButtonFeedback(button, 'pending', 'Lädt');
+  try {
+    await loadTtsStatus();
+    await loadAlexaBridgeStatus();
+    await loadDiscoveryStatus();
+    await loadSetupStatus();
+    await loadAdminSecurityStatus();
+    await loadPreflightStatus();
+    await loadEvents();
+    renderDashboard();
+    if (button) {
+      setButtonFeedback(button, 'success', 'Aktualisiert');
+      showToast('Übersicht aktualisiert', 'ok');
+    }
+  } catch (error) {
+    if (button) setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
+}
+
+function renderDashboard() {
+  if (!dashboardCards) return;
+  const cards = [
+    dashboardCard('Loxone', config?.loxone?.dryRun === false ? 'Live-Modus' : 'Dry-Run', config?.loxone?.dryRun === false ? 'ok' : 'info', config?.loxone?.dryRun === false ? 'Befehle werden an den Miniserver gesendet.' : 'Befehle werden nur protokolliert.'),
+    dashboardCard('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'info', ttsStatus?.ready ? `${deviceListCount(ttsStatus.defaultDevices)} Standard-Gerät(e).` : humanizeTtsStatusError(ttsStatus?.error || '')),
+    dashboardCard('Virtuelle Alexa-Geräte', alexaBridgeInfo?.bridgeHttp?.ready ? 'Bereit' : config?.alexaBridge?.enabled ? 'HTTP prüfen' : 'Deaktiviert', alexaBridgeInfo?.bridgeHttp?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'warning' : 'info', `${alexaBridgeInfo?.deviceCount ?? 0} Gerät(e), Alexa/Hue-Port ${alexaBridgeInfo?.port || config?.alexaBridge?.advertisePort || 80}.`),
+    dashboardCard('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.'),
+    dashboardCard('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail()),
+    dashboardCard('Admin-Schutz', adminSecurityInfo?.enabled ? 'Aktiv' : 'Inaktiv', adminSecurityInfo?.enabled ? 'ok' : 'info', adminSecurityInfo?.message || 'Status wird geladen.'),
+    dashboardCard('Systemprüfung', preflightInfo?.summary?.level === 'error' ? 'Fehler' : preflightInfo?.summary?.level === 'warning' ? 'Prüfen' : 'OK', preflightInfo?.summary?.level || 'info', preflightInfo?.summary?.text || 'Noch nicht geprüft.'),
+    dashboardCard('Version', dashboardVersionText(), 'info', dashboardVersionDetail())
+  ];
+  dashboardCards.innerHTML = cards.join('');
+  renderBackupReminder();
+}
+
+function dashboardCard(title, value, level, detail) {
+  const safeLevel = ['ok', 'warning', 'error', 'optional', 'info'].includes(level) ? level : 'info';
+  return `
+    <article class="dashboard-card ${safeLevel}">
+      <span>${escapeHtml(title)}</span>
+      <strong>${escapeHtml(value || 'Unbekannt')}</strong>
+      <p>${escapeHtml(detail || '')}</p>
+    </article>
+  `;
+}
+
+function backupStateTitle() {
+  if (configDirty) return 'Änderungen offen';
+  return localStorage.getItem(LAST_BACKUP_EXPORT_KEY) ? 'Exportiert' : 'Noch kein Export';
+}
+
+function backupReminderLevel() {
+  return configDirty ? 'warning' : localStorage.getItem(LAST_BACKUP_EXPORT_KEY) ? 'ok' : 'info';
+}
+
+function backupStateDetail() {
+  const lastExport = localStorage.getItem(LAST_BACKUP_EXPORT_KEY);
+  if (configDirty) return 'Seit der letzten Änderung wurde noch kein Backup exportiert.';
+  return lastExport ? `Letzter Export in diesem Browser: ${formatDateTime(lastExport)}.` : 'Backup kann unter Wartung exportiert werden.';
+}
+
+function renderBackupReminder() {
+  if (!backupReminder) return;
+  if (!configDirty) {
+    backupReminder.hidden = true;
+    backupReminder.textContent = '';
+    return;
+  }
+  backupReminder.hidden = false;
+  backupReminder.textContent = 'Seit der letzten Änderung wurde noch kein Backup exportiert. Nach größeren Anpassungen unter Wartung ein Backup erstellen.';
+}
+
+function dashboardVersionText() {
+  const detail = String(findPreflightCheck('LoxEvo', 'Version')?.detail || '');
+  const match = detail.match(/LoxEvo\s+([0-9]+(?:\.[0-9]+){1,2})/);
+  return match?.[1] || 'Unbekannt';
+}
+
+function dashboardVersionDetail() {
+  return findPreflightCheck('LoxEvo', 'Version')?.detail || 'Version aus package.json.';
+}
+
+function findPreflightCheck(sectionTitle, label) {
+  return preflightInfo?.sections
+    ?.find((section) => section.title === sectionTitle)
+    ?.checks
+    ?.find((check) => check.label === label);
 }
 
 function populateForms() {
@@ -2447,8 +2695,8 @@ async function loadEvents(button) {
   try {
     const response = await fetch(`/api/events?ts=${Date.now()}`, { cache: 'no-store' });
     await ensureOk(response);
-    const events = await response.json();
-    renderEvents(events);
+    allEvents = await response.json();
+    renderEvents(allEvents);
     if (button) {
       setButtonFeedback(button, 'success', 'Aktualisiert');
       showToast('Protokoll aktualisiert', 'ok');
@@ -2461,13 +2709,14 @@ async function loadEvents(button) {
 
 function renderEvents(events) {
   if (!eventsEl) return;
-  if (!events.length) {
+  const filteredEvents = filterEvents(events || []);
+  if (!filteredEvents.length) {
     eventsEl.innerHTML = '<p class="empty">Noch keine Befehle.</p>';
     return;
   }
 
   eventsEl.innerHTML = '';
-  events.forEach((event) => {
+  filteredEvents.slice(0, 50).forEach((event) => {
     const row = document.createElement('div');
     row.className = 'event-row';
     const meta = document.createElement('div');
@@ -2479,6 +2728,43 @@ function renderEvents(events) {
     row.append(meta, detail);
     eventsEl.append(row);
   });
+}
+
+async function clearEvents(button) {
+  if (!window.confirm('Protokoll leeren? Die laufende Funktion von LoxEvo wird dadurch nicht verändert.')) return;
+  setButtonFeedback(button, 'pending', 'Leert');
+  try {
+    const response = await fetch('/api/events/clear', { method: 'POST' });
+    await ensureOk(response);
+    const payload = await response.json();
+    allEvents = payload.events || [];
+    renderEvents(allEvents);
+    setButtonFeedback(button, 'success', 'Geleert');
+    showToast('Protokoll geleert', 'ok');
+  } catch (error) {
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
+}
+
+function filterEvents(events) {
+  const search = normalizeText(eventSearch?.value || '');
+  return events.filter((event) => {
+    const bucket = eventBucket(event);
+    const matchesFilter = activeEventFilter === 'all' || bucket === activeEventFilter || (activeEventFilter === 'error' && event.status === 'error');
+    const text = normalizeText(`${event.type || ''} ${event.status || ''} ${event.key || ''} ${event.label || ''} ${event.text || ''} ${event.url || ''} ${event.error || ''}`);
+    return matchesFilter && (!search || text.includes(search));
+  });
+}
+
+function eventBucket(event) {
+  const type = String(event.type || '');
+  if (event.status === 'error') return 'error';
+  if (type.startsWith('tts')) return 'tts';
+  if (type.startsWith('alexa')) return 'alexa';
+  if (type === 'backup') return 'backup';
+  if (['command', 'light', 'alexa-command'].includes(type)) return 'loxone';
+  return 'all';
 }
 
 function eventDetailText(event) {

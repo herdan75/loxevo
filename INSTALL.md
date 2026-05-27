@@ -109,7 +109,7 @@ docker compose up -d --build --force-recreate
 
 Die Dateien in `data/` bleiben dabei erhalten.
 
-Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung. Sie prüft auf Abruf Konfiguration, Schreibrechte, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Die installierte `alexa-remote2`-Version, der Installationspfad und verfügbare Versionen sind dort sichtbar und können per Button aktualisiert werden.
+Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung. Sie prüft auf Abruf Konfiguration, Schreibrechte, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Die installierte `alexa-remote2`-Version, der Installationspfad und verfügbare Versionen sind dort sichtbar und können per Button aktualisiert werden. Für Support oder Fehlersuche kann dort außerdem ein Diagnosepaket exportiert werden; sensible Werte werden dabei maskiert oder nur als Status zusammengefasst.
 
 ## Optional: Alexa-Gerätesuche per Button
 

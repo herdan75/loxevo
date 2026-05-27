@@ -60,9 +60,11 @@ Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCoo
 Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen lokalen Login-Proxy. LoxEvo setzt dafür automatisch die LAN-IP des LoxBerry; bei Bedarf kann `tts.proxyOwnIp` und `tts.proxyPort` in der Web-UI angepasst werden.
 Für den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
-Die Web-UI zeigt unter `Wartung` eine lokale Systemprüfung für Konfiguration, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Diese Prüfung läuft beim Öffnen des Registers oder per Button und erzeugt keine dauernde Hintergrundlast.
+Die Web-UI startet mit einer kompakten `Übersicht`. Dort sieht man auf einen Blick, ob Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche, Backup, Admin-Schutz und Systemprüfung in einem sinnvollen Zustand sind.
+Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung für Konfiguration, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Diese Prüfung läuft beim Öffnen des Registers oder per Button und erzeugt keine dauernde Hintergrundlast.
 Im gleichen Register zeigt LoxEvo die installierte `alexa-remote2`-Version und verfügbare npm-Versionen und kann Installation oder Update im laufenden Container anstoßen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
 Im gleichen Register können die Einstellungen als Backup exportiert und später wieder importiert werden. Der Export enthält standardmäßig die LoxEvo-Konfiguration; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden.
+Zusätzlich kann dort ein Diagnosepaket exportiert werden. Es enthält Health-Status, Systemprüfung, Versionsinformationen, eine zusammengefasste Konfiguration und die letzten Ereignisse. Zugangsdaten, Token und Hostnamen werden dabei nicht im Klartext ausgegeben.
 Backup-Dateien können sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten und sollten deshalb privat bleiben.
 
 Private Daten gehören in `data/`:
@@ -93,11 +95,12 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell können dort gepflegt w
 
 Die Oberfläche ist in klare Bereiche gegliedert:
 
+- `Übersicht`: kompakter Betriebszustand und Hinweise zu Backup, Version, Alexa und Loxone
 - `Testen`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI prüfen
 - `Externe Aufrufe`: fertige URLs für Alexa-Routinen, Loxone und optionale externe Tools testen und kopieren
 - `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
-- `Wartung`: Systemprüfung ausführen, Paketversionen prüfen, `alexa-remote2` verwalten, Backup exportieren und Backup importieren
-- `Protokoll`: zuletzt simulierte oder gesendete Aktionen ansehen
+- `Wartung`: Systemprüfung ausführen, Diagnose exportieren, Paketversionen prüfen, `alexa-remote2` verwalten, Backup exportieren und Backup importieren
+- `Protokoll`: zuletzt simulierte oder gesendete Aktionen filtern, durchsuchen und bei Bedarf leeren
 
 Die JSON-Ansicht bleibt als Expertenmodus erhalten.
 

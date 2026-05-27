@@ -142,12 +142,22 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
     return sendJson(res, events);
   }
 
+  if (req.method === 'POST' && pathParts[1] === 'events' && pathParts[2] === 'clear') {
+    events.length = 0;
+    addEvent({ type: 'events', status: 'cleared', text: 'Protokoll wurde geleert.' });
+    return sendJson(res, { ok: true, events });
+  }
+
   if (req.method === 'GET' && pathParts[1] === 'setup-status') {
     return sendJson(res, getSetupStatus());
   }
 
   if (req.method === 'GET' && pathParts[1] === 'preflight') {
     return sendJson(res, await getPreflightStatus());
+  }
+
+  if (req.method === 'GET' && pathParts[1] === 'diagnostics') {
+    return await exportDiagnostics(res);
   }
 
   if (req.method === 'GET' && pathParts[1] === 'admin' && pathParts[2] === 'status') {
@@ -264,6 +274,7 @@ function requiresAdminToken(req, pathParts) {
   if (method === 'PUT' && resource === 'config') return true;
   if (method === 'GET' && resource === 'backup') return true;
   if (method === 'POST' && resource === 'backup' && action === 'restore') return true;
+  if (method === 'GET' && resource === 'diagnostics') return true;
   if (method === 'POST' && resource === 'dependencies' && action === 'alexa-remote2' && subAction === 'update') return true;
   if (method === 'POST' && resource === 'system' && action === 'restart') return true;
   if (method === 'PUT' && resource === 'dry-run') return true;
@@ -452,6 +463,158 @@ async function restoreBackup(res, backupPayload) {
   });
 
   return sendJson(res, { ok: true, config, backupPath: currentBackupPath, cookieRestored });
+}
+
+async function exportDiagnostics(res) {
+  const exportedAt = new Date().toISOString();
+  const diagnostics = {
+    app: config.server?.name || 'LoxEvo',
+    formatVersion: 1,
+    exportedAt,
+    health: {
+      ok: true,
+      name: config.server?.name || 'LoxEvo',
+      tts: summarizeTtsStatus(tts.getStatus()),
+      alexaBridge: summarizeAlexaBridgeStatus(getAlexaBridgeStatus())
+    },
+    adminSecurity: getAdminSecurityStatus(),
+    preflight: sanitizeDiagnosticValue(await getPreflightStatus()),
+    dependencies: sanitizeDiagnosticValue([await getDependencyStatus('alexa-remote2')]),
+    configSummary: sanitizeConfigForDiagnostics(config),
+    recentEvents: events.slice(0, 50).map(sanitizeEventForDiagnostics)
+  };
+
+  addEvent({ type: 'diagnostics', status: 'exported', text: 'Diagnose exportiert.' });
+  return sendJsonDownload(res, diagnostics, `loxevo-diagnostics-${timestampForFile(exportedAt)}.json`);
+}
+
+function summarizeTtsStatus(status) {
+  return {
+    enabled: Boolean(status?.enabled),
+    ready: Boolean(status?.ready),
+    error: status?.error ? redactDiagnosticText(String(status.error)) : null,
+    defaultDevicesCount: configuredCount(status?.defaultDevices),
+    allDevicesCount: configuredCount(status?.allDevices),
+    alarmDevicesCount: configuredCount(status?.alarmDevices),
+    defaultVolume: status?.defaultVolume,
+    alarmVolume: status?.alarmVolume,
+    nativeSequences: Boolean(status?.nativeSequences)
+  };
+}
+
+function summarizeAlexaBridgeStatus(status) {
+  return {
+    enabled: Boolean(status?.enabled),
+    ready: Boolean(status?.ready),
+    error: status?.error ? redactDiagnosticText(String(status.error)) : null,
+    port: status?.port,
+    ssdpPort: status?.ssdpPort,
+    ssdpMode: status?.ssdpMode,
+    discoveryPaused: Boolean(status?.discoveryPaused),
+    deviceCount: status?.deviceCount,
+    bridgeHttp: status?.bridgeHttp
+      ? {
+          enabled: Boolean(status.bridgeHttp.enabled),
+          ready: Boolean(status.bridgeHttp.ready),
+          error: status.bridgeHttp.error ? redactDiagnosticText(String(status.bridgeHttp.error)) : null,
+          port: status.bridgeHttp.port
+        }
+      : undefined
+  };
+}
+
+function sanitizeConfigForDiagnostics(sourceConfig) {
+  return {
+    server: {
+      name: sourceConfig.server?.name,
+      port: sourceConfig.server?.port
+    },
+    loxone: {
+      baseUrl: redactUrlHost(sourceConfig.loxone?.baseUrl),
+      usernameConfigured: isConfiguredSecret(sourceConfig.loxone?.username),
+      passwordConfigured: isConfiguredSecret(sourceConfig.loxone?.password),
+      dryRun: sourceConfig.loxone?.dryRun
+    },
+    commands: {
+      count: Object.keys(sourceConfig.commands || {}).length,
+      activeCount: Object.values(sourceConfig.commands || {}).filter((command) => command?.enabled !== false).length,
+      categories: Array.from(new Set(Object.values(sourceConfig.commands || {}).map((command) => command?.category).filter(Boolean)))
+    },
+    alexaBridge: {
+      enabled: Boolean(sourceConfig.alexaBridge?.enabled),
+      advertiseIpConfigured: Boolean(sourceConfig.alexaBridge?.advertiseIp),
+      advertisePort: sourceConfig.alexaBridge?.advertisePort,
+      deviceCount: getAlexaBridgeStatus().deviceCount
+    },
+    tts: {
+      enabled: Boolean(sourceConfig.tts?.enabled),
+      cookieFile: sourceConfig.tts?.cookieFile,
+      defaultDevicesCount: configuredCount(sourceConfig.tts?.defaultDevices),
+      allDevicesCount: configuredCount(sourceConfig.tts?.allDevices),
+      alarmDevicesCount: configuredCount(sourceConfig.tts?.alarmDevices),
+      defaultVolume: sourceConfig.tts?.defaultVolume,
+      alarmVolume: sourceConfig.tts?.alarmVolume
+    }
+  };
+}
+
+function sanitizeEventForDiagnostics(event) {
+  return {
+    at: event.at,
+    type: event.type,
+    status: event.status,
+    key: event.key,
+    label: event.label,
+    category: event.category,
+    room: event.room,
+    function: event.function,
+    action: event.action,
+    commandType: event.commandType,
+    compat: event.compat,
+    text: event.text ? truncate(redactDiagnosticText(String(event.text)), 140) : undefined,
+    error: event.error ? truncate(redactDiagnosticText(String(event.error)), 180) : undefined,
+    volume: event.volume,
+    devicesCount: Array.isArray(event.devices) ? event.devices.length : undefined,
+    url: event.url ? redactUrl(event.url) : undefined
+  };
+}
+
+function redactUrlHost(value) {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    return `${url.protocol}//<host>${url.port ? `:${url.port}` : ''}`;
+  } catch {
+    return '<configured>';
+  }
+}
+
+function redactUrl(value) {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    url.hostname = '<host>';
+    if (url.username) url.username = '';
+    if (url.password) url.password = '';
+    return url.toString();
+  } catch {
+    return String(value).replace(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g, '<ip>');
+  }
+}
+
+function sanitizeDiagnosticValue(value) {
+  if (Array.isArray(value)) return value.map(sanitizeDiagnosticValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [key, sanitizeDiagnosticValue(nestedValue)]));
+  }
+  if (typeof value === 'string') return redactDiagnosticText(value);
+  return value;
+}
+
+function redactDiagnosticText(value) {
+  return value
+    .replace(/https?:\/\/[^\s"'<>]+/g, (match) => redactUrl(match))
+    .replace(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g, '<ip>');
 }
 
 function readBackupConfig(payload) {

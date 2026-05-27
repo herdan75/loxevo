@@ -32,14 +32,32 @@
       <section id="systemNotice" class="system-notice wide" hidden></section>
 
       <nav class="tab-nav wide" aria-label="LoxEvo Bereiche">
-        <button class="tab-button active" type="button" data-tab-target="controlView">Testen</button>
+        <button class="tab-button active" type="button" data-tab-target="dashboardView">Übersicht</button>
+        <button class="tab-button" type="button" data-tab-target="controlView">Testen</button>
         <button class="tab-button" type="button" data-tab-target="integrationView">Externe Aufrufe</button>
         <button class="tab-button" type="button" data-tab-target="configView">Konfiguration</button>
         <button class="tab-button" type="button" data-tab-target="maintenanceView">Wartung</button>
         <button class="tab-button" type="button" data-tab-target="eventsView">Protokoll</button>
       </nav>
 
-      <section id="controlView" class="view active wide">
+      <section id="dashboardView" class="view active wide">
+        <section class="panel wide dashboard-panel">
+          <div class="section-head">
+            <div>
+              <h2>Übersicht</h2>
+              <p>Aktueller Zustand von Loxone, Alexa, TTS, Backup und Schutz.</p>
+            </div>
+            <div class="actions">
+              <button id="refreshDashboardBtn" type="button" class="secondary">Status aktualisieren</button>
+              <button id="dashboardConfigBtn" type="button">Zur Konfiguration</button>
+            </div>
+          </div>
+          <div id="dashboardCards" class="dashboard-grid"></div>
+          <div id="backupReminder" class="service-status warning" hidden></div>
+        </section>
+      </section>
+
+      <section id="controlView" class="view wide">
       <section id="setupPanel" class="panel wide setup-panel">
         <div class="section-head">
           <div>
@@ -307,7 +325,10 @@ Content-Type: application/json
             <h2>Systemprüfung</h2>
             <p>Lokaler Statuscheck für Konfiguration, Schreibrechte, Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup.</p>
           </div>
-          <button id="refreshPreflightBtn" type="button" class="secondary">Systemprüfung aktualisieren</button>
+          <div class="actions">
+            <button id="exportDiagnosticsBtn" type="button" class="secondary">Diagnose exportieren</button>
+            <button id="refreshPreflightBtn" type="button" class="secondary">Systemprüfung aktualisieren</button>
+          </div>
         </div>
         <div id="preflightSummary" class="service-status">Systemprüfung noch nicht geladen.</div>
         <div id="preflightChecks" class="preflight-list"></div>
@@ -440,7 +461,19 @@ Content-Type: application/json
             <h2>Letzte Aktionen</h2>
             <p>Zeigt, was LoxEvo zuletzt simuliert oder gesendet hat.</p>
           </div>
-          <button id="refreshEventsBtn">Aktualisieren</button>
+          <div class="actions">
+            <button id="clearEventsBtn" type="button" class="secondary">Protokoll leeren</button>
+            <button id="refreshEventsBtn" type="button">Aktualisieren</button>
+          </div>
+        </div>
+        <div class="event-toolbar" aria-label="Protokollfilter">
+          <button type="button" class="event-filter active" data-event-filter="all">Alle</button>
+          <button type="button" class="event-filter" data-event-filter="error">Fehler</button>
+          <button type="button" class="event-filter" data-event-filter="loxone">Loxone</button>
+          <button type="button" class="event-filter" data-event-filter="alexa">Alexa</button>
+          <button type="button" class="event-filter" data-event-filter="tts">TTS</button>
+          <button type="button" class="event-filter" data-event-filter="backup">Backup</button>
+          <input id="eventSearch" type="search" placeholder="Protokoll durchsuchen">
         </div>
         <div id="events" class="events"></div>
       </section>

@@ -378,6 +378,56 @@ h2 {
   gap: 8px;
 }
 
+.wizard-footer-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-token-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.admin-token-dialog {
+  display: grid;
+  gap: 14px;
+  width: min(440px, 100%);
+  padding: 22px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+}
+
+.admin-token-dialog h2 {
+  margin-top: 2px;
+}
+
+.admin-token-message {
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.admin-token-dialog label:not(.switch-row) {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.admin-token-show {
+  justify-content: flex-start;
+  color: var(--muted);
+}
+
+.admin-token-actions {
+  justify-content: flex-end;
+}
+
 .field-invalid {
   border-color: var(--danger) !important;
   box-shadow: 0 0 0 2px rgba(161, 58, 50, 0.12);

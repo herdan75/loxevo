@@ -24,7 +24,6 @@ const startWizardBtn = document.querySelector('#startWizardBtn');
 const skipWizardBtn = document.querySelector('#skipWizardBtn');
 const wizardModal = document.querySelector('#wizardModal');
 const closeWizardBtn = document.querySelector('#closeWizardBtn');
-const dismissWizardBtn = document.querySelector('#dismissWizardBtn');
 const wizardBackBtn = document.querySelector('#wizardBackBtn');
 const wizardNextBtn = document.querySelector('#wizardNextBtn');
 const wizardStepLabel = document.querySelector('#wizardStepLabel');
@@ -141,7 +140,6 @@ dashboardConfigBtn?.addEventListener('click', () => showView('configView'));
 startWizardBtn?.addEventListener('click', () => openWizard(0));
 skipWizardBtn?.addEventListener('click', () => skipWizardPrompt());
 closeWizardBtn?.addEventListener('click', () => closeWizard());
-dismissWizardBtn?.addEventListener('click', () => skipWizardPrompt(true));
 wizardBackBtn?.addEventListener('click', () => moveWizard(-1));
 wizardNextBtn?.addEventListener('click', () => moveWizard(1));
 wizardModal?.addEventListener('click', (event) => {
@@ -710,15 +708,110 @@ async function adminFetch(url, options = {}) {
   const payload = await response.clone().json().catch(() => ({}));
   if (payload.code !== 'admin_token_required') return response;
 
-  const token = window.prompt('Admin-Token erforderlich. Bitte den LoxEvo Admin-Token eingeben:');
-  if (!token) return response;
-
-  sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token.trim());
-  response = await fetchWithAdminToken(url, options);
-  if (response.status === 401) {
+  const authenticatedResponse = await requestAdminToken('Bitte den LoxEvo Admin-Token eingeben.', async (token) => {
     sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-  }
-  return response;
+    sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token.trim());
+    const retryResponse = await fetchWithAdminToken(url, options);
+    if (retryResponse.status === 401) {
+      sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+      return { ok: false, message: 'Admin-Token war nicht korrekt. Bitte erneut eingeben.' };
+    }
+    return { ok: true, response: retryResponse };
+  });
+
+  return authenticatedResponse || response;
+}
+
+function requestAdminToken(message, verifyToken) {
+  return new Promise((resolve) => {
+    const modal = document.createElement('div');
+    modal.className = 'admin-token-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'adminTokenPromptTitle');
+
+    modal.innerHTML = `
+      <form class="admin-token-dialog">
+        <div>
+          <p class="eyebrow">Admin-Schutz</p>
+          <h2 id="adminTokenPromptTitle">Admin-Token erforderlich</h2>
+          <p class="admin-token-message"></p>
+        </div>
+        <label>
+          <span>Admin-Token</span>
+          <input class="admin-token-input" type="password" autocomplete="current-password">
+        </label>
+        <label class="switch-row admin-token-show">
+          <input class="admin-token-toggle" type="checkbox">
+          <span>Token anzeigen</span>
+        </label>
+        <div class="actions admin-token-actions">
+          <button type="button" class="secondary admin-token-cancel">Abbrechen</button>
+          <button type="submit">Entsperren</button>
+        </div>
+      </form>
+    `;
+
+    const form = modal.querySelector('form');
+    const messageEl = modal.querySelector('.admin-token-message');
+    const input = modal.querySelector('.admin-token-input');
+    const toggle = modal.querySelector('.admin-token-toggle');
+    const cancelButton = modal.querySelector('.admin-token-cancel');
+    const submitButton = modal.querySelector('button[type="submit"]');
+
+    const close = (value) => {
+      document.body.classList.remove('modal-open');
+      modal.remove();
+      resolve(value);
+    };
+
+    messageEl.textContent = message;
+    toggle.addEventListener('change', () => {
+      input.type = toggle.checked ? 'text' : 'password';
+      input.focus();
+    });
+    cancelButton.addEventListener('click', () => close(null));
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) close(null);
+    });
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const token = input.value.trim();
+      if (!token) {
+        input.focus();
+        return;
+      }
+      if (!verifyToken) {
+        close(token);
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.textContent = 'Prüfen...';
+      let result;
+      try {
+        result = await verifyToken(token);
+      } catch (error) {
+        result = { ok: false, message: error.message || 'Admin-Token konnte nicht geprüft werden.' };
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Entsperren';
+      }
+
+      if (result?.ok) {
+        close(result.response);
+        return;
+      }
+
+      messageEl.textContent = result?.message || 'Admin-Token war nicht korrekt. Bitte erneut eingeben.';
+      input.value = '';
+      input.focus();
+    });
+
+    document.body.append(modal);
+    document.body.classList.add('modal-open');
+    input.focus();
+  });
 }
 
 function fetchWithAdminToken(url, options = {}) {

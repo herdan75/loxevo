@@ -31,7 +31,7 @@ Loxone
 ```
 
 Der aktuelle Stand ist eine Docker-fähige Basis mit HTTP-API, Web-UI, generischen Loxone-Befehlen und integriertem TTS-Modul.
-Loxone-Befehle laufen standardmäßig im Dry-Run-Modus, damit lokal gefahrlos getestet werden kann.
+Loxone-Befehle laufen standardmässig im Dry-Run-Modus, damit lokal gefahrlos getestet werden kann.
 Wenn TTS aktiviert wird, aber `alexa-remote2` oder die Cookie-Datei noch fehlt, startet LoxEvo trotzdem weiter und zeigt den TTS-Status in der Web-UI an.
 Optional kann LoxEvo virtuelle Alexa-Geräte im lokalen Netzwerk bereitstellen. Alexa findet diese Geräte über die lokale Gerätesuche; ein Einschaltbefehl wie `Alexa, <Gerätename> an` löst dann den passenden LoxEvo-Befehl aus.
 
@@ -52,7 +52,7 @@ Web-UI:
 http://<loxberry>:8080
 ```
 
-In `data/config.json` ist `loxone.dryRun` standardmäßig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie im Protokoll, sendet aber noch nichts an Loxone.
+In `data/config.json` ist `loxone.dryRun` standardmässig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie im Protokoll, sendet aber noch nichts an Loxone.
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
 TTS braucht das Paket `alexa-remote2` und eine gültige Alexa-Cookie-Datei. Das Paket wird bewusst nicht fest im Docker-Build installiert, damit LoxEvo auch dann startet, wenn npm-Versionen wechseln. Installiere oder aktualisiere es in der Web-UI unter `Wartung`; im Docker/LoxBerry-Betrieb landet es im gemounteten `/config`-Bereich.
@@ -61,10 +61,10 @@ Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen l
 Für den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
 Die Web-UI startet mit einer kompakten `Übersicht`. Dort sieht man auf einen Blick, ob Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche, Backup, Admin-Schutz und Systemprüfung in einem sinnvollen Zustand sind.
-Auf der Übersicht steht außerdem ein überspringbarer Einrichtungsassistent bereit. Er führt Schritt für Schritt durch Loxone-Zugang, erste Befehle, Dry-Run/Live-Modus, virtuelle Alexa-Geräte, optionale Gerätesuche, TTS und Backup. Der Assistent ändert nichts automatisch; Aktionen wie `Gerätesuche aktivieren` müssen bewusst geklickt werden.
+Auf der Übersicht steht ausserdem ein überspringbarer Einrichtungsassistent bereit. Er führt Schritt für Schritt durch Loxone-Zugang, erste Befehle, Dry-Run/Live-Modus, virtuelle Alexa-Geräte, optionale Gerätesuche, TTS und Backup. Der Assistent ändert nichts automatisch; Aktionen wie `Gerätesuche aktivieren` müssen bewusst geklickt werden.
 Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung für Konfiguration, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Diese Prüfung läuft beim Öffnen des Registers oder per Button und erzeugt keine dauernde Hintergrundlast.
-Im gleichen Register zeigt LoxEvo die installierte `alexa-remote2`-Version und verfügbare npm-Versionen und kann Installation oder Update im laufenden Container anstoßen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
-Im gleichen Register können die Einstellungen als Backup exportiert und später wieder importiert werden. Der Export enthält standardmäßig die LoxEvo-Konfiguration; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden.
+Im gleichen Register zeigt LoxEvo die installierte `alexa-remote2`-Version und verfügbare npm-Versionen und kann Installation oder Update im laufenden Container anstossen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
+Im gleichen Register können die Einstellungen als Backup exportiert und später wieder importiert werden. Der Export enthält standardmässig die LoxEvo-Konfiguration; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden.
 Zusätzlich kann dort ein Diagnosepaket exportiert werden. Es enthält Health-Status, Systemprüfung, Versionsinformationen, eine zusammengefasste Konfiguration und die letzten Ereignisse. Zugangsdaten, Token und Hostnamen werden dabei nicht im Klartext ausgegeben.
 Backup-Dateien können sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten und sollten deshalb privat bleiben.
 
@@ -83,7 +83,7 @@ Optional kann in der Web-UI unter `Wartung` ein Admin-Token für sensible Bereic
 
 Wenn der Token gesetzt ist, verlangt LoxEvo für Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update und Dry-Run-Umschaltung den Header `X-LoxEvo-Admin-Token`. Die Web-UI fragt den Token bei Bedarf ab und merkt ihn nur für die aktuelle Browser-Sitzung. Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Endpunkte, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Alexa- und Loxone-Aufrufe nicht brechen.
 
-Der über die Web-UI gesetzte Token wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab. Der normale Backup-Export enthält diesen Hash nicht. Alternativ kann der Schutz weiterhin per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser Wert hat Vorrang und wird außerhalb der Web-UI verwaltet.
+Der über die Web-UI gesetzte Token wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab. Der normale Backup-Export enthält diesen Hash nicht. Alternativ kann der Schutz weiterhin per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser Wert hat Vorrang und wird ausserhalb der Web-UI verwaltet.
 
 Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell können dort gepflegt werden:
 
@@ -96,7 +96,7 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell können dort gepflegt w
 
 Die Oberfläche ist in klare Bereiche gegliedert:
 
-- `Übersicht`: kompakter Betriebszustand, Einrichtungsassistent und Hinweise zu Backup, Version, Alexa und Loxone
+- `Übersicht`: kompakte Statuskontrolle, Einrichtungsassistent und Hinweise zu Backup, Alexa und Loxone
 - `Testen`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI prüfen
 - `Externe Aufrufe`: fertige URLs für Alexa-Routinen, Loxone und optionale externe Tools testen und kopieren
 - `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
@@ -284,7 +284,7 @@ In Loxone Config einen virtuellen Ausgang anlegen, zum Beispiel `LoxEvo TTS`.
 Adresse:
 http://<loxberry-ip>:8080/
 
-Verbindung nach Senden schließen:
+Verbindung nach Senden schliessen:
 aktiviert
 ```
 
@@ -295,7 +295,7 @@ Adresse:
 http://<loxberry-ip>:8080/
 ```
 
-Die Web-UI von LoxEvo läuft standardmäßig auf Port `8080`. Der Alexa/Hue-Port `80` ist nur für die virtuelle Alexa-Gerätesuche relevant, nicht für diese Loxone-TTS-Aufrufe.
+Die Web-UI von LoxEvo läuft standardmässig auf Port `8080`. Der Alexa/Hue-Port `80` ist nur für die virtuelle Alexa-Gerätesuche relevant, nicht für diese Loxone-TTS-Aufrufe.
 
 ### Normale Sprachausgabe
 
@@ -456,7 +456,7 @@ Unterstützt:
 - `text` oder `t`
 - `vol`
 - `device=ALL`
-- Text `0` wird standardmäßig ignoriert
+- Text `0` wird standardmässig ignoriert
 - `ss` und `Grad` werden für bessere Aussprache normalisiert
 
 Hinweis: Auch dieser kompatible Einstieg nutzt die TTS-Gerätelisten aus der Web-UI. Mit `device=ALL` werden die `Alle-Geräte` genutzt, sonst die `Standard-Geräte`.

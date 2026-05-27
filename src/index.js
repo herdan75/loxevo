@@ -326,7 +326,7 @@ function getAdminSecurityStatus() {
 
 function describeAdminSecurity(source) {
   if (source === 'environment') {
-    return 'Admin-Schutz ist über LOXEVO_ADMIN_TOKEN aktiv und wird außerhalb der Web-UI verwaltet.';
+    return 'Admin-Schutz ist über LOXEVO_ADMIN_TOKEN aktiv und wird ausserhalb der Web-UI verwaltet.';
   }
   if (source === 'ui') {
     return 'Admin-Schutz ist aktiv und wird über die Web-UI verwaltet.';
@@ -1167,7 +1167,7 @@ function describeCookieInfo(info, enabled) {
     return `TTS ist deaktiviert. Konfigurierter Pfad: ${info.path}.`;
   }
   if (info.exists) {
-    return `Lesbar: ${info.path}. Größe: ${formatBytes(info.size)}, geändert: ${formatDateTimeForDetail(info.modifiedAt)}.`;
+    return `Lesbar: ${info.path}. Grösse: ${formatBytes(info.size)}, geändert: ${formatDateTimeForDetail(info.modifiedAt)}.`;
   }
   return `Nicht lesbar: ${info.path}. ${info.error || ''}`.trim();
 }
@@ -1765,7 +1765,7 @@ function readBody(req) {
     req.on('data', (chunk) => {
       data += chunk;
       if (data.length > MAX_REQUEST_BODY_SIZE) {
-        reject(new Error('Request body zu groß.'));
+        reject(new Error('Request body zu gross.'));
         req.destroy();
       }
     });

@@ -111,7 +111,7 @@ So wird der LoxBerry-SSDP-Dienst nur für die eigentliche Suche pausiert.
 
 ## Backup und Deinstallation
 
-Vor größeren Änderungen kann in der Web-UI unter `Wartung` ein Backup exportiert werden. Standardmäßig enthält es `data/config.json`; die Alexa-Cookie-Datei `data/Node.txt` wird nur mit exportiert, wenn der Haken dafür gesetzt ist. Der Admin-Token-Hash wird nicht im normalen Backup exportiert. Backup-Dateien können sensible Loxone- und Alexa-Daten enthalten und sollten privat bleiben.
+Vor grösseren Änderungen kann in der Web-UI unter `Wartung` ein Backup exportiert werden. Standardmässig enthält es `data/config.json`; die Alexa-Cookie-Datei `data/Node.txt` wird nur mit exportiert, wenn der Haken dafür gesetzt ist. Der Admin-Token-Hash wird nicht im normalen Backup exportiert. Backup-Dateien können sensible Loxone- und Alexa-Daten enthalten und sollten privat bleiben.
 
 Für Fehlersuche kann im gleichen Register ein Diagnosepaket exportiert werden. Es enthält Statusdaten, Systemprüfung, Versionsinformationen und gekürzte letzte Ereignisse. Zugangsdaten, Token und Hostnamen werden dabei nicht im Klartext ausgegeben.
 

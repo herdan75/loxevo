@@ -373,14 +373,14 @@ Content-Type: application/json
            <p>Geschützt sind unter anderem:
           Konfiguration, Backup/Restore, Neustart, <code>alexa-remote2</code>-Update, Dry-Run-Umschaltung und die Admin-Token-Verwaltung.</p>
 
-          <p>Der Token wird absichtlich nur temporär im aktuellen Browser-Tab gespeichert (<code>sessionStorage</code>). Nach Schließen des Tabs oder Browsers muss der Token erneut eingegeben werden. Der Token wird nicht dauerhaft im Browser gespeichert und nicht an Alexa, Loxone oder andere externe Systeme weitergegeben.</p>
+          <p>Der Token wird absichtlich nur temporär im aktuellen Browser-Tab gespeichert (<code>sessionStorage</code>). Nach Schliessen des Tabs oder Browsers muss der Token erneut eingegeben werden. Der Token wird nicht dauerhaft im Browser gespeichert und nicht an Alexa, Loxone oder andere externe Systeme weitergegeben.</p>
 
           <p>Bewusst weiterhin ohne Admin-Token erreichbar bleiben:
           Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Aufrufe, <code>/health</code>, Protokoll, Einrichtung und Systemprüfung. Dadurch funktionieren bestehende Alexa-, Loxone-, Home-Assistant- oder Node-RED-Automationen weiterhin ohne zusätzliche Anpassungen.</p>
 
           <p>Wenn der Schutz über die Web-UI aktiviert wird, speichert LoxEvo nur einen kryptographischen Hash im Datenordner. Der eigentliche Token wird nicht im Klartext gespeichert und nicht im normalen Backup exportiert.</p>
 
-          <p>Ein gesetztes <code>LOXEVO_ADMIN_TOKEN</code> aus Docker oder der Container-Umgebung hat Vorrang und kann ausschließlich dort geändert oder entfernt werden.</p>
+          <p>Ein gesetztes <code>LOXEVO_ADMIN_TOKEN</code> aus Docker oder der Container-Umgebung hat Vorrang und kann ausschliesslich dort geändert oder entfernt werden.</p>
         </div>
         <div id="adminSecurityStatus" class="service-status">Admin-Schutz wird geladen...</div>
         <div class="backup-grid admin-security-grid">
@@ -497,7 +497,7 @@ Content-Type: application/json
             <p id="wizardStepLabel" class="eyebrow">Einrichtungsassistent</p>
             <h2 id="wizardTitle">LoxEvo einrichten</h2>
           </div>
-          <button id="closeWizardBtn" type="button" class="info-button" aria-label="Assistent schließen">×</button>
+          <button id="closeWizardBtn" type="button" class="info-button" aria-label="Assistent schliessen">×</button>
         </div>
         <div id="wizardProgress" class="wizard-progress"></div>
         <div id="wizardBody" class="wizard-body"></div>

@@ -33,7 +33,7 @@ Die Web-UI ist für das eigene LAN gedacht. Port `8080` sollte nicht direkt ins 
 
 Optional kann ein Admin-Token für sensible Web-UI-Aktionen direkt in der Web-UI unter `Wartung` aktiviert werden. Ohne Token läuft LoxEvo wie bisher. Mit aktivem Token fragt die Web-UI bei Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update und Dry-Run-Umschaltung nach dem Token. Loxone-Befehle, TTS-Aufrufe und virtuelle Alexa-Geräte bleiben weiterhin ohne Token erreichbar.
 
-Der Web-UI-Token wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab und nimmt diesen nicht in den normalen Backup-Export auf. Optional kann der Schutz auch per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser Wert hat Vorrang und wird außerhalb der Web-UI gepflegt.
+Der Web-UI-Token wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab und nimmt diesen nicht in den normalen Backup-Export auf. Optional kann der Schutz auch per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser Wert hat Vorrang und wird ausserhalb der Web-UI gepflegt.
 
 ## Ersteinrichtung in der Web-UI
 
@@ -45,7 +45,7 @@ Der Web-UI-Token wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash 
 6. Konfiguration speichern.
 7. Unter `Testen` einen Befehl testen.
 8. Unter `Protokoll` prüfen, welche Loxone-URL erzeugt wurde.
-9. Optional TTS und virtuelle Alexa-Geräte einrichten. Wenn neue Alexa-Geräte gesucht werden sollen, führt der Assistent durch das kurze Aktivieren und anschließende Beenden der Gerätesuche.
+9. Optional TTS und virtuelle Alexa-Geräte einrichten. Wenn neue Alexa-Geräte gesucht werden sollen, führt der Assistent durch das kurze Aktivieren und anschliessende Beenden der Gerätesuche.
 10. Erst wenn alles passt, Dry-Run deaktivieren.
 
 ## Private Konfiguration
@@ -109,7 +109,7 @@ docker compose up -d --build --force-recreate
 
 Die Dateien in `data/` bleiben dabei erhalten.
 
-Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung. Sie prüft auf Abruf Konfiguration, Schreibrechte, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Die installierte `alexa-remote2`-Version, der Installationspfad und verfügbare Versionen sind dort sichtbar und können per Button aktualisiert werden. Für Support oder Fehlersuche kann dort außerdem ein Diagnosepaket exportiert werden; sensible Werte werden dabei maskiert oder nur als Status zusammengefasst.
+Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung. Sie prüft auf Abruf Konfiguration, Schreibrechte, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Die installierte `alexa-remote2`-Version, der Installationspfad und verfügbare Versionen sind dort sichtbar und können per Button aktualisiert werden. Für Support oder Fehlersuche kann dort ausserdem ein Diagnosepaket exportiert werden; sensible Werte werden dabei maskiert oder nur als Status zusammengefasst.
 
 ## Optional: Alexa-Gerätesuche per Button
 

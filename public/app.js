@@ -1139,7 +1139,7 @@ function renderSystemNotice() {
         level: 'info',
         title: '',
         text: 'Virtuelle Alexa-Geräte sind aktiviert und funktionsfähig. SSDP/UDP 1900 ist aktuell aber belegt. Für das Suchen und Hinzufügen neuer Geräte unter Konfiguration -> Alexa-Gerätesuche aktivieren.',
-        help: 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Für den normalen Betrieb und für bereits gefundene Geräte ist ein belegter Port 1900 kein Problem. Wenn neue Geräte hinzugefügt werden sollen: Konfiguration -> Alexa-Gerätesuche öffnen, Gerätesuche aktivieren, in der Alexa-App Geräte suchen und danach die Gerätesuche wieder beenden. So wird der Zugriff auf SSDP/UDP 1900 nur temporär genutzt und anschließend wieder an die andere Anwendung zurückgegeben.'
+        help: 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Für den normalen Betrieb und für bereits gefundene Geräte ist ein belegter Port 1900 kein Problem. Wenn neue Geräte hinzugefügt werden sollen: Konfiguration -> Alexa-Gerätesuche öffnen, Gerätesuche aktivieren, in der Alexa-App Geräte suchen und danach die Gerätesuche wieder beenden. So wird der Zugriff auf SSDP/UDP 1900 nur temporär genutzt und anschliessend wieder an die andere Anwendung zurückgegeben.'
       });
     } else if (!alexaBridgeInfo.ready) {
       issues.push({
@@ -1581,7 +1581,7 @@ function preflightHelpText(sectionTitle = '', check = {}) {
     'Alexa TTS|TTS-Sequenzen': 'Zeigt, ob LoxEvo native Alexa-Sequenzen nutzt. Dieser Modus ist für schnelle Sprachausgabe mit Lautstärke wichtig.',
     'Alexa TTS|Letzte TTS-Aktion': 'Zeigt die letzte TTS-, Alarm- oder Lautstärkeaktion seit dem letzten Start.',
     'Virtuelle Alexa-Geräte|Alexa/Hue-HTTP': 'Prüft, ob der lokale Hue-kompatible HTTP-Endpunkt für Alexa läuft. Neuere Echo-Geräte erwarten dafür meist Port 80.',
-    'Virtuelle Alexa-Geräte|Gerätesuche': 'Prüft den SSDP/UDP-1900-Status. Dieser Port wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Für den normalen Betrieb und für bereits gefundene Geräte ist ein belegter Port 1900 kein Problem. Wenn neue Geräte hinzugefügt werden sollen: unter Konfiguration -> Alexa-Gerätesuche kurz aktivieren, in der Alexa-App Geräte suchen und danach die Gerätesuche wieder beenden. Dadurch wird der Zugriff auf SSDP/UDP 1900 nur temporär genutzt und anschließend wieder an die andere Anwendung zurückgegeben.',
+    'Virtuelle Alexa-Geräte|Gerätesuche': 'Prüft den SSDP/UDP-1900-Status. Dieser Port wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Für den normalen Betrieb und für bereits gefundene Geräte ist ein belegter Port 1900 kein Problem. Wenn neue Geräte hinzugefügt werden sollen: unter Konfiguration -> Alexa-Gerätesuche kurz aktivieren, in der Alexa-App Geräte suchen und danach die Gerätesuche wieder beenden. Dadurch wird der Zugriff auf SSDP/UDP 1900 nur temporär genutzt und anschliessend wieder an die andere Anwendung zurückgegeben.',
     'Virtuelle Alexa-Geräte|Virtuelle Geräte': 'Zeigt, wie viele aktive LoxEvo-Befehle Alexa als virtuelle Geräte angeboten werden.',
     'Virtuelle Alexa-Geräte|Discovery-Helper': 'Prüft, ob der optionale Host-Helper für die Gerätesuche erreichbar ist. Er wird nur benötigt, wenn UDP 1900 durch LoxBerry oder einen anderen Dienst belegt ist.',
     'Virtuelle Alexa-Geräte|Bridge-Info': 'Zeigt technische Basisdaten der lokalen Hue-Bridge-Emulation, zum Beispiel Bridge-ID, Description-URL und Ports.',
@@ -1838,7 +1838,7 @@ function renderDashboard() {
     dashboardStatusRow('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'info', ttsStatus?.ready ? `${deviceListCount(ttsStatus.defaultDevices)} Standard-Gerät(e).` : humanizeTtsStatusError(ttsStatus?.error || ''), 'Zeigt den Status der Alexa-Sprachausgabe. Bereit bedeutet, dass alexa-remote2 verbunden ist und LoxEvo die konfigurierten Echo-Geräte für normale TTS- oder Alarmmeldungen verwenden kann.'),
     dashboardStatusRow('Virtuelle Alexa-Geräte', alexaBridgeInfo?.bridgeHttp?.ready ? 'Bereit' : config?.alexaBridge?.enabled ? 'HTTP prüfen' : 'Deaktiviert', alexaBridgeInfo?.bridgeHttp?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'warning' : 'info', `${alexaBridgeInfo?.deviceCount ?? 0} Gerät(e), Alexa/Hue-Port ${alexaBridgeInfo?.port || config?.alexaBridge?.advertisePort || 80}.`, 'Zeigt, ob LoxEvo die lokalen Hue-kompatiblen Geräte für Alexa bereitstellt. Diese Funktion ist für Sprachbefehle wie Licht ein oder aus zuständig und läuft unabhängig von Alexa TTS.'),
     dashboardStatusRow('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.', 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Bereits gefundene Geräte funktionieren normalerweise weiter. Für neue Geräte unter Konfiguration die Alexa-Gerätesuche kurz aktivieren, in der Alexa-App suchen und danach wieder beenden.'),
-    dashboardStatusRow('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail(), 'Zeigt, ob seit den letzten Änderungen ein Export der LoxEvo-Einstellungen empfohlen ist. Backups enthalten die Konfiguration; die Alexa-Cookie-Datei wird nur gesichert, wenn du sie beim Export bewusst einschließt.'),
+    dashboardStatusRow('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail(), 'Zeigt, ob seit den letzten Änderungen ein Export der LoxEvo-Einstellungen empfohlen ist. Backups enthalten die Konfiguration; die Alexa-Cookie-Datei wird nur gesichert, wenn du sie beim Export bewusst einschliesst.'),
     dashboardStatusRow('Admin-Schutz', adminSecurityInfo?.enabled ? 'Aktiv' : 'Inaktiv', adminSecurityInfo?.enabled ? 'ok' : 'info', adminSecurityInfo?.message || 'Status wird geladen.', 'Zeigt, ob sensible Web-UI-Aktionen wie Konfiguration, Backup, Restore, Neustart oder Protokoll löschen mit einem Admin-Token geschützt sind. Loxone-Befehle, TTS und Alexa/Hue-Endpunkte bleiben bewusst offen für lokale Automationen.'),
     dashboardStatusRow('Systemprüfung', preflightInfo?.summary?.level === 'error' ? 'Fehler' : preflightInfo?.summary?.level === 'warning' ? 'Prüfen' : 'OK', preflightInfo?.summary?.level || 'info', preflightInfo?.summary?.text || 'Noch nicht geprüft.', 'Fasst die Systemprüfung aus Wartung zusammen. Sie prüft lokale Konfiguration, Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Details findest du im Register Wartung.')
   ];
@@ -1898,7 +1898,7 @@ function renderBackupReminder() {
     return;
   }
   backupReminder.hidden = false;
-  backupReminder.textContent = 'Seit der letzten Änderung wurde noch kein Backup exportiert. Nach größeren Anpassungen unter Wartung ein Backup erstellen.';
+  backupReminder.textContent = 'Seit der letzten Änderung wurde noch kein Backup exportiert. Nach grösseren Anpassungen unter Wartung ein Backup erstellen.';
 }
 
 function renderWizardPrompt() {
@@ -1982,8 +1982,8 @@ function wizardSteps() {
     {
       shortTitle: 'Start',
       title: 'Einrichtung starten',
-      text: 'Dieser Assistent führt durch die wichtigsten Schritte. Er ändert nichts automatisch, außer du klickst bewusst auf eine Aktion.',
-      detail: 'Du kannst den Assistenten jederzeit schließen oder dauerhaft überspringen. Alle Einstellungen bleiben weiterhin in den normalen Registern erreichbar.',
+      text: 'Dieser Assistent führt durch die wichtigsten Schritte. Er ändert nichts automatisch, ausser du klickst bewusst auf eine Aktion.',
+      detail: 'Du kannst den Assistenten jederzeit schliessen oder dauerhaft überspringen. Alle Einstellungen bleiben weiterhin in den normalen Registern erreichbar.',
       status: setupStatus?.complete ? 'Basiskonfiguration vollständig.' : `${setupStatus?.openRequired ?? 0} notwendige Einrichtungsschritte offen.`,
       statusClass: setupStatus?.complete ? 'ready' : 'warning',
       actions: [

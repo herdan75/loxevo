@@ -171,8 +171,8 @@ function renderCommands() {
     return;
   }
 
-  Object.entries(groupCommandsByCategory(runnableCommands)).forEach(([category, commands], index) => {
-    const group = createCategoryGroup(category, commands.length, index === 0);
+  Object.entries(groupCommandsByCategory(runnableCommands)).forEach(([category, commands]) => {
+    const group = createCategoryGroup(category, commands.length);
 
     const sceneGrid = document.createElement('div');
     sceneGrid.className = 'scene-grid';
@@ -1080,6 +1080,7 @@ function showView(viewId) {
   views.forEach((view) => {
     view.classList.toggle('active', view.id === viewId);
   });
+  closeDetailsInView(viewId);
   if (viewId === 'eventsView') {
     loadEvents();
   }
@@ -1088,6 +1089,13 @@ function showView(viewId) {
     loadAdminSecurityStatus();
     loadDependencyStatus();
   }
+}
+
+function closeDetailsInView(viewId) {
+  const view = document.getElementById(viewId);
+  view?.querySelectorAll('details[open]').forEach((details) => {
+    details.open = false;
+  });
 }
 
 async function loadPreflightStatus(button) {
@@ -1642,8 +1650,8 @@ function updateTtsVolumeLabels() {
 function renderCommandEditor() {
   roomEditor.innerHTML = '';
   const commandGroups = groupCommandsByCategory(Object.entries(getConfiguredCommands()));
-  Object.entries(commandGroups).forEach(([category, commands], index) => {
-    const group = createCategoryGroup(category, commands.length, index === 0);
+  Object.entries(commandGroups).forEach(([category, commands]) => {
+    const group = createCategoryGroup(category, commands.length);
     commands.forEach(([commandKey, command]) => {
       group.append(createCommandCard(commandKey, command));
     });
@@ -1778,8 +1786,8 @@ function renderIntegrations() {
     lightEndpoints.innerHTML = '<p class="empty">Noch keine aktiven Befehle vorhanden.</p>';
   }
 
-  Object.entries(groupCommandsByCategory(runnableCommands)).forEach(([category, commands], index) => {
-    const group = createCategoryGroup(category, commands.length, index === 0);
+  Object.entries(groupCommandsByCategory(runnableCommands)).forEach(([category, commands]) => {
+    const group = createCategoryGroup(category, commands.length);
     commands.forEach(([commandKey, command]) => {
       group.append(createEndpointCard({
         title: command.label || commandKey,
@@ -1798,7 +1806,7 @@ function renderIntegrations() {
     lightEndpoints.append(group);
   });
 
-  const ttsGroup = createTtsEndpointGroup(baseUrl, runnableCommands.length === 0);
+  const ttsGroup = createTtsEndpointGroup(baseUrl);
   const ttsEndpointCount = Number(ttsGroup.querySelector('.count-badge')?.textContent || 0);
   setCountBadge(integrationCommandsCount, runnableCommands.length + ttsEndpointCount);
   lightEndpoints.append(ttsGroup);
@@ -2041,7 +2049,7 @@ async function copyText(value) {
   }
 }
 
-function createCategoryGroup(category, count, open = true) {
+function createCategoryGroup(category, count, open = false) {
   const group = document.createElement('details');
   group.className = 'category-group';
   group.open = open;

@@ -507,8 +507,9 @@ h2 {
 
 .backup-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+  max-width: 980px;
 }
 
 .backup-card {
@@ -531,6 +532,14 @@ h2 {
   margin: 0;
   color: var(--muted);
   line-height: 1.45;
+}
+
+.backup-card button {
+  justify-self: start;
+}
+
+.backup-card input[type='file'] {
+  max-width: 520px;
 }
 
 .version-select {

@@ -54,6 +54,16 @@
           </div>
           <div id="dashboardCards" class="dashboard-grid"></div>
           <div id="backupReminder" class="service-status warning" hidden></div>
+          <div id="wizardPrompt" class="wizard-prompt" hidden>
+            <div>
+              <strong>Einrichtungsassistent</strong>
+              <p>Führt Schritt für Schritt durch Loxone, Befehle, Live-Modus, Alexa-Geräte, TTS und Backup.</p>
+            </div>
+            <div class="actions">
+              <button id="startWizardBtn" type="button">Assistent starten</button>
+              <button id="skipWizardBtn" type="button" class="secondary">Überspringen</button>
+            </div>
+          </div>
         </section>
       </section>
 
@@ -479,6 +489,28 @@ Content-Type: application/json
       </section>
       </section>
     </main>
+
+    <div id="wizardModal" class="wizard-modal" hidden role="dialog" aria-modal="true" aria-labelledby="wizardTitle">
+      <div class="wizard-dialog">
+        <div class="wizard-head">
+          <div>
+            <p id="wizardStepLabel" class="eyebrow">Einrichtungsassistent</p>
+            <h2 id="wizardTitle">LoxEvo einrichten</h2>
+          </div>
+          <button id="closeWizardBtn" type="button" class="info-button" aria-label="Assistent schließen">×</button>
+        </div>
+        <div id="wizardProgress" class="wizard-progress"></div>
+        <div id="wizardBody" class="wizard-body"></div>
+        <div id="wizardActionBar" class="wizard-action-bar"></div>
+        <div class="wizard-footer">
+          <button id="dismissWizardBtn" type="button" class="secondary">Nicht mehr automatisch anzeigen</button>
+          <div class="actions">
+            <button id="wizardBackBtn" type="button" class="secondary">Zurück</button>
+            <button id="wizardNextBtn" type="button">Weiter</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     <script src="/assets/app.js"></script>

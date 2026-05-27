@@ -61,6 +61,7 @@ Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen l
 Für den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
 Die Web-UI startet mit einer kompakten `Übersicht`. Dort sieht man auf einen Blick, ob Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche, Backup, Admin-Schutz und Systemprüfung in einem sinnvollen Zustand sind.
+Auf der Übersicht steht außerdem ein überspringbarer Einrichtungsassistent bereit. Er führt Schritt für Schritt durch Loxone-Zugang, erste Befehle, Dry-Run/Live-Modus, virtuelle Alexa-Geräte, optionale Gerätesuche, TTS und Backup. Der Assistent ändert nichts automatisch; Aktionen wie `Gerätesuche aktivieren` müssen bewusst geklickt werden.
 Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung für Konfiguration, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Diese Prüfung läuft beim Öffnen des Registers oder per Button und erzeugt keine dauernde Hintergrundlast.
 Im gleichen Register zeigt LoxEvo die installierte `alexa-remote2`-Version und verfügbare npm-Versionen und kann Installation oder Update im laufenden Container anstoßen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
 Im gleichen Register können die Einstellungen als Backup exportiert und später wieder importiert werden. Der Export enthält standardmäßig die LoxEvo-Konfiguration; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden.
@@ -95,7 +96,7 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell können dort gepflegt w
 
 Die Oberfläche ist in klare Bereiche gegliedert:
 
-- `Übersicht`: kompakter Betriebszustand und Hinweise zu Backup, Version, Alexa und Loxone
+- `Übersicht`: kompakter Betriebszustand, Einrichtungsassistent und Hinweise zu Backup, Version, Alexa und Loxone
 - `Testen`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI prüfen
 - `Externe Aufrufe`: fertige URLs für Alexa-Routinen, Loxone und optionale externe Tools testen und kopieren
 - `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
@@ -111,7 +112,7 @@ Empfohlener Ablauf für neue Installationen:
 3. Erste Befehle in `Konfiguration -> Befehle und Sprachnamen` anlegen.
 4. Unter `Testen` prüfen, ob die erzeugten Loxone-URLs stimmen.
 5. Erst danach den Live-Modus aktivieren.
-6. Optional TTS und virtuelle Alexa-Geräte einrichten.
+6. Optional TTS und virtuelle Alexa-Geräte einrichten. Wenn neue Alexa-Geräte gesucht werden sollen und SSDP/UDP 1900 belegt ist, kann der Assistent zur temporären Gerätesuche führen: Gerätesuche aktivieren, in der Alexa-App suchen, danach die Gerätesuche wieder beenden.
 
 ## Backup und Deinstallation
 

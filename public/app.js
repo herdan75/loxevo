@@ -18,6 +18,19 @@ const dashboardCards = document.querySelector('#dashboardCards');
 const backupReminder = document.querySelector('#backupReminder');
 const refreshDashboardBtn = document.querySelector('#refreshDashboardBtn');
 const dashboardConfigBtn = document.querySelector('#dashboardConfigBtn');
+const wizardPrompt = document.querySelector('#wizardPrompt');
+const startWizardBtn = document.querySelector('#startWizardBtn');
+const skipWizardBtn = document.querySelector('#skipWizardBtn');
+const wizardModal = document.querySelector('#wizardModal');
+const closeWizardBtn = document.querySelector('#closeWizardBtn');
+const dismissWizardBtn = document.querySelector('#dismissWizardBtn');
+const wizardBackBtn = document.querySelector('#wizardBackBtn');
+const wizardNextBtn = document.querySelector('#wizardNextBtn');
+const wizardStepLabel = document.querySelector('#wizardStepLabel');
+const wizardTitle = document.querySelector('#wizardTitle');
+const wizardProgress = document.querySelector('#wizardProgress');
+const wizardBody = document.querySelector('#wizardBody');
+const wizardActionBar = document.querySelector('#wizardActionBar');
 const loxoneBaseUrl = document.querySelector('#loxoneBaseUrl');
 const loxoneUsername = document.querySelector('#loxoneUsername');
 const loxonePassword = document.querySelector('#loxonePassword');
@@ -109,6 +122,8 @@ let activeEventFilter = 'all';
 let configDirty = false;
 const ADMIN_TOKEN_STORAGE_KEY = 'loxevoAdminToken';
 const LAST_BACKUP_EXPORT_KEY = 'loxevoLastBackupExportAt';
+const SETUP_WIZARD_SKIPPED_KEY = 'loxevoSetupWizardSkipped';
+let wizardStepIndex = 0;
 
 load();
 
@@ -122,6 +137,15 @@ clearEventsBtn?.addEventListener('click', () => clearEvents(clearEventsBtn));
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 refreshDashboardBtn?.addEventListener('click', () => refreshDashboard(refreshDashboardBtn));
 dashboardConfigBtn?.addEventListener('click', () => showView('configView'));
+startWizardBtn?.addEventListener('click', () => openWizard(0));
+skipWizardBtn?.addEventListener('click', () => skipWizardPrompt());
+closeWizardBtn?.addEventListener('click', () => closeWizard());
+dismissWizardBtn?.addEventListener('click', () => skipWizardPrompt(true));
+wizardBackBtn?.addEventListener('click', () => moveWizard(-1));
+wizardNextBtn?.addEventListener('click', () => moveWizard(1));
+wizardModal?.addEventListener('click', (event) => {
+  if (event.target === wizardModal) closeWizard();
+});
 addRoomBtn.addEventListener('click', addRoom);
 refreshIntegrationsBtn.addEventListener('click', () => {
   renderIntegrations();
@@ -174,6 +198,11 @@ document.querySelector('#configView')?.addEventListener('input', () => markConfi
 document.querySelector('#configView')?.addEventListener('change', () => markConfigDirty());
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => showView(button.dataset.tabTarget));
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && wizardModal && !wizardModal.hidden) {
+    closeWizard();
+  }
 });
 
 async function load() {
@@ -1071,6 +1100,7 @@ async function runDiscoveryAction(action, button) {
     await loadPreflightStatus();
     await loadEvents();
     renderDashboard();
+    if (wizardModal && !wizardModal.hidden) renderWizard();
     setButtonFeedback(button, 'success', successLabel);
     showToast(action === 'start' ? 'Gerätesuche aktiviert' : 'Gerätesuche beendet', 'ok');
   } catch (error) {
@@ -1717,6 +1747,8 @@ async function setDryRun(enabled) {
     await loadSetupStatus();
     await loadPreflightStatus();
     await loadEvents();
+    renderDashboard();
+    if (wizardModal && !wizardModal.hidden) renderWizard();
     showToast(result.dryRun ? 'Dry-Run aktiv' : 'Live-Modus aktiv', result.dryRun ? 'ok' : 'ok');
   } catch (error) {
     dryRunToggle.checked = Boolean(config.loxone?.dryRun);
@@ -1812,6 +1844,7 @@ function renderDashboard() {
   ];
   dashboardCards.innerHTML = cards.join('');
   renderBackupReminder();
+  renderWizardPrompt();
 }
 
 function dashboardCard(title, value, level, detail) {
@@ -1849,6 +1882,197 @@ function renderBackupReminder() {
   }
   backupReminder.hidden = false;
   backupReminder.textContent = 'Seit der letzten Änderung wurde noch kein Backup exportiert. Nach größeren Anpassungen unter Wartung ein Backup erstellen.';
+}
+
+function renderWizardPrompt() {
+  if (!wizardPrompt) return;
+  const skipped = localStorage.getItem(SETUP_WIZARD_SKIPPED_KEY) === 'true';
+  const hasOpenSetup = setupStatus && !setupStatus.complete;
+  const shouldShow = !skipped && (hasOpenSetup || !localStorage.getItem(LAST_BACKUP_EXPORT_KEY));
+  wizardPrompt.hidden = !shouldShow;
+}
+
+function skipWizardPrompt(closeModalToo = false) {
+  localStorage.setItem(SETUP_WIZARD_SKIPPED_KEY, 'true');
+  renderWizardPrompt();
+  if (closeModalToo) closeWizard();
+  showToast('Einrichtungsassistent übersprungen', 'ok');
+}
+
+function openWizard(stepIndex = 0) {
+  if (!wizardModal) return;
+  wizardStepIndex = Math.max(0, Math.min(stepIndex, wizardSteps().length - 1));
+  wizardModal.hidden = false;
+  document.body.classList.add('modal-open');
+  renderWizard();
+}
+
+function closeWizard() {
+  if (!wizardModal) return;
+  wizardModal.hidden = true;
+  document.body.classList.remove('modal-open');
+}
+
+function moveWizard(direction) {
+  const steps = wizardSteps();
+  const nextIndex = wizardStepIndex + direction;
+  if (nextIndex >= steps.length) {
+    closeWizard();
+    showToast('Einrichtungsassistent abgeschlossen', 'ok');
+    return;
+  }
+  wizardStepIndex = Math.max(0, nextIndex);
+  renderWizard();
+}
+
+function renderWizard() {
+  const steps = wizardSteps();
+  const step = steps[wizardStepIndex];
+  if (!step || !wizardBody || !wizardTitle || !wizardProgress || !wizardActionBar) return;
+
+  wizardStepLabel.textContent = `Schritt ${wizardStepIndex + 1} von ${steps.length}`;
+  wizardTitle.textContent = step.title;
+  wizardProgress.innerHTML = steps.map((item, index) => `<span class="${index === wizardStepIndex ? 'active' : index < wizardStepIndex ? 'done' : ''}">${escapeHtml(item.shortTitle)}</span>`).join('');
+  wizardBody.innerHTML = `
+    <p>${escapeHtml(step.text)}</p>
+    ${step.detail ? `<div class="wizard-detail">${escapeHtml(step.detail)}</div>` : ''}
+    ${step.status ? `<div class="service-status ${step.statusClass || 'disabled'}">${escapeHtml(step.status)}</div>` : ''}
+  `;
+  wizardActionBar.innerHTML = '';
+  step.actions.forEach((action) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = action.label;
+    button.className = action.secondary ? 'secondary' : '';
+    button.disabled = Boolean(action.disabled);
+    button.addEventListener('click', () => action.run(button));
+    wizardActionBar.append(button);
+  });
+  wizardBackBtn.disabled = wizardStepIndex === 0;
+  wizardNextBtn.textContent = wizardStepIndex === steps.length - 1 ? 'Fertig' : 'Weiter';
+}
+
+function wizardSteps() {
+  const commandCount = Object.keys(config?.commands || {}).length;
+  const ttsReady = Boolean(ttsStatus?.ready);
+  const bridgeEnabled = Boolean(config?.alexaBridge?.enabled);
+  const bridgeReady = Boolean(alexaBridgeInfo?.bridgeHttp?.ready);
+  const discoveryActive = Boolean(alexaBridgeInfo?.ready);
+  const discoveryOptional = bridgeEnabled && !discoveryActive;
+  const helperAvailable = Boolean(discoveryInfo?.helper?.available);
+  const dryRun = config?.loxone?.dryRun !== false;
+  return [
+    {
+      shortTitle: 'Start',
+      title: 'Einrichtung starten',
+      text: 'Dieser Assistent führt durch die wichtigsten Schritte. Er ändert nichts automatisch, außer du klickst bewusst auf eine Aktion.',
+      detail: 'Du kannst den Assistenten jederzeit schließen oder dauerhaft überspringen. Alle Einstellungen bleiben weiterhin in den normalen Registern erreichbar.',
+      status: setupStatus?.complete ? 'Basiskonfiguration vollständig.' : `${setupStatus?.openRequired ?? 0} notwendige Einrichtungsschritte offen.`,
+      statusClass: setupStatus?.complete ? 'ready' : 'warning',
+      actions: [
+        { label: 'Zur Übersicht', secondary: true, run: () => showView('dashboardView') }
+      ]
+    },
+    {
+      shortTitle: 'Loxone',
+      title: 'Loxone verbinden',
+      text: 'Trage Miniserver-URL, Benutzer und Passwort ein. Für erste Tests sollte Dry-Run aktiv bleiben.',
+      detail: 'LoxEvo sendet im Live-Modus echte Befehle an den Miniserver. Deshalb zuerst im Dry-Run prüfen.',
+      status: isValidHttpUrl(config?.loxone?.baseUrl || '') ? 'Miniserver-URL ist eingetragen.' : 'Miniserver-URL fehlt oder ist ungültig.',
+      statusClass: isValidHttpUrl(config?.loxone?.baseUrl || '') ? 'ready' : 'warning',
+      actions: [
+        { label: 'Loxone-Konfiguration öffnen', run: () => openConfigArea('Loxone') }
+      ]
+    },
+    {
+      shortTitle: 'Befehle',
+      title: 'Erste Befehle anlegen',
+      text: 'Lege Loxone-Befehle mit verständlichem Namen, Rubrik und Ziel an. Diese Befehle werden später getestet oder Alexa als virtuelle Geräte angeboten.',
+      detail: 'Jeder aktive Befehl braucht einen Zieltyp mit UUID/Wert oder einen direkten Pfad.',
+      status: commandCount ? `${commandCount} Befehl(e) vorhanden.` : 'Noch keine Befehle vorhanden.',
+      statusClass: commandCount ? 'ready' : 'warning',
+      actions: [
+        { label: 'Befehle öffnen', run: () => openConfigArea('Befehle und Sprachnamen') },
+        { label: 'Testen öffnen', secondary: true, run: () => showView('controlView') }
+      ]
+    },
+    {
+      shortTitle: 'Betrieb',
+      title: 'Dry-Run oder Live-Modus wählen',
+      text: 'Im Dry-Run wird nur protokolliert. Im Live-Modus werden Befehle wirklich an Loxone gesendet.',
+      detail: 'Für eine neue Installation ist Dry-Run am Anfang sinnvoll. Im produktiven Betrieb ist Live-Modus korrekt.',
+      status: dryRun ? 'Dry-Run ist aktiv.' : 'Live-Modus ist aktiv.',
+      statusClass: dryRun ? 'disabled' : 'ready',
+      actions: [
+        { label: dryRun ? 'Live-Modus aktivieren' : 'Dry-Run aktivieren', secondary: !dryRun, run: () => setDryRun(!dryRun) }
+      ]
+    },
+    {
+      shortTitle: 'Alexa',
+      title: 'Virtuelle Alexa-Geräte',
+      text: 'Aktive Loxone-Befehle können Alexa als lokale Hue-kompatible Geräte angeboten werden.',
+      detail: 'Bereits gefundene Geräte funktionieren auch dann weiter, wenn SSDP/UDP 1900 später wieder durch LoxBerry belegt ist.',
+      status: bridgeEnabled ? `${alexaBridgeInfo?.deviceCount ?? 0} virtuelle Gerät(e), Alexa/Hue-HTTP ${bridgeReady ? 'bereit' : 'prüfen'}.` : 'Virtuelle Alexa-Geräte sind deaktiviert.',
+      statusClass: bridgeEnabled && bridgeReady ? 'ready' : 'disabled',
+      actions: [
+        { label: 'Alexa-Geräte konfigurieren', run: () => openConfigArea('Alexa-Geräte') }
+      ]
+    },
+    {
+      shortTitle: 'Suche',
+      title: 'Alexa-Gerätesuche bei Bedarf',
+      text: 'SSDP/UDP 1900 wird nur zum Finden neuer virtueller Alexa-Geräte benötigt.',
+      detail: 'Wenn der Port durch LoxBerry-ssdpd belegt ist, ist das für den normalen Betrieb kein Fehler. Für neue Geräte kannst du die Gerätesuche kurz aktivieren, in der Alexa-App suchen und danach wieder beenden.',
+      status: discoveryActive
+        ? 'Gerätesuche ist aktiv. Nach der Alexa-Suche wieder beenden.'
+        : discoveryOptional && !helperAvailable
+          ? 'Host-Helper ist nicht installiert oder nicht erreichbar. Die normale Funktion bleibt erhalten; neue Geräte können so nicht gesucht werden.'
+          : discoveryOptional
+          ? 'Gerätesuche ist aktuell nicht aktiv. Bereits gefundene Geräte funktionieren weiter.'
+          : 'Gerätesuche ist nur relevant, wenn virtuelle Alexa-Geräte aktiv sind.',
+      statusClass: discoveryActive ? 'ready' : 'disabled',
+      actions: [
+        { label: 'Gerätesuche-Einstellungen öffnen', run: () => openConfigArea('Alexa-Gerätesuche') },
+        { label: 'Gerätesuche aktivieren', disabled: !helperAvailable || discoveryActive || !bridgeEnabled, run: (button) => runDiscoveryAction('start', button) },
+        { label: 'Gerätesuche beenden', secondary: true, disabled: !helperAvailable || !discoveryActive, run: (button) => runDiscoveryAction('stop', button) }
+      ]
+    },
+    {
+      shortTitle: 'TTS',
+      title: 'Alexa TTS einrichten',
+      text: 'Für Sprachausgabe benötigt LoxEvo alexa-remote2, eine Cookie-Datei und mindestens ein ausgewähltes Echo-Gerät.',
+      detail: 'Alarm nutzt die Alarm-Geräte und die Alarm-Lautstärke. Normale Meldungen nutzen die Standard-Geräte.',
+      status: ttsReady ? 'Alexa TTS ist bereit.' : config?.tts?.enabled ? humanizeTtsStatusError(ttsStatus?.error || 'TTS ist noch nicht bereit.') : 'Alexa TTS ist deaktiviert.',
+      statusClass: ttsReady ? 'ready' : 'warning',
+      actions: [
+        { label: 'TTS konfigurieren', run: () => openConfigArea('Alexa TTS') },
+        { label: 'TTS-Geräte öffnen', secondary: true, run: () => openConfigArea('TTS-Geräte') }
+      ]
+    },
+    {
+      shortTitle: 'Backup',
+      title: 'Backup erstellen',
+      text: 'Wenn die Einrichtung passt, sollte ein Backup exportiert werden.',
+      detail: 'Der normale Export enthält die LoxEvo-Konfiguration. Die Alexa-Cookie-Datei wird nur gesichert, wenn du den Haken bewusst setzt.',
+      status: backupStateDetail(),
+      statusClass: backupReminderLevel() === 'warning' ? 'warning' : 'disabled',
+      actions: [
+        { label: 'Backup öffnen', run: () => showView('maintenanceView') }
+      ]
+    }
+  ];
+}
+
+function openConfigArea(label) {
+  showView('configView');
+  const target = [...document.querySelectorAll('#configView details.config-section')].find((details) => {
+    const text = details.querySelector('.summary-label')?.textContent || '';
+    return normalizeText(text) === normalizeText(label);
+  });
+  if (target) {
+    target.open = true;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 function dashboardVersionText() {

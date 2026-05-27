@@ -38,14 +38,14 @@ Der Web-UI-Token wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash 
 ## Ersteinrichtung in der Web-UI
 
 1. Web-UI öffnen.
-2. Im Bereich `Einrichtung` die offenen Punkte anschauen.
-3. `Zur Konfiguration` wählen.
-4. Loxone-Miniserver URL, Benutzer und Passwort eintragen.
-5. Rubriken und Befehle mit Sprachname, Raum, Funktion, Aktion, Loxone-Typ, UUID und Wert oder Pfad eintragen.
-6. `Dry-Run aktiv` eingeschaltet lassen.
-7. Konfiguration speichern.
-8. Unter `Testen` einen Befehl testen.
-9. Unter `Protokoll` prüfen, welche Loxone-URL erzeugt wurde.
+2. Auf der `Übersicht` den Einrichtungsassistenten starten oder bewusst überspringen.
+3. Loxone-Miniserver URL, Benutzer und Passwort eintragen.
+4. Rubriken und Befehle mit Sprachname, Raum, Funktion, Aktion, Loxone-Typ, UUID und Wert oder Pfad eintragen.
+5. `Dry-Run aktiv` eingeschaltet lassen.
+6. Konfiguration speichern.
+7. Unter `Testen` einen Befehl testen.
+8. Unter `Protokoll` prüfen, welche Loxone-URL erzeugt wurde.
+9. Optional TTS und virtuelle Alexa-Geräte einrichten. Wenn neue Alexa-Geräte gesucht werden sollen, führt der Assistent durch das kurze Aktivieren und anschließende Beenden der Gerätesuche.
 10. Erst wenn alles passt, Dry-Run deaktivieren.
 
 ## Private Konfiguration

@@ -9,6 +9,7 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 - Diagnoseexport im Register `Wartung` ergänzt; sensible Werte werden dabei zusammengefasst oder maskiert.
 - Konfigurationsspeichern prüft wichtige Eingaben wie Loxone-URL, Zugangsdaten, Alexa/Hue-Port und TTS-Cookie-Pfad vor dem Schreiben.
 - Backup-Hinweis nach Konfigurationsänderungen ergänzt.
+- Überspringbaren Einrichtungsassistenten ergänzt, inklusive optionaler Alexa-Gerätesuche mit SSDP/UDP-1900-Hinweis.
 
 ## 1.0.0 - 2026-05-27
 

@@ -116,7 +116,7 @@ h2 {
 
 .dashboard-status-row {
   display: grid;
-  grid-template-columns: 120px minmax(160px, 0.45fr) minmax(0, 1fr);
+  grid-template-columns: 120px minmax(170px, 0.45fr) minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   min-height: 48px;
@@ -131,7 +131,10 @@ h2 {
 }
 
 .status-pill {
+  display: inline-grid;
+  place-items: center;
   min-width: 96px;
+  min-height: 30px;
   padding: 7px 10px;
   border-radius: 6px;
   background: #eef3f5;
@@ -172,6 +175,22 @@ h2 {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
+}
+
+.dashboard-status-help {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #c7dde2;
+  border-radius: 6px;
+  background: #f7fcfd;
+  color: #3f5061;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.dashboard-status-help[hidden] {
+  display: none;
 }
 
 .dashboard-status-row.ok {

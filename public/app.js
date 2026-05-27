@@ -1834,28 +1834,45 @@ async function refreshDashboard(button) {
 function renderDashboard() {
   if (!dashboardCards) return;
   const rows = [
-    dashboardStatusRow('Loxone', config?.loxone?.dryRun === false ? 'Live-Modus' : 'Dry-Run', config?.loxone?.dryRun === false ? 'ok' : 'info', config?.loxone?.dryRun === false ? 'Befehle werden an den Miniserver gesendet.' : 'Befehle werden nur protokolliert.'),
-    dashboardStatusRow('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'info', ttsStatus?.ready ? `${deviceListCount(ttsStatus.defaultDevices)} Standard-Gerät(e).` : humanizeTtsStatusError(ttsStatus?.error || '')),
-    dashboardStatusRow('Virtuelle Alexa-Geräte', alexaBridgeInfo?.bridgeHttp?.ready ? 'Bereit' : config?.alexaBridge?.enabled ? 'HTTP prüfen' : 'Deaktiviert', alexaBridgeInfo?.bridgeHttp?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'warning' : 'info', `${alexaBridgeInfo?.deviceCount ?? 0} Gerät(e), Alexa/Hue-Port ${alexaBridgeInfo?.port || config?.alexaBridge?.advertisePort || 80}.`),
-    dashboardStatusRow('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.'),
-    dashboardStatusRow('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail()),
-    dashboardStatusRow('Admin-Schutz', adminSecurityInfo?.enabled ? 'Aktiv' : 'Inaktiv', adminSecurityInfo?.enabled ? 'ok' : 'info', adminSecurityInfo?.message || 'Status wird geladen.'),
-    dashboardStatusRow('Systemprüfung', preflightInfo?.summary?.level === 'error' ? 'Fehler' : preflightInfo?.summary?.level === 'warning' ? 'Prüfen' : 'OK', preflightInfo?.summary?.level || 'info', preflightInfo?.summary?.text || 'Noch nicht geprüft.')
+    dashboardStatusRow('Loxone', config?.loxone?.dryRun === false ? 'Live-Modus' : 'Dry-Run', config?.loxone?.dryRun === false ? 'ok' : 'info', config?.loxone?.dryRun === false ? 'Befehle werden an den Miniserver gesendet.' : 'Befehle werden nur protokolliert.', 'Zeigt, ob LoxEvo echte Befehle an den Loxone-Miniserver sendet. Dry-Run ist für Tests gedacht und protokolliert nur. Live-Modus ist für den produktiven Betrieb, sobald die Befehle geprüft sind.'),
+    dashboardStatusRow('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'info', ttsStatus?.ready ? `${deviceListCount(ttsStatus.defaultDevices)} Standard-Gerät(e).` : humanizeTtsStatusError(ttsStatus?.error || ''), 'Zeigt den Status der Alexa-Sprachausgabe. Bereit bedeutet, dass alexa-remote2 verbunden ist und LoxEvo die konfigurierten Echo-Geräte für normale TTS- oder Alarmmeldungen verwenden kann.'),
+    dashboardStatusRow('Virtuelle Alexa-Geräte', alexaBridgeInfo?.bridgeHttp?.ready ? 'Bereit' : config?.alexaBridge?.enabled ? 'HTTP prüfen' : 'Deaktiviert', alexaBridgeInfo?.bridgeHttp?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'warning' : 'info', `${alexaBridgeInfo?.deviceCount ?? 0} Gerät(e), Alexa/Hue-Port ${alexaBridgeInfo?.port || config?.alexaBridge?.advertisePort || 80}.`, 'Zeigt, ob LoxEvo die lokalen Hue-kompatiblen Geräte für Alexa bereitstellt. Diese Funktion ist für Sprachbefehle wie Licht ein oder aus zuständig und läuft unabhängig von Alexa TTS.'),
+    dashboardStatusRow('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.', 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Bereits gefundene Geräte funktionieren normalerweise weiter. Für neue Geräte unter Konfiguration die Alexa-Gerätesuche kurz aktivieren, in der Alexa-App suchen und danach wieder beenden.'),
+    dashboardStatusRow('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail(), 'Zeigt, ob seit den letzten Änderungen ein Export der LoxEvo-Einstellungen empfohlen ist. Backups enthalten die Konfiguration; die Alexa-Cookie-Datei wird nur gesichert, wenn du sie beim Export bewusst einschließt.'),
+    dashboardStatusRow('Admin-Schutz', adminSecurityInfo?.enabled ? 'Aktiv' : 'Inaktiv', adminSecurityInfo?.enabled ? 'ok' : 'info', adminSecurityInfo?.message || 'Status wird geladen.', 'Zeigt, ob sensible Web-UI-Aktionen wie Konfiguration, Backup, Restore, Neustart oder Protokoll löschen mit einem Admin-Token geschützt sind. Loxone-Befehle, TTS und Alexa/Hue-Endpunkte bleiben bewusst offen für lokale Automationen.'),
+    dashboardStatusRow('Systemprüfung', preflightInfo?.summary?.level === 'error' ? 'Fehler' : preflightInfo?.summary?.level === 'warning' ? 'Prüfen' : 'OK', preflightInfo?.summary?.level || 'info', preflightInfo?.summary?.text || 'Noch nicht geprüft.', 'Fasst die Systemprüfung aus Wartung zusammen. Sie prüft lokale Konfiguration, Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Details findest du im Register Wartung.')
   ];
   dashboardCards.innerHTML = rows.join('');
+  bindDashboardHelpButtons();
   renderBackupReminder();
   renderWizardPrompt();
 }
 
-function dashboardStatusRow(title, value, level, detail) {
+function dashboardStatusRow(title, value, level, detail, helpText) {
   const safeLevel = ['ok', 'warning', 'error', 'optional', 'info'].includes(level) ? level : 'info';
+  const helpId = `dashboard-help-${normalizeText(title).replace(/[^a-z0-9]+/g, '-')}`;
   return `
     <article class="dashboard-status-row ${safeLevel}">
       <span class="status-pill ${safeLevel}">${escapeHtml(value || 'Unbekannt')}</span>
       <strong class="dashboard-status-title">${escapeHtml(title)}</strong>
       <p class="dashboard-status-detail">${escapeHtml(detail || '')}</p>
+      <button type="button" class="info-button info-button-small dashboard-info-button" aria-expanded="false" aria-controls="${helpId}" aria-label="${escapeHtml(title)} erklären" title="${escapeHtml(title)} erklären">i</button>
+      <p id="${helpId}" class="dashboard-status-help" hidden>${escapeHtml(helpText || '')}</p>
     </article>
   `;
+}
+
+function bindDashboardHelpButtons() {
+  dashboardCards?.querySelectorAll('.dashboard-info-button').forEach((button) => {
+    const help = button.getAttribute('aria-controls')
+      ? document.getElementById(button.getAttribute('aria-controls'))
+      : null;
+    button.addEventListener('click', () => {
+      if (!help) return;
+      help.hidden = !help.hidden;
+      button.setAttribute('aria-expanded', String(!help.hidden));
+    });
+  });
 }
 
 function backupStateTitle() {

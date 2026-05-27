@@ -741,10 +741,6 @@ function requestAdminToken(message, verifyToken) {
           <span>Admin-Token</span>
           <input class="admin-token-input" type="password" autocomplete="current-password">
         </label>
-        <label class="switch-row admin-token-show">
-          <input class="admin-token-toggle" type="checkbox">
-          <span>Token anzeigen</span>
-        </label>
         <div class="actions admin-token-actions">
           <button type="button" class="secondary admin-token-cancel">Abbrechen</button>
           <button type="submit">Entsperren</button>
@@ -755,7 +751,6 @@ function requestAdminToken(message, verifyToken) {
     const form = modal.querySelector('form');
     const messageEl = modal.querySelector('.admin-token-message');
     const input = modal.querySelector('.admin-token-input');
-    const toggle = modal.querySelector('.admin-token-toggle');
     const cancelButton = modal.querySelector('.admin-token-cancel');
     const submitButton = modal.querySelector('button[type="submit"]');
 
@@ -766,10 +761,6 @@ function requestAdminToken(message, verifyToken) {
     };
 
     messageEl.textContent = message;
-    toggle.addEventListener('change', () => {
-      input.type = toggle.checked ? 'text' : 'password';
-      input.focus();
-    });
     cancelButton.addEventListener('click', () => close(null));
     modal.addEventListener('click', (event) => {
       if (event.target === modal) close(null);

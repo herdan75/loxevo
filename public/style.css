@@ -419,11 +419,6 @@ h2 {
   font-weight: 700;
 }
 
-.admin-token-show {
-  justify-content: flex-start;
-  color: var(--muted);
-}
-
 .admin-token-actions {
   justify-content: flex-end;
 }

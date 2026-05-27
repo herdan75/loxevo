@@ -107,55 +107,87 @@ h2 {
   color: #725000;
 }
 
-.dashboard-grid {
+.dashboard-status-list {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   margin-bottom: 12px;
 }
 
-.dashboard-card {
+.dashboard-status-row {
   display: grid;
-  gap: 6px;
-  min-height: 118px;
-  padding: 14px;
+  grid-template-columns: 120px minmax(160px, 0.45fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  padding: 9px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
 }
 
-.dashboard-card span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
+.dashboard-status-row .status-pill {
+  justify-self: start;
 }
 
-.dashboard-card strong {
-  font-size: 20px;
+.status-pill {
+  min-width: 96px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: #eef3f5;
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.status-pill.ok {
+  background: #e7f7ee;
+  color: #0b6b3a;
+}
+
+.status-pill.warning,
+.status-pill.optional {
+  background: #fff1cd;
+  color: #805300;
+}
+
+.status-pill.error {
+  background: #fde5e2;
+  color: var(--danger);
+}
+
+.status-pill.info {
+  background: #edf5f7;
   color: var(--accent-strong);
 }
 
-.dashboard-card p {
+.dashboard-status-title {
+  color: var(--accent-strong);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dashboard-status-detail {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
 }
 
-.dashboard-card.ok {
-  border-color: #b9d8c5;
-  background: #f4fbf6;
+.dashboard-status-row.ok {
+  border-color: #cce4d5;
+  background: #fbfefc;
 }
 
-.dashboard-card.warning,
-.dashboard-card.optional {
+.dashboard-status-row.warning,
+.dashboard-status-row.optional {
   border-color: #ecd08e;
-  background: #fffaf0;
+  background: #fffdf8;
 }
 
-.dashboard-card.error {
+.dashboard-status-row.error {
   border-color: #e8b8b2;
-  background: #fff4f2;
+  background: #fff9f8;
 }
 
 .wizard-prompt {
@@ -1526,8 +1558,8 @@ pre {
 }
 
 @media (max-width: 1100px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .dashboard-status-list {
+    grid-template-columns: 1fr;
   }
 
   .wizard-progress {
@@ -1555,7 +1587,7 @@ pre {
   }
 
   .config-sections,
-  .dashboard-grid,
+  .dashboard-status-list,
   .event-toolbar,
   .wizard-prompt,
   .form-row,
@@ -1568,6 +1600,11 @@ pre {
   .view,
   .scene-row {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-status-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 
   .tab-nav {

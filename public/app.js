@@ -1833,28 +1833,27 @@ async function refreshDashboard(button) {
 
 function renderDashboard() {
   if (!dashboardCards) return;
-  const cards = [
-    dashboardCard('Loxone', config?.loxone?.dryRun === false ? 'Live-Modus' : 'Dry-Run', config?.loxone?.dryRun === false ? 'ok' : 'info', config?.loxone?.dryRun === false ? 'Befehle werden an den Miniserver gesendet.' : 'Befehle werden nur protokolliert.'),
-    dashboardCard('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'info', ttsStatus?.ready ? `${deviceListCount(ttsStatus.defaultDevices)} Standard-Gerät(e).` : humanizeTtsStatusError(ttsStatus?.error || '')),
-    dashboardCard('Virtuelle Alexa-Geräte', alexaBridgeInfo?.bridgeHttp?.ready ? 'Bereit' : config?.alexaBridge?.enabled ? 'HTTP prüfen' : 'Deaktiviert', alexaBridgeInfo?.bridgeHttp?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'warning' : 'info', `${alexaBridgeInfo?.deviceCount ?? 0} Gerät(e), Alexa/Hue-Port ${alexaBridgeInfo?.port || config?.alexaBridge?.advertisePort || 80}.`),
-    dashboardCard('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.'),
-    dashboardCard('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail()),
-    dashboardCard('Admin-Schutz', adminSecurityInfo?.enabled ? 'Aktiv' : 'Inaktiv', adminSecurityInfo?.enabled ? 'ok' : 'info', adminSecurityInfo?.message || 'Status wird geladen.'),
-    dashboardCard('Systemprüfung', preflightInfo?.summary?.level === 'error' ? 'Fehler' : preflightInfo?.summary?.level === 'warning' ? 'Prüfen' : 'OK', preflightInfo?.summary?.level || 'info', preflightInfo?.summary?.text || 'Noch nicht geprüft.'),
-    dashboardCard('Version', dashboardVersionText(), 'info', dashboardVersionDetail())
+  const rows = [
+    dashboardStatusRow('Loxone', config?.loxone?.dryRun === false ? 'Live-Modus' : 'Dry-Run', config?.loxone?.dryRun === false ? 'ok' : 'info', config?.loxone?.dryRun === false ? 'Befehle werden an den Miniserver gesendet.' : 'Befehle werden nur protokolliert.'),
+    dashboardStatusRow('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'info', ttsStatus?.ready ? `${deviceListCount(ttsStatus.defaultDevices)} Standard-Gerät(e).` : humanizeTtsStatusError(ttsStatus?.error || '')),
+    dashboardStatusRow('Virtuelle Alexa-Geräte', alexaBridgeInfo?.bridgeHttp?.ready ? 'Bereit' : config?.alexaBridge?.enabled ? 'HTTP prüfen' : 'Deaktiviert', alexaBridgeInfo?.bridgeHttp?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'warning' : 'info', `${alexaBridgeInfo?.deviceCount ?? 0} Gerät(e), Alexa/Hue-Port ${alexaBridgeInfo?.port || config?.alexaBridge?.advertisePort || 80}.`),
+    dashboardStatusRow('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.'),
+    dashboardStatusRow('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail()),
+    dashboardStatusRow('Admin-Schutz', adminSecurityInfo?.enabled ? 'Aktiv' : 'Inaktiv', adminSecurityInfo?.enabled ? 'ok' : 'info', adminSecurityInfo?.message || 'Status wird geladen.'),
+    dashboardStatusRow('Systemprüfung', preflightInfo?.summary?.level === 'error' ? 'Fehler' : preflightInfo?.summary?.level === 'warning' ? 'Prüfen' : 'OK', preflightInfo?.summary?.level || 'info', preflightInfo?.summary?.text || 'Noch nicht geprüft.')
   ];
-  dashboardCards.innerHTML = cards.join('');
+  dashboardCards.innerHTML = rows.join('');
   renderBackupReminder();
   renderWizardPrompt();
 }
 
-function dashboardCard(title, value, level, detail) {
+function dashboardStatusRow(title, value, level, detail) {
   const safeLevel = ['ok', 'warning', 'error', 'optional', 'info'].includes(level) ? level : 'info';
   return `
-    <article class="dashboard-card ${safeLevel}">
-      <span>${escapeHtml(title)}</span>
-      <strong>${escapeHtml(value || 'Unbekannt')}</strong>
-      <p>${escapeHtml(detail || '')}</p>
+    <article class="dashboard-status-row ${safeLevel}">
+      <span class="status-pill ${safeLevel}">${escapeHtml(value || 'Unbekannt')}</span>
+      <strong class="dashboard-status-title">${escapeHtml(title)}</strong>
+      <p class="dashboard-status-detail">${escapeHtml(detail || '')}</p>
     </article>
   `;
 }
@@ -2074,16 +2073,6 @@ function openConfigArea(label) {
     target.open = true;
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-}
-
-function dashboardVersionText() {
-  const detail = String(findPreflightCheck('LoxEvo', 'Version')?.detail || '');
-  const match = detail.match(/LoxEvo\s+([0-9]+(?:\.[0-9]+){1,2})/);
-  return match?.[1] || 'Unbekannt';
-}
-
-function dashboardVersionDetail() {
-  return findPreflightCheck('LoxEvo', 'Version')?.detail || 'Version aus package.json.';
 }
 
 function findPreflightCheck(sectionTitle, label) {

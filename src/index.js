@@ -2,7 +2,7 @@ import http from 'node:http';
 import { constants } from 'node:fs';
 import { access, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,8 +26,10 @@ let discoveryControl = new DiscoveryControl(config);
 let bridgeHttpServer = null;
 let bridgeHttpStatus = { enabled: false, ready: false, error: null, port: null };
 const events = [];
+const dedupedEventTimes = new Map();
 const startedAt = new Date();
 const MAX_REQUEST_BODY_SIZE = 1024 * 1024 * 2;
+const OPTIONAL_DISCOVERY_EVENT_DEDUPE_MS = 30 * 60 * 1000;
 const ENV_ADMIN_TOKEN = String(process.env.LOXEVO_ADMIN_TOKEN || '').trim();
 let adminSecurity = await loadAdminSecurity();
 const LOXONE_TTS_RESERVED_PATHS = new Set([
@@ -418,6 +420,7 @@ function hashAdminToken(token, salt) {
 
 async function exportBackup(res, includeCookie) {
   const exportedAt = new Date().toISOString();
+  const fileName = `loxevo-backup-${timestampForFile(exportedAt)}.json`;
   const backup = {
     app: config.server?.name || 'LoxEvo',
     formatVersion: 1,
@@ -437,8 +440,14 @@ async function exportBackup(res, includeCookie) {
     }
   }
 
+  await writeBackupExportState({
+    exportedAt,
+    includeCookie,
+    fileName,
+    configHash: backupRelevantConfigHash(config)
+  });
   addEvent({ type: 'backup', status: 'exported', text: includeCookie ? 'Backup mit Cookie exportiert.' : 'Backup exportiert.' });
-  return sendJsonDownload(res, backup, `loxevo-backup-${timestampForFile(exportedAt)}.json`);
+  return sendJsonDownload(res, backup, fileName);
 }
 
 async function restoreBackup(res, backupPayload) {
@@ -682,6 +691,10 @@ function getConfigDir() {
 
 function getAdminTokenPath() {
   return resolve(process.env.LOXEVO_ADMIN_TOKEN_FILE || join(getConfigDir(), 'admin-token.json'));
+}
+
+function getBackupStatePath() {
+  return resolve(process.env.LOXEVO_BACKUP_STATE_FILE || join(getConfigDir(), 'backup-state.json'));
 }
 
 function isInsideDirectory(path, directory) {
@@ -1012,7 +1025,7 @@ async function getPreflightStatus() {
       title: 'Backup',
       checks: [
         preflightCheck(configWriteError ? 'error' : 'ok', 'Export und Import', configWriteError || 'Backups können exportiert und Import-Sicherungen im Datenordner angelegt werden.'),
-        preflightCheck(backupInfo.error ? 'warning' : 'info', 'Lokale Sicherungen', describeBackupInfo(backupInfo)),
+        preflightCheck(backupInfo.error ? 'warning' : backupInfo.needsBackup ? 'warning' : 'ok', 'Lokale Sicherungen', describeBackupInfo(backupInfo)),
         preflightCheck('info', 'Alexa-Cookie', 'Die Cookie-Datei wird nur exportiert, wenn der Haken beim Backup gesetzt ist.'),
         preflightCheck(lastBackupEvent ? eventLevel(lastBackupEvent) : 'info', 'Letzte Backup-Aktion', describeEvent(lastBackupEvent, 'Seit dem letzten Start wurde noch kein Backup exportiert oder importiert.'))
       ]
@@ -1022,6 +1035,12 @@ async function getPreflightStatus() {
   return {
     checkedAt: new Date().toISOString(),
     summary: summarizePreflight(sections),
+    backup: {
+      lastExport: backupInfo.lastExport || null,
+      needsBackup: Boolean(backupInfo.needsBackup),
+      localBackupCount: backupInfo.count || 0,
+      latestLocalBackup: backupInfo.latest || null
+    },
     sections
   };
 }
@@ -1089,6 +1108,8 @@ async function getCookieFileInfo(cookieFile) {
 }
 
 async function getBackupInfo() {
+  const exportState = await readBackupExportState();
+  const currentConfigHash = backupRelevantConfigHash(config);
   try {
     const directory = getConfigDir();
     const files = await readdir(directory);
@@ -1117,11 +1138,73 @@ async function getBackupInfo() {
     return {
       directory,
       count: backupFiles.length,
-      latest: backupFiles[0] || null
+      latest: backupFiles[0] || null,
+      lastExport: exportState,
+      currentConfigHash,
+      needsBackup: !exportState?.configHash || exportState.configHash !== currentConfigHash
     };
   } catch (error) {
-    return { directory: getConfigDir(), count: 0, latest: null, error: error.message };
+    return {
+      directory: getConfigDir(),
+      count: 0,
+      latest: null,
+      lastExport: exportState,
+      currentConfigHash,
+      needsBackup: !exportState?.configHash || exportState.configHash !== currentConfigHash,
+      error: error.message
+    };
   }
+}
+
+async function writeBackupExportState(state) {
+  const payload = {
+    formatVersion: 1,
+    exportedAt: state.exportedAt,
+    includeCookie: Boolean(state.includeCookie),
+    fileName: state.fileName || null,
+    configHash: state.configHash || null
+  };
+  await writeFile(getBackupStatePath(), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+}
+
+async function readBackupExportState() {
+  try {
+    const payload = JSON.parse(await readFile(getBackupStatePath(), 'utf8'));
+    if (!payload?.exportedAt) return null;
+    return {
+      exportedAt: payload.exportedAt,
+      includeCookie: Boolean(payload.includeCookie),
+      fileName: payload.fileName || null,
+      configHash: payload.configHash || null
+    };
+  } catch {
+    return null;
+  }
+}
+
+function backupRelevantConfigHash(sourceConfig) {
+  return createHash('sha256')
+    .update(JSON.stringify(sortForStableHash(toBackupRelevantConfig(sourceConfig))))
+    .digest('hex');
+}
+
+function toBackupRelevantConfig(sourceConfig) {
+  const snapshot = structuredClone(sourceConfig || {});
+  if (snapshot.loxone) {
+    delete snapshot.loxone.dryRun;
+  }
+  return snapshot;
+}
+
+function sortForStableHash(value) {
+  if (Array.isArray(value)) return value.map(sortForStableHash);
+  if (!isPlainObject(value)) return value;
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .filter((key) => value[key] !== undefined)
+      .map((key) => [key, sortForStableHash(value[key])])
+  );
 }
 
 function latestEvent(predicate) {
@@ -1180,6 +1263,13 @@ function cookieLevel(info, status) {
 function describeBackupInfo(info) {
   if (info.error) {
     return `Backup-Ordner konnte nicht gelesen werden: ${info.error}`;
+  }
+  if (info.lastExport?.exportedAt) {
+    const cookieText = info.lastExport.includeCookie ? 'mit Alexa-Cookie' : 'ohne Alexa-Cookie';
+    const backupText = info.needsBackup
+      ? ' Seitdem wurden backup-relevante Einstellungen geändert; ein neues Backup wird empfohlen.'
+      : ' Die backup-relevanten Einstellungen sind seitdem unverändert.';
+    return `Letzter Export: ${formatDateTimeForDetail(info.lastExport.exportedAt)} (${cookieText}).${backupText}`;
   }
   if (!info.count) {
     return `Noch keine lokalen Sicherungsdateien in ${info.directory} gefunden.`;
@@ -1882,11 +1972,29 @@ function firstNonEmpty(...lists) {
 
 function addEvent(event) {
   const normalizedEvent = normalizeEvent(event);
+  if (shouldSuppressEvent(normalizedEvent)) return;
   events.unshift({
     at: new Date().toISOString(),
     ...normalizedEvent
   });
   events.splice(50);
+}
+
+function shouldSuppressEvent(event) {
+  if (!event) return false;
+  const type = String(event.type || '');
+  const status = String(event.status || '');
+  const text = [event.text, event.error].filter(Boolean).join(' ');
+  const isRepeatedDiscoveryHint = type === 'alexa-bridge' && status === 'optional' && isDiscoveryPortIssue(text);
+  if (!isRepeatedDiscoveryHint) return false;
+
+  const key = `${type}:${status}:discovery-port`;
+  const now = Date.now();
+  const lastAt = dedupedEventTimes.get(key) || 0;
+  if (now - lastAt < OPTIONAL_DISCOVERY_EVENT_DEDUPE_MS) return true;
+
+  dedupedEventTimes.set(key, now);
+  return false;
 }
 
 function normalizeEvent(event) {

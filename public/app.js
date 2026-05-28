@@ -499,6 +499,7 @@ async function exportBackup(button) {
     downloadBlob(blob, filenameFromResponse(response) || `loxevo-backup-${timestampForFile(new Date())}.json`);
     localStorage.setItem(LAST_BACKUP_EXPORT_KEY, new Date().toISOString());
     configDirty = false;
+    await loadPreflightStatus();
     renderDashboard();
     await loadEvents();
     setButtonFeedback(button, 'success', 'Exportiert');
@@ -1506,6 +1507,17 @@ function deviceListCount(values) {
   return Array.isArray(values) ? values.filter((value) => value && !String(value).includes('replace-with')).length : 0;
 }
 
+function ttsDeviceSummary(status) {
+  if (!status?.ready) return humanizeTtsStatusError(status?.error || '');
+  const parts = [
+    `Standard: ${deviceListCount(status.defaultDevices)}`,
+    `Alarm: ${deviceListCount(status.alarmDevices)}`
+  ];
+  const allCount = deviceListCount(status.allDevices);
+  if (allCount) parts.push(`Alle: ${allCount}`);
+  return `${parts.join(' · ')} Gerät(e).`;
+}
+
 function setCountBadge(element, count) {
   if (!element) return;
   const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : 0;
@@ -1861,6 +1873,7 @@ function renderSetupStatus(errorText) {
 
   if (errorText) {
     setupPanel.classList.add('setup-warning');
+    setupSummary.className = 'setup-summary error';
     setupSummary.textContent = `Setup-Status konnte nicht geladen werden: ${errorText}`;
     setupChecks.innerHTML = '';
     if (setupDetailsCount) setupDetailsCount.textContent = '0';
@@ -1871,6 +1884,7 @@ function renderSetupStatus(errorText) {
 
   setupPanel.classList.toggle('setup-complete', setupStatus.complete);
   setupPanel.classList.toggle('setup-warning', !setupStatus.complete);
+  setupSummary.className = `setup-summary ${setupStatus.complete ? 'ok' : 'warning'}`;
   setupSummary.textContent = setupStatus.complete
     ? setupStatus.dryRun
       ? 'Die Basiskonfiguration ist vollständig. Dry-Run ist für erste Tests aktiv.'
@@ -1925,7 +1939,7 @@ function renderDashboard() {
   if (!dashboardCards) return;
   const rows = [
     dashboardStatusRow('Loxone', config?.loxone?.dryRun === false ? 'Live-Modus' : 'Dry-Run', config?.loxone?.dryRun === false ? 'ok' : 'info', config?.loxone?.dryRun === false ? 'Befehle werden an den Miniserver gesendet.' : 'Befehle werden nur protokolliert.', 'Zeigt, ob LoxEvo echte Befehle an den Loxone-Miniserver sendet. Dry-Run ist für Tests gedacht und protokolliert nur. Live-Modus ist für den produktiven Betrieb, sobald die Befehle geprüft sind.'),
-    dashboardStatusRow('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'info', ttsStatus?.ready ? `${deviceListCount(ttsStatus.defaultDevices)} Standard-Gerät(e).` : humanizeTtsStatusError(ttsStatus?.error || ''), 'Zeigt den Status der Alexa-Sprachausgabe. Bereit bedeutet, dass alexa-remote2 verbunden ist und LoxEvo die konfigurierten Echo-Geräte für normale TTS- oder Alarmmeldungen verwenden kann.'),
+    dashboardStatusRow('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'info', ttsDeviceSummary(ttsStatus), 'Zeigt den Status der Alexa-Sprachausgabe. Bereit bedeutet, dass alexa-remote2 verbunden ist und LoxEvo die konfigurierten Echo-Geräte für normale TTS- oder Alarmmeldungen verwenden kann.'),
     dashboardStatusRow('Virtuelle Alexa-Geräte', alexaBridgeInfo?.bridgeHttp?.ready ? 'Bereit' : config?.alexaBridge?.enabled ? 'HTTP prüfen' : 'Deaktiviert', alexaBridgeInfo?.bridgeHttp?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'warning' : 'info', `${alexaBridgeInfo?.deviceCount ?? 0} Gerät(e), Alexa/Hue-Port ${alexaBridgeInfo?.port || config?.alexaBridge?.advertisePort || 80}.`, 'Zeigt, ob LoxEvo die lokalen Hue-kompatiblen Geräte für Alexa bereitstellt. Diese Funktion ist für Sprachbefehle wie Licht ein oder aus zuständig und läuft unabhängig von Alexa TTS.'),
     dashboardStatusRow('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.', 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Bereits gefundene Geräte funktionieren normalerweise weiter. Für neue Geräte unter Konfiguration die Alexa-Gerätesuche kurz aktivieren, in der Alexa-App suchen und danach wieder beenden.'),
     dashboardStatusRow('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail(), 'Zeigt, ob seit den letzten Änderungen ein Export der LoxEvo-Einstellungen empfohlen ist. Backups enthalten die Konfiguration; die Alexa-Cookie-Datei wird nur gesichert, wenn du sie beim Export bewusst einschliesst.'),
@@ -1966,37 +1980,51 @@ function bindDashboardHelpButtons() {
 }
 
 function backupStateTitle() {
-  if (configDirty) return 'Offen';
-  return localStorage.getItem(LAST_BACKUP_EXPORT_KEY) ? 'Exportiert' : 'Kein Export';
+  if (configDirty || backupNeedsExport()) return 'Empfohlen';
+  return getLastBackupExportAt() ? 'Exportiert' : 'Kein Export';
 }
 
 function backupReminderLevel() {
-  return configDirty ? 'warning' : localStorage.getItem(LAST_BACKUP_EXPORT_KEY) ? 'ok' : 'info';
+  return configDirty || backupNeedsExport() ? 'warning' : getLastBackupExportAt() ? 'ok' : 'info';
 }
 
 function backupStateDetail() {
-  const lastExport = localStorage.getItem(LAST_BACKUP_EXPORT_KEY);
+  const lastExport = getLastBackupExportAt();
   if (configDirty) return 'Seit der letzten Änderung wurde noch kein Backup exportiert.';
-  return lastExport ? `Letzter Export in diesem Browser: ${formatDateTime(lastExport)}.` : 'Backup kann unter Wartung exportiert werden.';
+  if (backupNeedsExport()) {
+    return lastExport
+      ? `Seit dem letzten Export am ${formatDateTime(lastExport)} wurden Einstellungen geändert.`
+      : 'Noch kein Backup exportiert. Backup wird empfohlen.';
+  }
+  return lastExport ? `Letzter Export: ${formatDateTime(lastExport)}. Keine relevanten Änderungen seitdem.` : 'Backup kann unter Wartung exportiert werden.';
+}
+
+function getLastBackupExportAt() {
+  return preflightInfo?.backup?.lastExport?.exportedAt || localStorage.getItem(LAST_BACKUP_EXPORT_KEY);
+}
+
+function backupNeedsExport() {
+  return Boolean(preflightInfo?.backup?.needsBackup);
 }
 
 function renderBackupReminder() {
   if (!backupReminder) return;
-  if (!configDirty) {
+  if (!configDirty && !backupNeedsExport()) {
     backupReminder.hidden = true;
     backupReminder.textContent = '';
     return;
   }
   backupReminder.hidden = false;
-  backupReminder.textContent = 'Seit der letzten Änderung wurde noch kein Backup exportiert. Nach grösseren Anpassungen unter Wartung ein Backup erstellen.';
+  backupReminder.textContent = 'Seit dem letzten Backup wurden Einstellungen geändert. Unter Wartung ein neues Backup exportieren.';
 }
 
 function renderWizardPrompt() {
   if (!wizardPrompt) return;
   const skipped = localStorage.getItem(SETUP_WIZARD_SKIPPED_KEY) === 'true';
   const hasOpenSetup = setupStatus && !setupStatus.complete;
-  const shouldShow = !skipped && (hasOpenSetup || !localStorage.getItem(LAST_BACKUP_EXPORT_KEY));
+  const shouldShow = !skipped && (hasOpenSetup || !getLastBackupExportAt());
   wizardPrompt.hidden = !shouldShow;
+  if (openWizardBtn) openWizardBtn.hidden = !skipped;
 }
 
 function skipWizardPrompt(closeModalToo = false) {

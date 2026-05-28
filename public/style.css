@@ -1187,9 +1187,11 @@ legend {
 
 .target-highlight {
   position: relative;
-  outline: 3px solid rgba(37, 111, 116, 0.68);
+  border-color: #1f7a80 !important;
+  background: #f1fbfb !important;
+  outline: 3px solid rgba(37, 111, 116, 0.78);
   outline-offset: 4px;
-  animation: targetPulse 2.6s ease-out;
+  animation: targetPulse 3.6s ease-out;
 }
 
 @keyframes targetPulse {

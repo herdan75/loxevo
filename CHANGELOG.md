@@ -6,6 +6,7 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 - Doppelten Alexa-Gerätesuche-Hinweis unterhalb des Live-/Testmodus entfernt; der SSDP-Hinweis bleibt im Modusbereich sichtbar.
 - Zielnavigation aus der Statuskontrolle klarer hervorgehoben und Zielbereiche mittiger ins Bild gescrollt.
+- Statuskontrolle verlinkt die Wartungsbereiche für Admin-Schutz, Backup und Systemprüfung genauer und scrollt den Zielbereich sichtbar mit Abstand ein.
 
 ## 1.0.2 - 2026-05-28
 

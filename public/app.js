@@ -2059,7 +2059,7 @@ function renderDashboard() {
     dashboardStatusRow('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.', 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Bereits gefundene Geräte funktionieren normalerweise weiter. Für neue Geräte unter Konfiguration die Alexa-Gerätesuche kurz aktivieren, in der Alexa-App suchen und danach wieder beenden.', 'config:Alexa-Gerätesuche'),
     dashboardStatusRow('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail(), 'Zeigt, ob seit dem letzten Backup backup-relevante Einstellungen geändert wurden. Backup-relevant sind Loxone-Zugang, Befehle, Räume, Alexa-Bridge, Gerätesuche, TTS-Einstellungen, Geräteauswahl, Lautstärken und Server-Einstellungen. Nicht backup-relevant ist der Betriebszustand Dry-Run/Live-Modus. Die Alexa-Cookie-Datei wird nur gesichert, wenn du sie beim Export bewusst einschliesst.', 'maintenance:maintenanceBackupPanel'),
     dashboardStatusRow('Admin-Schutz', adminStatus.value, adminStatus.level, adminStatus.detail, 'Zeigt, ob sensible Web-UI-Aktionen wie Konfiguration, Backup, Restore, Neustart oder Protokoll löschen mit einem Admin-Passwort geschützt sind. Loxone-Befehle, TTS und Alexa/Hue-Endpunkte bleiben bewusst offen für lokale Automationen.', 'maintenance:maintenanceAdminPanel'),
-    dashboardStatusRow('Systemprüfung', systemStatus.value, systemStatus.level, systemStatus.detail, 'Fasst technische Zusatzprüfungen aus Wartung zusammen. Hinweise, die bereits eigene Statuszeilen haben, werden hier nicht nochmals als offene Punkte gewertet. Details findest du im Register Wartung.', 'maintenance:maintenancePreflightPanel')
+    dashboardStatusRow('Systemprüfung', systemStatus.value, systemStatus.level, systemStatus.detail, 'Fasst technische Zusatzprüfungen aus Wartung zusammen. Hinweise, die bereits eigene Statuszeilen haben, werden hier nicht nochmals als offene Punkte gewertet. Details findest du im Register Wartung.', 'maintenance:maintenanceSystemCheckPanel')
   ];
   dashboardCards.innerHTML = prioritizeDashboardRows(rows).join('');
   bindDashboardHelpButtons();
@@ -2256,18 +2256,25 @@ function openDashboardTarget(target) {
     return;
   }
   if (kind === 'maintenance' && value) {
-    showView('maintenanceView');
-    highlightTargetElement(document.getElementById(value));
+    openMaintenanceArea(value);
   }
+}
+
+function openMaintenanceArea(elementId) {
+  showView('maintenanceView');
+  window.setTimeout(() => {
+    highlightTargetElement(document.getElementById(elementId));
+  }, 220);
 }
 
 function highlightTargetElement(element) {
   if (!element) return;
   element.classList.remove('target-highlight');
   window.setTimeout(() => {
-    element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    const top = element.getBoundingClientRect().top + window.scrollY - 88;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     element.classList.add('target-highlight');
-    window.setTimeout(() => element.classList.remove('target-highlight'), 2600);
+    window.setTimeout(() => element.classList.remove('target-highlight'), 3600);
   }, 120);
 }
 

@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+- Register `Übersicht` in `Statuskontrolle` umbenannt und Register-Reihenfolge angepasst.
+- Register `Externe Aufrufe` in `Aufrufübersicht` umbenannt.
+- Einrichtungsdetails im Register `Testen` als aufklappbaren Detailbereich dargestellt.
+- Sichtbare Admin-Schutz-Texte von Admin-Token auf Admin-Passwort umgestellt; technische Header bleiben unverändert.
+
 ## 1.0.1 - 2026-05-28
 
 - Startregister `Übersicht` mit kompakter Statuskontrolle für Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche, Backup, Admin-Schutz und Systemprüfung ergänzt.

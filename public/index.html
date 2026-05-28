@@ -32,10 +32,10 @@
       <section id="systemNotice" class="system-notice wide" hidden></section>
 
       <nav class="tab-nav wide" aria-label="LoxEvo Bereiche">
-        <button class="tab-button active" type="button" data-tab-target="dashboardView">Übersicht</button>
-        <button class="tab-button" type="button" data-tab-target="controlView">Testen</button>
-        <button class="tab-button" type="button" data-tab-target="integrationView">Externe Aufrufe</button>
+        <button class="tab-button active" type="button" data-tab-target="dashboardView">Statuskontrolle</button>
         <button class="tab-button" type="button" data-tab-target="configView">Konfiguration</button>
+        <button class="tab-button" type="button" data-tab-target="controlView">Testen</button>
+        <button class="tab-button" type="button" data-tab-target="integrationView">Aufrufübersicht</button>
         <button class="tab-button" type="button" data-tab-target="maintenanceView">Wartung</button>
         <button class="tab-button" type="button" data-tab-target="eventsView">Protokoll</button>
       </nav>
@@ -93,7 +93,13 @@
           </div>
           <button id="setupConfigBtn" type="button" class="secondary">Zur Konfiguration</button>
         </div>
-        <div id="setupChecks" class="setup-checks"></div>
+        <details id="setupDetails" class="setup-details">
+          <summary>
+            <span>Details zur Einrichtung</span>
+            <span id="setupDetailsCount" class="count-badge">0</span>
+          </summary>
+          <div id="setupChecks" class="setup-checks"></div>
+        </details>
       </section>
 
       <section class="panel">
@@ -125,8 +131,8 @@
       <section class="panel wide">
         <div class="section-head">
           <div>
-            <h2>Externe Aufrufe</h2>
-            <p>URLs für Alexa-Routinen, Loxone oder andere Systeme.</p>
+            <h2>Aufrufübersicht</h2>
+            <p>Bereits angelegte Befehle, virtuelle Alexa-Geräte und fertige URLs für lokale Systeme.</p>
           </div>
           <button id="refreshIntegrationsBtn" type="button" class="secondary">Aufrufe aktualisieren</button>
         </div>
@@ -337,7 +343,7 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
 
       <section class="panel wide">
         <h2>API-Kurzbeispiel</h2>
-        <p>Fertige URLs zum Kopieren stehen im Register Externe Aufrufe.</p>
+        <p>Fertige URLs zum Kopieren stehen im Register Aufrufübersicht.</p>
         <pre><code>POST http://&lt;loxberry&gt;:&lt;port&gt;/api/command
 Content-Type: application/json
 
@@ -385,37 +391,37 @@ Content-Type: application/json
           <button id="adminSecurityHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="adminSecurityHelpText" aria-label="Admin-Schutz-Hilfe anzeigen" title="Erklärt, welche Web-UI-Aktionen geschützt werden.">i</button>
         </div>
         <div id="adminSecurityHelpText" class="help-box" hidden>
-          <p><strong>Wichtig:</strong> Die Web-UI lädt beim Öffnen automatisch die Konfiguration über <code>/api/config</code>. Deshalb wird bei aktivem Admin-Schutz bereits beim Öffnen der Web-UI der Admin-Token abgefragt.</p>
+          <p><strong>Wichtig:</strong> Die Web-UI lädt beim Öffnen automatisch die Konfiguration über <code>/api/config</code>. Deshalb wird bei aktivem Admin-Schutz bereits beim Öffnen der Web-UI das Admin-Passwort abgefragt.</p>
 
            <p>Geschützt sind unter anderem:
-          Konfiguration, Backup/Restore, Neustart, <code>alexa-remote2</code>-Update, Dry-Run-Umschaltung und die Admin-Token-Verwaltung.</p>
+          Konfiguration, Backup/Restore, Neustart, <code>alexa-remote2</code>-Update, Dry-Run-Umschaltung und die Admin-Passwort-Verwaltung.</p>
 
-          <p>Der Token wird absichtlich nur temporär im aktuellen Browser-Tab gespeichert (<code>sessionStorage</code>). Nach Schliessen des Tabs oder Browsers muss der Token erneut eingegeben werden. Der Token wird nicht dauerhaft im Browser gespeichert und nicht an Alexa, Loxone oder andere externe Systeme weitergegeben.</p>
+          <p>Das Admin-Passwort wird absichtlich nur temporär im aktuellen Browser-Tab gespeichert (<code>sessionStorage</code>). Nach Schliessen des Tabs oder Browsers muss es erneut eingegeben werden. Es wird nicht dauerhaft im Browser gespeichert und nicht an Alexa, Loxone oder andere externe Systeme weitergegeben.</p>
 
-          <p>Bewusst weiterhin ohne Admin-Token erreichbar bleiben:
+          <p>Bewusst weiterhin ohne Admin-Passwort erreichbar bleiben:
           Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Aufrufe, <code>/health</code>, Protokoll, Einrichtung und Systemprüfung. Dadurch funktionieren bestehende Alexa-, Loxone-, Home-Assistant- oder Node-RED-Automationen weiterhin ohne zusätzliche Anpassungen.</p>
 
-          <p>Wenn der Schutz über die Web-UI aktiviert wird, speichert LoxEvo nur einen kryptographischen Hash im Datenordner. Der eigentliche Token wird nicht im Klartext gespeichert und nicht im normalen Backup exportiert.</p>
+          <p>Wenn der Schutz über die Web-UI aktiviert wird, speichert LoxEvo nur einen kryptographischen Hash im Datenordner. Das eigentliche Admin-Passwort wird nicht im Klartext gespeichert und nicht im normalen Backup exportiert.</p>
 
-          <p>Ein gesetztes <code>LOXEVO_ADMIN_TOKEN</code> aus Docker oder der Container-Umgebung hat Vorrang und kann ausschliesslich dort geändert oder entfernt werden.</p>
+          <p>Technisch wird das Admin-Passwort als Admin-Token im Header <code>X-LoxEvo-Admin-Token</code> gesendet. Ein gesetztes <code>LOXEVO_ADMIN_TOKEN</code> aus Docker oder der Container-Umgebung hat Vorrang und kann ausschliesslich dort geändert oder entfernt werden.</p>
         </div>
         <div id="adminSecurityStatus" class="service-status">Admin-Schutz wird geladen...</div>
         <div class="backup-grid admin-security-grid">
           <div class="backup-card">
             <div class="card-title-row">
-              <h3>Token setzen oder ändern</h3>
-              <button id="adminTokenHelpBtn" type="button" class="info-button info-button-small" aria-expanded="false" aria-controls="adminTokenHelpText" aria-label="Hilfe zum Admin-Token anzeigen" title="Erklärt, wie der Admin-Token gespeichert und verwendet wird.">i</button>
+              <h3>Admin-Passwort setzen oder ändern</h3>
+              <button id="adminTokenHelpBtn" type="button" class="info-button info-button-small" aria-expanded="false" aria-controls="adminTokenHelpText" aria-label="Hilfe zum Admin-Passwort anzeigen" title="Erklärt, wie das Admin-Passwort gespeichert und verwendet wird.">i</button>
             </div>
             <div id="adminTokenHelpText" class="help-box compact-help" hidden>
-              <p>Aktiviert oder ändert den Admin-Schutz für sensible Web-UI-Aktionen. LoxEvo speichert nur einen Hash des Tokens, nicht den Token im Klartext. Bei aktivem Schutz muss die aktuelle Browser-Sitzung zuerst mit dem bestehenden Token autorisiert sein.</p>
+              <p>Aktiviert oder ändert den Admin-Schutz für sensible Web-UI-Aktionen. LoxEvo speichert nur einen Hash des Admin-Passworts, nicht das Passwort im Klartext. Bei aktivem Schutz muss die aktuelle Browser-Sitzung zuerst mit dem bestehenden Admin-Passwort autorisiert sein.</p>
             </div>
-            <p>Mindestens 8 Zeichen. Bei aktivem Schutz fragt die Web-UI zuerst den aktuellen Token ab.</p>
+            <p>Mindestens 8 Zeichen. Bei aktivem Schutz fragt die Web-UI zuerst das aktuelle Admin-Passwort ab.</p>
             <label>
-              Neuer Admin-Token
+              Neues Admin-Passwort
               <input id="adminTokenInput" type="password" autocomplete="new-password">
             </label>
             <label>
-              Admin-Token wiederholen
+              Admin-Passwort wiederholen
               <input id="adminTokenRepeatInput" type="password" autocomplete="new-password">
             </label>
             <button id="saveAdminTokenBtn" type="button">Admin-Schutz aktivieren</button>
@@ -428,7 +434,7 @@ Content-Type: application/json
             <div id="adminDisableHelpText" class="help-box compact-help" hidden>
               <p>Entfernt nur den Admin-Schutz, der über diese Web-UI gesetzt wurde. Wenn der Schutz per Docker-Umgebungsvariable <code>LOXEVO_ADMIN_TOKEN</code> gesetzt ist, bleibt er aktiv und muss in der Docker-Konfiguration geändert werden.</p>
             </div>
-            <p>Entfernt den über die Web-UI gesetzten Token. Ein Docker-Token aus <code>LOXEVO_ADMIN_TOKEN</code> kann hier nicht entfernt werden.</p>
+            <p>Entfernt das über die Web-UI gesetzte Admin-Passwort. Ein Docker-Umgebungswert aus <code>LOXEVO_ADMIN_TOKEN</code> kann hier nicht entfernt werden.</p>
             <button id="disableAdminTokenBtn" type="button" class="secondary">Admin-Schutz deaktivieren</button>
           </div>
         </div>
@@ -445,7 +451,7 @@ Content-Type: application/json
         <div id="backupHelpText" class="help-box" hidden>
           <p>Gesichert wird die LoxEvo-Konfiguration aus <code>data/config.json</code>: Loxone-Zugang, Befehle, Rubriken, Alexa-Bridge, TTS-Einstellungen, Geräte-Seriennummern und Lautstärken.</p>
           <p>Die Alexa-Cookie-Datei <code>data/Node.txt</code> wird nur exportiert, wenn der Haken gesetzt ist. Das Backup kann sensible Daten enthalten und sollte privat bleiben.</p>
-          <p>Nicht im Backup enthalten sind der Admin-Token-Hash, installierte Pakete wie <code>alexa-remote2</code>, Docker-Images, Logs und temporäre Dateien. Ein normaler Container-Neustart behält diese Daten, solange der Datenordner erhalten bleibt. Bei einer frischen Installation oder gelöschtem Datenordner muss <code>alexa-remote2</code> im Register Wartung erneut installiert werden.</p>
+          <p>Nicht im Backup enthalten sind der Admin-Passwort-Hash, installierte Pakete wie <code>alexa-remote2</code>, Docker-Images, Logs und temporäre Dateien. Ein normaler Container-Neustart behält diese Daten, solange der Datenordner erhalten bleibt. Bei einer frischen Installation oder gelöschtem Datenordner muss <code>alexa-remote2</code> im Register Wartung erneut installiert werden.</p>
           <p>Beim Import legt LoxEvo zuerst automatisch eine Sicherung der aktuellen Konfiguration im Datenordner an und spielt danach die Backup-Datei ein.</p>
         </div>
         <div class="backup-grid">

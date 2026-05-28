@@ -60,12 +60,12 @@ Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCoo
 Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen lokalen Login-Proxy. LoxEvo setzt dafür automatisch die LAN-IP des LoxBerry; bei Bedarf kann `tts.proxyOwnIp` und `tts.proxyPort` in der Web-UI angepasst werden.
 Für den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
-Die Web-UI startet mit einer kompakten `Übersicht`. Dort sieht man auf einen Blick, ob Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche, Backup, Admin-Schutz und Systemprüfung in einem sinnvollen Zustand sind.
-Auf der Übersicht steht ausserdem ein überspringbarer Einrichtungsassistent bereit. Er führt Schritt für Schritt durch Loxone-Zugang, erste Befehle, Dry-Run/Live-Modus, virtuelle Alexa-Geräte, optionale Gerätesuche, TTS und Backup. Der Assistent ändert nichts automatisch; Aktionen wie `Gerätesuche aktivieren` müssen bewusst geklickt werden.
+Die Web-UI startet mit einer kompakten `Statuskontrolle`. Dort sieht man auf einen Blick, ob Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche, Backup, Admin-Schutz und Systemprüfung in einem sinnvollen Zustand sind.
+Auf der Statuskontrolle steht ausserdem ein überspringbarer Einrichtungsassistent bereit. Er führt Schritt für Schritt durch Loxone-Zugang, erste Befehle, Dry-Run/Live-Modus, virtuelle Alexa-Geräte, optionale Gerätesuche, TTS und Backup. Der Assistent ändert nichts automatisch; Aktionen wie `Gerätesuche aktivieren` müssen bewusst geklickt werden.
 Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung für Konfiguration, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Diese Prüfung läuft beim Öffnen des Registers oder per Button und erzeugt keine dauernde Hintergrundlast.
 Im gleichen Register zeigt LoxEvo die installierte `alexa-remote2`-Version und verfügbare npm-Versionen und kann Installation oder Update im laufenden Container anstossen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
 Im gleichen Register können die Einstellungen als Backup exportiert und später wieder importiert werden. Der Export enthält standardmässig die LoxEvo-Konfiguration; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden.
-Zusätzlich kann dort ein Diagnosepaket exportiert werden. Es enthält Health-Status, Systemprüfung, Versionsinformationen, eine zusammengefasste Konfiguration und die letzten Ereignisse. Zugangsdaten, Token und Hostnamen werden dabei nicht im Klartext ausgegeben.
+Zusätzlich kann dort ein Diagnosepaket exportiert werden. Es enthält Health-Status, Systemprüfung, Versionsinformationen, eine zusammengefasste Konfiguration und die letzten Ereignisse. Zugangsdaten, Admin-Passwort, Token und Hostnamen werden dabei nicht im Klartext ausgegeben.
 Backup-Dateien können sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten und sollten deshalb privat bleiben.
 
 Private Daten gehören in `data/`:
@@ -79,11 +79,11 @@ Bei einer Neuinstallation reicht es normalerweise, den Ordner `data/` zu sichern
 
 Wichtig für Live-Tests: Die Web-UI zeigt und speichert Loxone-Zugangsdaten. LoxEvo sollte deshalb nur im eigenen LAN oder per VPN erreichbar sein und nicht direkt ins Internet freigegeben werden.
 
-Optional kann in der Web-UI unter `Wartung` ein Admin-Token für sensible Bereiche aktiviert werden.
+Optional kann in der Web-UI unter `Wartung` ein Admin-Passwort für sensible Bereiche aktiviert werden.
 
-Wenn der Token gesetzt ist, verlangt LoxEvo für Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update und Dry-Run-Umschaltung den Header `X-LoxEvo-Admin-Token`. Die Web-UI fragt den Token bei Bedarf ab und merkt ihn nur für die aktuelle Browser-Sitzung. Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Endpunkte, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Alexa- und Loxone-Aufrufe nicht brechen.
+Wenn das Admin-Passwort gesetzt ist, verlangt LoxEvo für Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update und Dry-Run-Umschaltung technisch den Header `X-LoxEvo-Admin-Token`. Die Web-UI fragt das Admin-Passwort bei Bedarf ab und merkt es nur für die aktuelle Browser-Sitzung. Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Endpunkte, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Alexa- und Loxone-Aufrufe nicht brechen.
 
-Der über die Web-UI gesetzte Token wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab. Der normale Backup-Export enthält diesen Hash nicht. Alternativ kann der Schutz weiterhin per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser Wert hat Vorrang und wird ausserhalb der Web-UI verwaltet.
+Das über die Web-UI gesetzte Admin-Passwort wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab. Der normale Backup-Export enthält diesen Hash nicht. Alternativ kann der Schutz weiterhin per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser Wert hat Vorrang und wird ausserhalb der Web-UI verwaltet.
 
 Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell können dort gepflegt werden:
 
@@ -96,10 +96,10 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell können dort gepflegt w
 
 Die Oberfläche ist in klare Bereiche gegliedert:
 
-- `Übersicht`: kompakte Statuskontrolle, Einrichtungsassistent und Hinweise zu Backup, Alexa und Loxone
-- `Testen`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI prüfen
-- `Externe Aufrufe`: fertige URLs für Alexa-Routinen, Loxone und optionale externe Tools testen und kopieren
+- `Statuskontrolle`: kompakter Schnellcheck, Einrichtungsassistent und Hinweise zu Backup, Alexa und Loxone
 - `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
+- `Testen`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI prüfen
+- `Aufrufübersicht`: angelegte Befehle, virtuelle Alexa-Geräte und fertige URLs für lokale Systeme ansehen, testen und kopieren
 - `Wartung`: Systemprüfung ausführen, Diagnose exportieren, Paketversionen prüfen, `alexa-remote2` verwalten, Backup exportieren und Backup importieren
 - `Protokoll`: zuletzt simulierte oder gesendete Aktionen filtern, durchsuchen und bei Bedarf leeren
 
@@ -116,7 +116,7 @@ Empfohlener Ablauf für neue Installationen:
 
 ## Backup und Deinstallation
 
-Backups werden in der Web-UI unter `Wartung` erstellt. Der normale Export enthält `config.json` mit Loxone-, Alexa-Bridge-, Befehls- und TTS-Einstellungen. Die Alexa-Cookie-Datei `Node.txt` wird nur exportiert, wenn der entsprechende Haken gesetzt ist, weil diese Datei Zugriffsdaten für das Amazon-Konto enthalten kann. Der Admin-Token-Hash wird nicht im normalen Backup exportiert. Backup-Dateien enthalten private Installationsdaten und sollten nicht veröffentlicht werden.
+Backups werden in der Web-UI unter `Wartung` erstellt. Der normale Export enthält `config.json` mit Loxone-, Alexa-Bridge-, Befehls- und TTS-Einstellungen. Die Alexa-Cookie-Datei `Node.txt` wird nur exportiert, wenn der entsprechende Haken gesetzt ist, weil diese Datei Zugriffsdaten für das Amazon-Konto enthalten kann. Der Admin-Passwort-Hash wird nicht im normalen Backup exportiert. Backup-Dateien enthalten private Installationsdaten und sollten nicht veröffentlicht werden.
 
 Beim Import legt LoxEvo zuerst eine Sicherung der aktuellen Konfiguration im lokalen Datenordner an und schreibt danach die importierte Konfiguration. Wenn im Backup ein Cookie enthalten ist, wird es ebenfalls in den konfigurierten Cookie-Pfad geschrieben.
 Installierte npm-Pakete wie `alexa-remote2` werden nicht in die Backup-Datei aufgenommen. Wenn der komplette Ordner `data/` erhalten bleibt, bleiben sie lokal vorhanden; nach einer frischen Wiederherstellung können sie im Register `Wartung` erneut installiert werden.

@@ -77,6 +77,8 @@ const ttsHelpBtn = document.querySelector('#ttsHelpBtn');
 const ttsHelpText = document.querySelector('#ttsHelpText');
 const setupPanel = document.querySelector('#setupPanel');
 const setupSummary = document.querySelector('#setupSummary');
+const setupDetails = document.querySelector('#setupDetails');
+const setupDetailsCount = document.querySelector('#setupDetailsCount');
 const setupChecks = document.querySelector('#setupChecks');
 const setupConfigBtn = document.querySelector('#setupConfigBtn');
 const refreshMaintenanceBtn = document.querySelector('#refreshMaintenanceBtn');
@@ -595,7 +597,7 @@ function renderAdminSecurityStatus() {
   const envManaged = status.enabled && status.source === 'environment';
   if (saveAdminTokenBtn) {
     saveAdminTokenBtn.disabled = Boolean(envManaged);
-    saveAdminTokenBtn.textContent = status.enabled ? 'Token ändern' : 'Admin-Schutz aktivieren';
+    saveAdminTokenBtn.textContent = status.enabled ? 'Passwort ändern' : 'Admin-Schutz aktivieren';
   }
   if (disableAdminTokenBtn) {
     disableAdminTokenBtn.disabled = Boolean(!status.enabled || envManaged);
@@ -608,11 +610,11 @@ async function saveAdminToken(button) {
   const token = String(adminTokenInput?.value || '').trim();
   const repeat = String(adminTokenRepeatInput?.value || '').trim();
   if (token.length < 8) {
-    showToast('Der Admin-Token muss mindestens 8 Zeichen lang sein.', 'error');
+    showToast('Das Admin-Passwort muss mindestens 8 Zeichen lang sein.', 'error');
     return;
   }
   if (token !== repeat) {
-    showToast('Die eingegebenen Tokens stimmen nicht überein.', 'error');
+    showToast('Die eingegebenen Admin-Passwörter stimmen nicht überein.', 'error');
     return;
   }
 
@@ -641,7 +643,7 @@ async function saveAdminToken(button) {
 }
 
 async function disableAdminToken(button) {
-  if (!window.confirm('Admin-Schutz deaktivieren? Sensible Web-UI-Aktionen sind danach ohne Token erreichbar.')) {
+  if (!window.confirm('Admin-Schutz deaktivieren? Sensible Web-UI-Aktionen sind danach ohne Admin-Passwort erreichbar.')) {
     return;
   }
   setButtonFeedback(button, 'pending', 'Deaktiviert');
@@ -708,13 +710,13 @@ async function adminFetch(url, options = {}) {
   const payload = await response.clone().json().catch(() => ({}));
   if (payload.code !== 'admin_token_required') return response;
 
-  const authenticatedResponse = await requestAdminToken('Bitte den LoxEvo Admin-Token eingeben.', async (token) => {
+  const authenticatedResponse = await requestAdminToken('Bitte das LoxEvo Admin-Passwort eingeben.', async (token) => {
     sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
     sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token.trim());
     const retryResponse = await fetchWithAdminToken(url, options);
     if (retryResponse.status === 401) {
       sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-      return { ok: false, message: 'Admin-Token war nicht korrekt. Bitte erneut eingeben.' };
+      return { ok: false, message: 'Admin-Passwort war nicht korrekt. Bitte erneut eingeben.' };
     }
     return { ok: true, response: retryResponse };
   });
@@ -734,11 +736,11 @@ function requestAdminToken(message, verifyToken) {
       <form class="admin-token-dialog">
         <div>
           <p class="eyebrow">Admin-Schutz</p>
-          <h2 id="adminTokenPromptTitle">Admin-Token erforderlich</h2>
+          <h2 id="adminTokenPromptTitle">Admin-Passwort erforderlich</h2>
           <p class="admin-token-message"></p>
         </div>
         <label>
-          <span>Admin-Token</span>
+          <span>Admin-Passwort</span>
           <input class="admin-token-input" type="password" autocomplete="current-password">
         </label>
         <div class="actions admin-token-actions">
@@ -783,7 +785,7 @@ function requestAdminToken(message, verifyToken) {
       try {
         result = await verifyToken(token);
       } catch (error) {
-        result = { ok: false, message: error.message || 'Admin-Token konnte nicht geprüft werden.' };
+        result = { ok: false, message: error.message || 'Admin-Passwort konnte nicht geprüft werden.' };
       } finally {
         submitButton.disabled = false;
         submitButton.textContent = 'Entsperren';
@@ -794,7 +796,7 @@ function requestAdminToken(message, verifyToken) {
         return;
       }
 
-      messageEl.textContent = result?.message || 'Admin-Token war nicht korrekt. Bitte erneut eingeben.';
+      messageEl.textContent = result?.message || 'Admin-Passwort war nicht korrekt. Bitte erneut eingeben.';
       input.value = '';
       input.focus();
     });
@@ -1648,7 +1650,7 @@ function preflightHelpText(sectionTitle = '', check = {}) {
     'LoxEvo|Laufzeit': 'Zeigt, seit wann der aktuelle Prozess läuft und mit welcher Node.js-Version er gestartet wurde. Nach einem Neustart beginnt diese Laufzeit neu.',
     'LoxEvo|Konfiguration lesbar': 'Prüft, ob LoxEvo die gespeicherte Konfigurationsdatei lesen kann. Ohne diese Datei kann die Oberfläche keine Einstellungen laden.',
     'LoxEvo|Datenordner beschreibbar': 'Prüft, ob LoxEvo im Datenordner schreiben darf. Das ist nötig für Speichern, Backup, Import-Sicherung und Cookie-Dateien.',
-    'LoxEvo|Admin-Schutz': 'Zeigt, ob sensible Web-UI-Aktionen durch einen Admin-Token geschützt sind. Alexa-/Hue-Bridge, Loxone-Befehle und TTS-Aufrufe bleiben bewusst offen, damit bestehende Automationen weiter funktionieren.',
+    'LoxEvo|Admin-Schutz': 'Zeigt, ob sensible Web-UI-Aktionen durch ein Admin-Passwort geschützt sind. Alexa-/Hue-Bridge, Loxone-Befehle und TTS-Aufrufe bleiben bewusst offen, damit bestehende Automationen weiter funktionieren.',
     'LoxEvo|Datenhaltung': 'Erklärt, wo LoxEvo seine persistenten Daten erwartet. Docker-Neustarts sind unkritisch, solange dieser Datenordner erhalten bleibt.',
     'LoxEvo|Diagnosequelle': 'Dieser Hinweis erscheint nur, wenn Detaildaten vom Server nicht geladen wurden und die Weboberfläche auf lokale Browserdaten zurückfällt.',
     'LoxEvo|Ports': 'Zeigt die wichtigsten Ports aus der Konfiguration: Web-UI/API und den separaten Alexa/Hue-Port für virtuelle Geräte.',
@@ -1861,6 +1863,7 @@ function renderSetupStatus(errorText) {
     setupPanel.classList.add('setup-warning');
     setupSummary.textContent = `Setup-Status konnte nicht geladen werden: ${errorText}`;
     setupChecks.innerHTML = '';
+    if (setupDetailsCount) setupDetailsCount.textContent = '0';
     return;
   }
 
@@ -1874,6 +1877,8 @@ function renderSetupStatus(errorText) {
       : 'Die Basiskonfiguration ist vollständig. Live-Modus ist aktiv.'
     : `${setupStatus.openRequired} notwendige Einrichtungsschritte sind noch offen.`;
 
+  if (setupDetailsCount) setupDetailsCount.textContent = String(setupStatus.checks.length);
+  if (setupDetails) setupDetails.open = false;
   setupChecks.innerHTML = '';
   setupStatus.checks.forEach((check) => {
     const row = document.createElement('div');
@@ -1908,7 +1913,7 @@ async function refreshDashboard(button) {
     renderDashboard();
     if (button) {
       setButtonFeedback(button, 'success', 'Aktualisiert');
-      showToast('Übersicht aktualisiert', 'ok');
+      showToast('Statuskontrolle aktualisiert', 'ok');
     }
   } catch (error) {
     if (button) setButtonFeedback(button, 'error', 'Fehler');
@@ -1924,7 +1929,7 @@ function renderDashboard() {
     dashboardStatusRow('Virtuelle Alexa-Geräte', alexaBridgeInfo?.bridgeHttp?.ready ? 'Bereit' : config?.alexaBridge?.enabled ? 'HTTP prüfen' : 'Deaktiviert', alexaBridgeInfo?.bridgeHttp?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'warning' : 'info', `${alexaBridgeInfo?.deviceCount ?? 0} Gerät(e), Alexa/Hue-Port ${alexaBridgeInfo?.port || config?.alexaBridge?.advertisePort || 80}.`, 'Zeigt, ob LoxEvo die lokalen Hue-kompatiblen Geräte für Alexa bereitstellt. Diese Funktion ist für Sprachbefehle wie Licht ein oder aus zuständig und läuft unabhängig von Alexa TTS.'),
     dashboardStatusRow('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.', 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Bereits gefundene Geräte funktionieren normalerweise weiter. Für neue Geräte unter Konfiguration die Alexa-Gerätesuche kurz aktivieren, in der Alexa-App suchen und danach wieder beenden.'),
     dashboardStatusRow('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail(), 'Zeigt, ob seit den letzten Änderungen ein Export der LoxEvo-Einstellungen empfohlen ist. Backups enthalten die Konfiguration; die Alexa-Cookie-Datei wird nur gesichert, wenn du sie beim Export bewusst einschliesst.'),
-    dashboardStatusRow('Admin-Schutz', adminSecurityInfo?.enabled ? 'Aktiv' : 'Inaktiv', adminSecurityInfo?.enabled ? 'ok' : 'info', adminSecurityInfo?.message || 'Status wird geladen.', 'Zeigt, ob sensible Web-UI-Aktionen wie Konfiguration, Backup, Restore, Neustart oder Protokoll löschen mit einem Admin-Token geschützt sind. Loxone-Befehle, TTS und Alexa/Hue-Endpunkte bleiben bewusst offen für lokale Automationen.'),
+    dashboardStatusRow('Admin-Schutz', adminSecurityInfo?.enabled ? 'Aktiv' : 'Inaktiv', adminSecurityInfo?.enabled ? 'ok' : 'info', adminSecurityInfo?.message || 'Status wird geladen.', 'Zeigt, ob sensible Web-UI-Aktionen wie Konfiguration, Backup, Restore, Neustart oder Protokoll löschen mit einem Admin-Passwort geschützt sind. Loxone-Befehle, TTS und Alexa/Hue-Endpunkte bleiben bewusst offen für lokale Automationen.'),
     dashboardStatusRow('Systemprüfung', preflightInfo?.summary?.level === 'error' ? 'Fehler' : preflightInfo?.summary?.level === 'warning' ? 'Prüfen' : 'OK', preflightInfo?.summary?.level || 'info', preflightInfo?.summary?.text || 'Noch nicht geprüft.', 'Fasst die Systemprüfung aus Wartung zusammen. Sie prüft lokale Konfiguration, Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Details findest du im Register Wartung.')
   ];
   dashboardCards.innerHTML = rows.join('');
@@ -2072,7 +2077,7 @@ function wizardSteps() {
       status: setupStatus?.complete ? 'Basiskonfiguration vollständig.' : `${setupStatus?.openRequired ?? 0} notwendige Einrichtungsschritte offen.`,
       statusClass: setupStatus?.complete ? 'ready' : 'warning',
       actions: [
-        { label: 'Zur Übersicht', secondary: true, run: () => showView('dashboardView') }
+        { label: 'Zur Statuskontrolle', secondary: true, run: () => showView('dashboardView') }
       ]
     },
     {

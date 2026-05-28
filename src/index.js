@@ -130,7 +130,7 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
     return sendJson(res, {
       ok: false,
       code: 'admin_token_required',
-      error: 'Admin-Token erforderlich.'
+      error: 'Admin-Passwort erforderlich.'
     }, 401);
   }
 
@@ -331,7 +331,7 @@ function describeAdminSecurity(source) {
   if (source === 'ui') {
     return 'Admin-Schutz ist aktiv und wird über die Web-UI verwaltet.';
   }
-  return 'Admin-Schutz ist deaktiviert. Sensible Web-UI-Aktionen sind ohne Token erreichbar.';
+  return 'Admin-Schutz ist deaktiviert. Sensible Web-UI-Aktionen sind ohne Admin-Passwort erreichbar.';
 }
 
 async function updateAdminToken(res, payload) {
@@ -351,7 +351,7 @@ async function updateAdminToken(res, payload) {
 
   const token = String(payload?.token || '').trim();
   if (token.length < 8) {
-    throw new Error('Der Admin-Token muss mindestens 8 Zeichen lang sein.');
+    throw new Error('Das Admin-Passwort muss mindestens 8 Zeichen lang sein.');
   }
 
   adminSecurity = createAdminTokenRecord(token);

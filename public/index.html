@@ -308,7 +308,13 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
           <div class="config-section-body">
           <div class="section-head compact">
             <p>Echo-Geräte aus Alexa laden und bei Standard, Alle oder Alarm anhaken. Die Seriennummern werden automatisch in die Felder übernommen.</p>
-            <button id="refreshTtsDevicesBtn" type="button" class="secondary">Alexa-Geräte suchen</button>
+            <div class="actions">
+              <label class="checkbox-row inline">
+                <input id="showAllTtsDeviceTypes" type="checkbox">
+                <span>Alle Gerätetypen anzeigen</span>
+              </label>
+              <button id="refreshTtsDevicesBtn" type="button" class="secondary">Alexa-Geräte suchen</button>
+            </div>
           </div>
           <div id="ttsDeviceList" class="device-picker"></div>
           <div class="form-row three">
@@ -341,7 +347,7 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
         </details>
       </section>
 
-      <section class="panel wide">
+      <section id="maintenancePreflightPanel" class="panel wide">
         <h2>API-Kurzbeispiel</h2>
         <p>Fertige URLs zum Kopieren stehen im Register Aufrufübersicht.</p>
         <pre><code>POST http://&lt;loxberry&gt;:&lt;port&gt;/api/command
@@ -352,7 +358,7 @@ Content-Type: application/json
       </section>
 
       <section id="maintenanceView" class="view wide">
-      <section class="panel wide">
+      <section id="maintenanceDependenciesPanel" class="panel wide">
         <div class="section-head">
           <div>
             <h2>Systemprüfung</h2>
@@ -382,7 +388,7 @@ Content-Type: application/json
       </section>
 
       <div class="maintenance-tools wide">
-      <section class="panel">
+      <section id="maintenanceAdminPanel" class="panel">
         <div class="section-head">
           <div>
             <h2>Admin-Schutz</h2>
@@ -440,7 +446,7 @@ Content-Type: application/json
         </div>
       </section>
 
-      <section class="panel">
+      <section id="maintenanceBackupPanel" class="panel">
         <div class="section-head">
           <div>
             <h2>Backup</h2>
@@ -450,6 +456,7 @@ Content-Type: application/json
         </div>
         <div id="backupHelpText" class="help-box" hidden>
           <p>Gesichert wird die LoxEvo-Konfiguration aus <code>data/config.json</code>: Loxone-Zugang, Befehle, Rubriken, Alexa-Bridge, TTS-Einstellungen, Geräte-Seriennummern und Lautstärken.</p>
+          <p>Die Statuskontrolle vergleicht seit dem letzten Export nur backup-relevante Einstellungen. Dazu gehören Loxone-Zugang, Befehle, Räume, Alexa-Bridge, Gerätesuche, TTS, Geräteauswahl, Lautstärken und Server-Einstellungen. Reine Betriebszustände wie Dry-Run/Live-Modus werden bewusst ignoriert.</p>
           <p>Die Alexa-Cookie-Datei <code>data/Node.txt</code> wird nur exportiert, wenn der Haken gesetzt ist. Das Backup kann sensible Daten enthalten und sollte privat bleiben.</p>
           <p>Nicht im Backup enthalten sind der Admin-Passwort-Hash, installierte Pakete wie <code>alexa-remote2</code>, Docker-Images, Logs und temporäre Dateien. Ein normaler Container-Neustart behält diese Daten, solange der Datenordner erhalten bleibt. Bei einer frischen Installation oder gelöschtem Datenordner muss <code>alexa-remote2</code> im Register Wartung erneut installiert werden.</p>
           <p>Beim Import legt LoxEvo zuerst automatisch eine Sicherung der aktuellen Konfiguration im Datenordner an und spielt danach die Backup-Datei ein.</p>
@@ -461,7 +468,7 @@ Content-Type: application/json
               <button id="backupExportHelpBtn" type="button" class="info-button info-button-small" aria-expanded="false" aria-controls="backupExportHelpText" aria-label="Hilfe zum Backup-Export anzeigen" title="Erklärt, was beim Export gespeichert wird.">i</button>
             </div>
             <div id="backupExportHelpText" class="help-box compact-help" hidden>
-              <p>Lädt eine JSON-Backup-Datei mit der aktuellen LoxEvo-Konfiguration herunter. Die Alexa-Cookie-Datei wird nur mitgesichert, wenn der Haken gesetzt ist. Backup-Dateien können Zugangsdaten enthalten und sollten privat aufbewahrt werden.</p>
+              <p>Lädt eine JSON-Backup-Datei mit der aktuellen LoxEvo-Konfiguration herunter und merkt sich serverseitig den Stand dieser Einstellungen. Ändert sich danach eine backup-relevante Einstellung, empfiehlt die Statuskontrolle ein neues Backup. Die Alexa-Cookie-Datei wird nur mitgesichert, wenn der Haken gesetzt ist.</p>
             </div>
             <p>Exportiert die aktuelle LoxEvo-Konfiguration. Die Alexa-Cookie-Datei wird nur auf Wunsch eingeschlossen. Backup-Dateien bitte privat aufbewahren.</p>
             <label class="checkbox-row">

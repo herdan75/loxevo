@@ -17,6 +17,28 @@ Die Ziele von LoxEvo:
 - Echo-TTS soll direkt aus Loxone auslösbar sein
 - Wartung soll über eine zentrale Konfiguration und Web-UI erfolgen
 
+## In 5 Minuten starten
+
+1. Repository auf dem LoxBerry oder Docker-Host ablegen.
+2. Container starten:
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. Web-UI öffnen:
+
+   ```text
+   http://<loxberry>:8080
+   ```
+
+4. In der `Statuskontrolle` den Einrichtungsassistenten starten oder direkt zu `Konfiguration` wechseln.
+5. Loxone-Miniserver, Zugangsdaten und erste Befehle eintragen.
+6. Zuerst im Dry-Run testen, danach bewusst auf Live-Modus wechseln.
+7. Optional Alexa TTS, virtuelle Alexa-Geräte, Admin-Schutz und Backup einrichten.
+
+Die ausführliche Installation, LoxBerry-Hinweise und Gerätesuche stehen in [INSTALL.md](INSTALL.md).
+
 ## Zielarchitektur
 
 ```text
@@ -61,10 +83,11 @@ Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen l
 Für den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
 Die Web-UI startet mit einer kompakten `Statuskontrolle`. Dort sieht man auf einen Blick, ob Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche, Backup, Admin-Schutz und Systemprüfung in einem sinnvollen Zustand sind.
+Offene Punkte wie Fehler, Prüfbedarf oder optionale Empfehlungen werden zuerst angezeigt. Ein Klick auf eine Statuszeile öffnet direkt den passenden Konfigurations- oder Wartungsbereich; der Info-Button erklärt den jeweiligen Status.
 Auf der Statuskontrolle steht ausserdem ein überspringbarer Einrichtungsassistent bereit. Er führt Schritt für Schritt durch Loxone-Zugang, erste Befehle, Dry-Run/Live-Modus, virtuelle Alexa-Geräte, optionale Gerätesuche, TTS und Backup. Der Assistent ändert nichts automatisch; Aktionen wie `Gerätesuche aktivieren` müssen bewusst geklickt werden.
-Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung für Konfiguration, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Diese Prüfung läuft beim Öffnen des Registers oder per Button und erzeugt keine dauernde Hintergrundlast.
+Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung für Konfiguration, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Diese Prüfung läuft beim Öffnen des Registers oder per Button und erzeugt keine dauernde Hintergrundlast. Bereiche mit Fehlern oder Hinweisen werden aufgeklappt, reine OK-/Info-Bereiche bleiben kompakt.
 Im gleichen Register zeigt LoxEvo die installierte `alexa-remote2`-Version und verfügbare npm-Versionen und kann Installation oder Update im laufenden Container anstossen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
-Im gleichen Register können die Einstellungen als Backup exportiert und später wieder importiert werden. Der Export enthält standardmässig die LoxEvo-Konfiguration; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden.
+Im gleichen Register können die Einstellungen als Backup exportiert und später wieder importiert werden. Der Export enthält standardmässig die LoxEvo-Konfiguration; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden. LoxEvo merkt sich serverseitig den letzten Backup-Stand und empfiehlt ein neues Backup, wenn backup-relevante Einstellungen geändert wurden.
 Zusätzlich kann dort ein Diagnosepaket exportiert werden. Es enthält Health-Status, Systemprüfung, Versionsinformationen, eine zusammengefasste Konfiguration und die letzten Ereignisse. Zugangsdaten, Admin-Passwort, Token und Hostnamen werden dabei nicht im Klartext ausgegeben.
 Backup-Dateien können sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten und sollten deshalb privat bleiben.
 
@@ -101,7 +124,7 @@ Die Oberfläche ist in klare Bereiche gegliedert:
 - `Testen`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI prüfen
 - `Aufrufübersicht`: angelegte Befehle, virtuelle Alexa-Geräte und fertige URLs für lokale Systeme ansehen, testen und kopieren
 - `Wartung`: Systemprüfung ausführen, Diagnose exportieren, Paketversionen prüfen, `alexa-remote2` verwalten, Backup exportieren und Backup importieren
-- `Protokoll`: zuletzt simulierte oder gesendete Aktionen filtern, durchsuchen und bei Bedarf leeren
+- `Protokoll`: zuletzt simulierte oder gesendete Aktionen filtern, durchsuchen und bei Bedarf leeren; direkt wiederholte gleichartige Meldungen werden kompakt zusammengefasst
 
 Die JSON-Ansicht bleibt als Expertenmodus erhalten.
 
@@ -117,6 +140,8 @@ Empfohlener Ablauf für neue Installationen:
 ## Backup und Deinstallation
 
 Backups werden in der Web-UI unter `Wartung` erstellt. Der normale Export enthält `config.json` mit Loxone-, Alexa-Bridge-, Befehls- und TTS-Einstellungen. Die Alexa-Cookie-Datei `Node.txt` wird nur exportiert, wenn der entsprechende Haken gesetzt ist, weil diese Datei Zugriffsdaten für das Amazon-Konto enthalten kann. Der Admin-Passwort-Hash wird nicht im normalen Backup exportiert. Backup-Dateien enthalten private Installationsdaten und sollten nicht veröffentlicht werden.
+
+Nach einem Export schreibt LoxEvo im Datenordner zusätzlich einen kleinen Backup-Status. Darin wird kein Klartext-Passwort gespeichert, sondern ein Hash der backup-relevanten Einstellungen. Als backup-relevant gelten Loxone-Zugang, Befehle, Räume, Alexa-Bridge, Gerätesuche, TTS-Einstellungen, Geräteauswahl, Lautstärken und Server-Einstellungen. Reine Betriebszustände wie Dry-Run/Live-Modus werden bewusst ignoriert. Die Statuskontrolle zeigt dadurch an, ob seit dem letzten Export ein neues Backup empfohlen ist und welche Bereiche betroffen sind.
 
 Beim Import legt LoxEvo zuerst eine Sicherung der aktuellen Konfiguration im lokalen Datenordner an und schreibt danach die importierte Konfiguration. Wenn im Backup ein Cookie enthalten ist, wird es ebenfalls in den konfigurierten Cookie-Pfad geschrieben.
 Installierte npm-Pakete wie `alexa-remote2` werden nicht in die Backup-Datei aufgenommen. Wenn der komplette Ordner `data/` erhalten bleibt, bleiben sie lokal vorhanden; nach einer frischen Wiederherstellung können sie im Register `Wartung` erneut installiert werden.
@@ -232,7 +257,7 @@ Wenn während der Entwicklung Geräte mehrfach gefunden wurden, alte LoxEvo-Test
 
 ## TTS-API
 
-Echo-Geräte müssen nicht manuell geraten werden: In der Web-UI unter `Konfiguration -> TTS-Geräte` kann LoxEvo die Geräteliste aus dem verbundenen Alexa-Konto laden. Dabei werden Name und Seriennummer angezeigt und per Checkbox in Standard-, Alle- oder Alarm-Geräte übernommen.
+Echo-Geräte müssen nicht manuell geraten werden: In der Web-UI unter `Konfiguration -> TTS-Geräte` kann LoxEvo die Geräteliste aus dem verbundenen Alexa-Konto laden. Dabei werden Name und Seriennummer angezeigt und per Checkbox in Standard-, Alle- oder Alarm-Geräte übernommen. Standardmässig zeigt LoxEvo nur echte Echo-Geräte an; weitere Alexa-Gerätetypen wie Gruppen, TV oder App-Geräte können bei Bedarf eingeblendet werden.
 
 Normale Sprachausgabe:
 

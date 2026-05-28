@@ -58,6 +58,7 @@ const ttsDefaultDevices = document.querySelector('#ttsDefaultDevices');
 const ttsAllDevices = document.querySelector('#ttsAllDevices');
 const ttsAlarmDevices = document.querySelector('#ttsAlarmDevices');
 const refreshTtsDevicesBtn = document.querySelector('#refreshTtsDevicesBtn');
+const showAllTtsDeviceTypes = document.querySelector('#showAllTtsDeviceTypes');
 const ttsDeviceList = document.querySelector('#ttsDeviceList');
 const roomEditor = document.querySelector('#roomEditor');
 const addRoomBtn = document.querySelector('#addRoomBtn');
@@ -124,6 +125,7 @@ let configDirty = false;
 const ADMIN_TOKEN_STORAGE_KEY = 'loxevoAdminToken';
 const LAST_BACKUP_EXPORT_KEY = 'loxevoLastBackupExportAt';
 const SETUP_WIZARD_SKIPPED_KEY = 'loxevoSetupWizardSkipped';
+const SHOW_ALL_TTS_DEVICE_TYPES_KEY = 'loxevoShowAllTtsDeviceTypes';
 let wizardStepIndex = 0;
 
 load();
@@ -172,6 +174,10 @@ discoveryHelpBtn?.addEventListener('click', () => toggleDiscoveryHelp());
 startDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('start', startDiscoveryBtn));
 stopDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('stop', stopDiscoveryBtn));
 refreshTtsDevicesBtn?.addEventListener('click', () => loadTtsDevices(refreshTtsDevicesBtn));
+showAllTtsDeviceTypes?.addEventListener('change', () => {
+  localStorage.setItem(SHOW_ALL_TTS_DEVICE_TYPES_KEY, showAllTtsDeviceTypes.checked ? 'true' : 'false');
+  renderTtsDevices();
+});
 eventSearch?.addEventListener('input', () => renderEvents(allEvents));
 eventFilterButtons.forEach((button) => {
   button.addEventListener('click', () => {
@@ -283,6 +289,7 @@ async function saveConfig(button) {
       focusConfigValidation(validation);
       return;
     }
+    if (!confirmConfigSave(nextConfig)) return;
     setButtonFeedback(button, 'pending', 'Speichert');
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
@@ -309,7 +316,6 @@ async function saveConfig(button) {
 }
 
 async function saveJsonConfig(button) {
-  setButtonFeedback(button, 'pending', 'Speichert');
   try {
     const nextConfig = JSON.parse(configEditor.value);
     const validation = validateConfigBeforeSave(nextConfig);
@@ -318,6 +324,8 @@ async function saveJsonConfig(button) {
       showToast(validation[0], 'error');
       return;
     }
+    if (!confirmConfigSave(nextConfig)) return;
+    setButtonFeedback(button, 'pending', 'Speichert');
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
     populateForms();
@@ -949,6 +957,9 @@ async function loadTtsDevices(button) {
 function renderTtsDevices(errorText = '') {
   if (!ttsDeviceList) return;
   updateConfigSectionCounts();
+  if (showAllTtsDeviceTypes) {
+    showAllTtsDeviceTypes.checked = localStorage.getItem(SHOW_ALL_TTS_DEVICE_TYPES_KEY) === 'true';
+  }
 
   if (errorText) {
     ttsDeviceList.innerHTML = `<div class="service-status error">${escapeHtml(errorText)}</div>`;
@@ -970,9 +981,18 @@ function renderTtsDevices(errorText = '') {
     all: new Set(linesToList(ttsAllDevices.value)),
     alarm: new Set(linesToList(ttsAlarmDevices.value))
   };
+  const showAllTypes = showAllTtsDeviceTypes?.checked === true;
+  const visibleDevices = showAllTypes
+    ? ttsDevices
+    : ttsDevices.filter((device) => isEchoDevice(device) || isSelectedTtsDevice(device, selected));
 
   ttsDeviceList.innerHTML = '';
-  ttsDevices.forEach((device) => {
+  if (!visibleDevices.length) {
+    ttsDeviceList.innerHTML = '<p class="empty">Keine Echo-Geräte gefunden. Aktiviere "Alle Gerätetypen anzeigen", um TV-, Raum- oder App-Geräte einzublenden.</p>';
+    return;
+  }
+
+  visibleDevices.forEach((device) => {
     const card = document.createElement('div');
     card.className = 'device-card';
 
@@ -1009,6 +1029,16 @@ function renderTtsDevices(errorText = '') {
     card.append(title, serial, choices);
     ttsDeviceList.append(card);
   });
+}
+
+function isEchoDevice(device) {
+  const haystack = `${device?.type || ''} ${device?.name || ''} ${device?.family || ''}`.toLowerCase();
+  return /\becho\b/.test(haystack) || haystack.includes('echo dot') || haystack.includes('echo show') || haystack.includes('echo studio');
+}
+
+function isSelectedTtsDevice(device, selected) {
+  const serial = device?.serial;
+  return Boolean(serial && (selected.default.has(serial) || selected.all.has(serial) || selected.alarm.has(serial)));
 }
 
 function updateTtsDeviceSelection(group, serial, enabled) {
@@ -1563,7 +1593,7 @@ function renderPreflightStatus() {
   sections.forEach((section) => {
     const card = document.createElement('details');
     card.className = 'preflight-section';
-    card.open = false;
+    card.open = preflightSectionNeedsAttention(section);
 
     const summaryEl = document.createElement('summary');
     const title = document.createElement('strong');
@@ -1621,6 +1651,10 @@ function renderPreflightStatus() {
     preflightChecks.append(card);
   });
   renderDashboard();
+}
+
+function preflightSectionNeedsAttention(section) {
+  return (section.checks || []).some((check) => ['error', 'warning'].includes(check.level));
 }
 
 function sectionStatusText(section) {
@@ -1686,7 +1720,7 @@ function preflightHelpText(sectionTitle = '', check = {}) {
     'Virtuelle Alexa-Geräte|Bridge-Info': 'Zeigt technische Basisdaten der lokalen Hue-Bridge-Emulation, zum Beispiel Bridge-ID, Description-URL und Ports.',
     'Virtuelle Alexa-Geräte|Letzte Alexa-Aktion': 'Zeigt die letzte Alexa-Geräteaktion oder Gerätesuche-Aktion seit dem letzten Start.',
     'Backup|Export und Import': 'Prüft, ob der Datenordner grundsätzlich für Backup-Export und Import-Sicherung nutzbar ist.',
-    'Backup|Lokale Sicherungen': 'Zeigt, ob LoxEvo im Datenordner vorhandene Sicherungsdateien findet.',
+    'Backup|Lokale Sicherungen': 'Zeigt den letzten bekannten Backup-Export und prüft, ob sich seitdem backup-relevante Einstellungen geändert haben. Relevant sind Loxone-Zugang, Befehle, Räume, Alexa-Bridge, Gerätesuche, TTS, Geräteauswahl, Lautstärken und Server-Einstellungen. Dry-Run/Live-Modus wird bewusst ignoriert.',
     'Backup|Alexa-Cookie': 'Erinnert daran, dass das Amazon-Cookie nur exportiert wird, wenn der Backup-Haken ausdrücklich gesetzt ist.',
     'Backup|Letzte Backup-Aktion': 'Zeigt den letzten Backup-Export oder Import seit dem letzten Start.'
   };
@@ -1937,26 +1971,67 @@ async function refreshDashboard(button) {
 
 function renderDashboard() {
   if (!dashboardCards) return;
+  const adminStatus = dashboardAdminStatus();
   const rows = [
-    dashboardStatusRow('Loxone', config?.loxone?.dryRun === false ? 'Live-Modus' : 'Dry-Run', config?.loxone?.dryRun === false ? 'ok' : 'info', config?.loxone?.dryRun === false ? 'Befehle werden an den Miniserver gesendet.' : 'Befehle werden nur protokolliert.', 'Zeigt, ob LoxEvo echte Befehle an den Loxone-Miniserver sendet. Dry-Run ist für Tests gedacht und protokolliert nur. Live-Modus ist für den produktiven Betrieb, sobald die Befehle geprüft sind.'),
-    dashboardStatusRow('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'info', ttsDeviceSummary(ttsStatus), 'Zeigt den Status der Alexa-Sprachausgabe. Bereit bedeutet, dass alexa-remote2 verbunden ist und LoxEvo die konfigurierten Echo-Geräte für normale TTS- oder Alarmmeldungen verwenden kann.'),
-    dashboardStatusRow('Virtuelle Alexa-Geräte', alexaBridgeInfo?.bridgeHttp?.ready ? 'Bereit' : config?.alexaBridge?.enabled ? 'HTTP prüfen' : 'Deaktiviert', alexaBridgeInfo?.bridgeHttp?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'warning' : 'info', `${alexaBridgeInfo?.deviceCount ?? 0} Gerät(e), Alexa/Hue-Port ${alexaBridgeInfo?.port || config?.alexaBridge?.advertisePort || 80}.`, 'Zeigt, ob LoxEvo die lokalen Hue-kompatiblen Geräte für Alexa bereitstellt. Diese Funktion ist für Sprachbefehle wie Licht ein oder aus zuständig und läuft unabhängig von Alexa TTS.'),
-    dashboardStatusRow('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.', 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Bereits gefundene Geräte funktionieren normalerweise weiter. Für neue Geräte unter Konfiguration die Alexa-Gerätesuche kurz aktivieren, in der Alexa-App suchen und danach wieder beenden.'),
-    dashboardStatusRow('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail(), 'Zeigt, ob seit den letzten Änderungen ein Export der LoxEvo-Einstellungen empfohlen ist. Backups enthalten die Konfiguration; die Alexa-Cookie-Datei wird nur gesichert, wenn du sie beim Export bewusst einschliesst.'),
-    dashboardStatusRow('Admin-Schutz', adminSecurityInfo?.enabled ? 'Aktiv' : 'Inaktiv', adminSecurityInfo?.enabled ? 'ok' : 'info', adminSecurityInfo?.message || 'Status wird geladen.', 'Zeigt, ob sensible Web-UI-Aktionen wie Konfiguration, Backup, Restore, Neustart oder Protokoll löschen mit einem Admin-Passwort geschützt sind. Loxone-Befehle, TTS und Alexa/Hue-Endpunkte bleiben bewusst offen für lokale Automationen.'),
-    dashboardStatusRow('Systemprüfung', preflightInfo?.summary?.level === 'error' ? 'Fehler' : preflightInfo?.summary?.level === 'warning' ? 'Prüfen' : 'OK', preflightInfo?.summary?.level || 'info', preflightInfo?.summary?.text || 'Noch nicht geprüft.', 'Fasst die Systemprüfung aus Wartung zusammen. Sie prüft lokale Konfiguration, Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Details findest du im Register Wartung.')
+    dashboardStatusRow('Loxone', config?.loxone?.dryRun === false ? 'Live-Modus' : 'Dry-Run', config?.loxone?.dryRun === false ? 'ok' : 'info', config?.loxone?.dryRun === false ? 'Befehle werden an den Miniserver gesendet.' : 'Befehle werden nur protokolliert.', 'Zeigt, ob LoxEvo echte Befehle an den Loxone-Miniserver sendet. Dry-Run ist für Tests gedacht und protokolliert nur. Live-Modus ist für den produktiven Betrieb, sobald die Befehle geprüft sind.', 'config:Loxone'),
+    dashboardStatusRow('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'optional', ttsDeviceSummary(ttsStatus), 'Zeigt den Status der Alexa-Sprachausgabe. Bereit bedeutet, dass alexa-remote2 verbunden ist und LoxEvo die konfigurierten Echo-Geräte für normale TTS- oder Alarmmeldungen verwenden kann.', 'config:Alexa TTS'),
+    dashboardStatusRow('Virtuelle Alexa-Geräte', alexaBridgeInfo?.bridgeHttp?.ready ? 'Bereit' : config?.alexaBridge?.enabled ? 'HTTP prüfen' : 'Deaktiviert', alexaBridgeInfo?.bridgeHttp?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'warning' : 'optional', `${alexaBridgeInfo?.deviceCount ?? 0} Gerät(e), Alexa/Hue-Port ${alexaBridgeInfo?.port || config?.alexaBridge?.advertisePort || 80}.`, 'Zeigt, ob LoxEvo die lokalen Hue-kompatiblen Geräte für Alexa bereitstellt. Diese Funktion ist für Sprachbefehle wie Licht ein oder aus zuständig und läuft unabhängig von Alexa TTS.', 'config:Alexa-Geräte'),
+    dashboardStatusRow('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.', 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Bereits gefundene Geräte funktionieren normalerweise weiter. Für neue Geräte unter Konfiguration die Alexa-Gerätesuche kurz aktivieren, in der Alexa-App suchen und danach wieder beenden.', 'config:Alexa-Gerätesuche'),
+    dashboardStatusRow('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail(), 'Zeigt, ob seit dem letzten Backup backup-relevante Einstellungen geändert wurden. Backup-relevant sind Loxone-Zugang, Befehle, Räume, Alexa-Bridge, Gerätesuche, TTS-Einstellungen, Geräteauswahl, Lautstärken und Server-Einstellungen. Nicht backup-relevant ist der Betriebszustand Dry-Run/Live-Modus. Die Alexa-Cookie-Datei wird nur gesichert, wenn du sie beim Export bewusst einschliesst.', 'maintenance:maintenanceBackupPanel'),
+    dashboardStatusRow('Admin-Schutz', adminStatus.value, adminStatus.level, adminStatus.detail, 'Zeigt, ob sensible Web-UI-Aktionen wie Konfiguration, Backup, Restore, Neustart oder Protokoll löschen mit einem Admin-Passwort geschützt sind. Loxone-Befehle, TTS und Alexa/Hue-Endpunkte bleiben bewusst offen für lokale Automationen.', 'maintenance:maintenanceAdminPanel'),
+    dashboardStatusRow('Systemprüfung', preflightInfo?.summary?.level === 'error' ? 'Fehler' : preflightInfo?.summary?.level === 'warning' ? 'Prüfen' : 'OK', preflightInfo?.summary?.level || 'info', preflightInfo?.summary?.text || 'Noch nicht geprüft.', 'Fasst die Systemprüfung aus Wartung zusammen. Sie prüft lokale Konfiguration, Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Details findest du im Register Wartung.', 'maintenance:maintenancePreflightPanel')
   ];
-  dashboardCards.innerHTML = rows.join('');
+  dashboardCards.innerHTML = prioritizeDashboardRows(rows).join('');
   bindDashboardHelpButtons();
+  bindDashboardRowNavigation();
   renderBackupReminder();
   renderWizardPrompt();
 }
 
-function dashboardStatusRow(title, value, level, detail, helpText) {
+function dashboardAdminStatus() {
+  if (!adminSecurityInfo) {
+    return {
+      value: 'Prüfen',
+      level: 'warning',
+      detail: 'Admin-Schutz-Status wird geladen.'
+    };
+  }
+  if (adminSecurityInfo.enabled && adminSecurityInfo.source === 'environment') {
+    return {
+      value: 'Docker-ENV',
+      level: 'ok',
+      detail: adminSecurityInfo.message || 'Admin-Schutz ist per Docker-Umgebungswert aktiv.'
+    };
+  }
+  if (adminSecurityInfo.enabled) {
+    return {
+      value: 'Aktiv',
+      level: 'ok',
+      detail: adminSecurityInfo.message || 'Admin-Schutz ist aktiv.'
+    };
+  }
+  return {
+    value: 'Optional',
+    level: 'optional',
+    detail: adminSecurityInfo.message || 'Admin-Schutz ist deaktiviert. Sensible Web-UI-Aktionen sind ohne Admin-Passwort erreichbar.'
+  };
+}
+
+function prioritizeDashboardRows(rows) {
+  const priority = { error: 0, warning: 1, optional: 2, info: 3, ok: 4 };
+  return [...rows].sort((left, right) => {
+    const leftLevel = left.match(/dashboard-status-row ([a-z]+)/)?.[1] || 'info';
+    const rightLevel = right.match(/dashboard-status-row ([a-z]+)/)?.[1] || 'info';
+    return (priority[leftLevel] ?? 3) - (priority[rightLevel] ?? 3);
+  });
+}
+
+function dashboardStatusRow(title, value, level, detail, helpText, target = '') {
   const safeLevel = ['ok', 'warning', 'error', 'optional', 'info'].includes(level) ? level : 'info';
   const helpId = `dashboard-help-${normalizeText(title).replace(/[^a-z0-9]+/g, '-')}`;
+  const actionAttrs = target ? ` role="button" tabindex="0" data-dashboard-target="${escapeHtml(target)}"` : '';
   return `
-    <article class="dashboard-status-row ${safeLevel}">
+    <article class="dashboard-status-row ${safeLevel}${target ? ' clickable' : ''}"${actionAttrs}>
       <span class="status-pill ${safeLevel}">${escapeHtml(value || 'Unbekannt')}</span>
       <strong class="dashboard-status-title">${escapeHtml(title)}</strong>
       <p class="dashboard-status-detail">${escapeHtml(detail || '')}</p>
@@ -1985,15 +2060,43 @@ function backupStateTitle() {
 }
 
 function backupReminderLevel() {
-  return configDirty || backupNeedsExport() ? 'warning' : getLastBackupExportAt() ? 'ok' : 'info';
+  return configDirty || backupNeedsExport() ? 'warning' : getLastBackupExportAt() ? 'ok' : 'optional';
+}
+
+function bindDashboardRowNavigation() {
+  dashboardCards?.querySelectorAll('.dashboard-status-row[data-dashboard-target]').forEach((row) => {
+    const openTarget = () => openDashboardTarget(row.dataset.dashboardTarget || '');
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('.dashboard-info-button')) return;
+      openTarget();
+    });
+    row.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      openTarget();
+    });
+  });
+}
+
+function openDashboardTarget(target) {
+  const [kind, value] = String(target || '').split(':');
+  if (kind === 'config' && value) {
+    openConfigArea(value);
+    return;
+  }
+  if (kind === 'maintenance' && value) {
+    showView('maintenanceView');
+    document.getElementById(value)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 function backupStateDetail() {
   const lastExport = getLastBackupExportAt();
   if (configDirty) return 'Seit der letzten Änderung wurde noch kein Backup exportiert.';
   if (backupNeedsExport()) {
+    const changedText = backupChangedSectionsText();
     return lastExport
-      ? `Seit dem letzten Export am ${formatDateTime(lastExport)} wurden Einstellungen geändert.`
+      ? `Seit dem letzten Export am ${formatDateTime(lastExport)} wurden Einstellungen geändert.${changedText}`
       : 'Noch kein Backup exportiert. Backup wird empfohlen.';
   }
   return lastExport ? `Letzter Export: ${formatDateTime(lastExport)}. Keine relevanten Änderungen seitdem.` : 'Backup kann unter Wartung exportiert werden.';
@@ -2005,6 +2108,11 @@ function getLastBackupExportAt() {
 
 function backupNeedsExport() {
   return Boolean(preflightInfo?.backup?.needsBackup);
+}
+
+function backupChangedSectionsText() {
+  const sections = preflightInfo?.backup?.changedSections || [];
+  return sections.length ? ` Betroffen: ${sections.join(', ')}.` : '';
 }
 
 function renderBackupReminder() {
@@ -2738,6 +2846,33 @@ function collectCommands() {
   return commands;
 }
 
+function confirmConfigSave(nextConfig) {
+  const summary = configSaveSummary(nextConfig);
+  return window.confirm(`Konfiguration speichern?\n\n${summary}`);
+}
+
+function configSaveSummary(nextConfig) {
+  const commandCount = Object.values(nextConfig.commands || {}).filter((command) => command?.enabled !== false).length;
+  const defaultCount = Array.isArray(nextConfig.tts?.defaultDevices) ? nextConfig.tts.defaultDevices.length : 0;
+  const allCount = Array.isArray(nextConfig.tts?.allDevices) ? nextConfig.tts.allDevices.length : 0;
+  const alarmCount = Array.isArray(nextConfig.tts?.alarmDevices) ? nextConfig.tts.alarmDevices.length : 0;
+  const virtualDeviceCount = nextConfig.alexaBridge?.enabled ? commandCount : 0;
+  const modeText = nextConfig.loxone?.dryRun === false ? 'Live-Modus aktiv' : 'Dry-Run aktiv';
+  const ttsText = nextConfig.tts?.enabled
+    ? `${defaultCount} Standard-, ${allCount} Alle- und ${alarmCount} Alarm-Gerät(e)`
+    : 'TTS deaktiviert';
+  const bridgeText = nextConfig.alexaBridge?.enabled
+    ? `${virtualDeviceCount} virtuelle Alexa-Gerät(e)`
+    : 'Virtuelle Alexa-Geräte deaktiviert';
+
+  return [
+    `${commandCount} aktive Loxone-Befehl(e)`,
+    bridgeText,
+    `Alexa TTS: ${ttsText}`,
+    modeText
+  ].join('\n');
+}
+
 function syncConfigFromForms() {
   config = collectConfigFromForms();
   syncJsonFromForms();
@@ -3051,25 +3186,56 @@ async function loadEvents(button) {
 
 function renderEvents(events) {
   if (!eventsEl) return;
-  const filteredEvents = filterEvents(events || []);
-  if (!filteredEvents.length) {
+  const compactedEvents = compactEvents(filterEvents(events || []));
+  if (!compactedEvents.length) {
     eventsEl.innerHTML = '<p class="empty">Noch keine Befehle.</p>';
     return;
   }
 
   eventsEl.innerHTML = '';
-  filteredEvents.slice(0, 50).forEach((event) => {
+  compactedEvents.slice(0, 50).forEach((event) => {
     const row = document.createElement('div');
     row.className = 'event-row';
     const meta = document.createElement('div');
     meta.className = 'event-meta';
-    meta.textContent = `${formatTime(event.at)} | ${event.type} | ${event.status}`;
+    meta.textContent = event.count > 1
+      ? `${formatTime(event.at)} | ${event.type} | ${event.status} | ${event.count}x seit ${formatTime(event.firstAt)}`
+      : `${formatTime(event.at)} | ${event.type} | ${event.status}`;
     const detail = document.createElement('div');
     detail.className = 'event-detail';
     detail.textContent = eventDetailText(event);
     row.append(meta, detail);
     eventsEl.append(row);
   });
+}
+
+function compactEvents(events) {
+  const compacted = [];
+  for (const event of events) {
+    const signature = eventSignature(event);
+    const previous = compacted[compacted.length - 1];
+    if (previous?.signature === signature) {
+      previous.count += 1;
+      previous.firstAt = event.at || previous.firstAt;
+      continue;
+    }
+    compacted.push({ ...event, signature, count: 1, firstAt: event.at });
+  }
+  return compacted.map(({ signature, ...event }) => event);
+}
+
+function eventSignature(event) {
+  return [
+    event.type || '',
+    event.status || '',
+    event.key || '',
+    event.label || '',
+    event.url || '',
+    event.text || '',
+    event.error || '',
+    Array.isArray(event.devices) ? event.devices.join(',') : '',
+    event.volume ?? ''
+  ].join('|');
 }
 
 async function clearEvents(button) {

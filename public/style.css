@@ -126,6 +126,20 @@ h2 {
   background: #ffffff;
 }
 
+.dashboard-status-row.clickable {
+  cursor: pointer;
+}
+
+.dashboard-status-row.clickable:hover {
+  border-color: #9fcbd3;
+  background: #f8fcfd;
+}
+
+.dashboard-status-row.clickable:focus-visible {
+  outline: 3px solid rgba(36, 128, 134, 0.22);
+  outline-offset: 2px;
+}
+
 .dashboard-status-row .status-pill {
   justify-self: start;
 }
@@ -917,7 +931,7 @@ h2 {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
-  max-width: 980px;
+  width: 100%;
 }
 
 .maintenance-tools {
@@ -935,6 +949,7 @@ h2 {
   display: grid;
   align-content: start;
   gap: 12px;
+  min-height: 0;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;

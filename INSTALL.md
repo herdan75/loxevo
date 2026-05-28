@@ -31,9 +31,9 @@ http://<loxberry-ip>:8080
 
 Die Web-UI ist für das eigene LAN gedacht. Port `8080` sollte nicht direkt ins Internet freigegeben werden, weil darüber Loxone-Zugangsdaten und Steuerbefehle konfiguriert werden.
 
-Optional kann ein Admin-Token für sensible Web-UI-Aktionen direkt in der Web-UI unter `Wartung` aktiviert werden. Ohne Token läuft LoxEvo wie bisher. Mit aktivem Token fragt die Web-UI bei Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update und Dry-Run-Umschaltung nach dem Token. Loxone-Befehle, TTS-Aufrufe und virtuelle Alexa-Geräte bleiben weiterhin ohne Token erreichbar.
+Optional kann ein Admin-Passwort für sensible Web-UI-Aktionen direkt in der Web-UI unter `Wartung` aktiviert werden. Ohne Admin-Passwort läuft LoxEvo wie bisher. Mit aktivem Schutz fragt die Web-UI bei Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update und Dry-Run-Umschaltung nach dem Admin-Passwort. Loxone-Befehle, TTS-Aufrufe und virtuelle Alexa-Geräte bleiben weiterhin ohne Admin-Passwort erreichbar.
 
-Der Web-UI-Token wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab und nimmt diesen nicht in den normalen Backup-Export auf. Optional kann der Schutz auch per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser Wert hat Vorrang und wird ausserhalb der Web-UI gepflegt.
+Das Web-UI-Passwort wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab und nimmt diesen nicht in den normalen Backup-Export auf. Optional kann der Schutz auch per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser technische Wert hat Vorrang und wird ausserhalb der Web-UI gepflegt.
 
 ## Ersteinrichtung in der Web-UI
 
@@ -109,7 +109,7 @@ docker compose up -d --build --force-recreate
 
 Die Dateien in `data/` bleiben dabei erhalten.
 
-Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung. Sie prüft auf Abruf Konfiguration, Schreibrechte, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Die installierte `alexa-remote2`-Version, der Installationspfad und verfügbare Versionen sind dort sichtbar und können per Button aktualisiert werden. Für Support oder Fehlersuche kann dort ausserdem ein Diagnosepaket exportiert werden; sensible Werte werden dabei maskiert oder nur als Status zusammengefasst.
+Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung. Sie prüft beim Öffnen des Registers oder auf Abruf Konfiguration, Schreibrechte, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Es läuft kein dauerhaftes Polling im Hintergrund. Bereiche mit Fehlern oder Hinweisen werden aufgeklappt, reine OK-/Info-Bereiche bleiben kompakt. Die installierte `alexa-remote2`-Version, der Installationspfad und verfügbare Versionen sind dort sichtbar und können per Button aktualisiert werden. Für Support oder Fehlersuche kann dort ausserdem ein Diagnosepaket exportiert werden; sensible Werte werden dabei maskiert oder nur als Status zusammengefasst.
 
 ## Optional: Alexa-Gerätesuche per Button
 
@@ -135,7 +135,9 @@ Wenn der Helper nicht installiert ist, bleiben die Buttons deaktiviert und LoxEv
 
 ## Backup und Wiederherstellung
 
-In der Web-UI unter `Wartung` kann ein Backup der Einstellungen exportiert werden. Der normale Export enthält die LoxEvo-Konfiguration aus `data/config.json`. Die Alexa-Cookie-Datei `data/Node.txt` wird nur exportiert, wenn der Haken dafür gesetzt ist. Der Admin-Token-Hash wird nicht im normalen Backup exportiert. Backup-Dateien können sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten.
+In der Web-UI unter `Wartung` kann ein Backup der Einstellungen exportiert werden. Der normale Export enthält die LoxEvo-Konfiguration aus `data/config.json`. Die Alexa-Cookie-Datei `data/Node.txt` wird nur exportiert, wenn der Haken dafür gesetzt ist. Der Admin-Passwort-Hash wird nicht im normalen Backup exportiert. Backup-Dateien können sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten.
+
+Nach einem Export speichert LoxEvo im Datenordner einen kleinen Backup-Status mit dem Zeitpunkt und einem Hash der backup-relevanten Einstellungen. Dadurch kann die Statuskontrolle später anzeigen, ob seit dem letzten Export ein neues Backup empfohlen ist. Backup-relevant sind Loxone-Zugang, Befehle, Räume, Alexa-Bridge, Gerätesuche, TTS, Geräteauswahl, Lautstärken und Server-Einstellungen. Dry-Run/Live-Modus wird dabei bewusst ignoriert.
 
 Beim Import legt LoxEvo zuerst eine Sicherung der aktuellen Konfiguration im Datenordner an und spielt danach die importierte Konfiguration ein. Wenn das Backup eine Cookie-Datei enthält, wird diese ebenfalls wiederhergestellt.
 

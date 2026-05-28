@@ -8,6 +8,17 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 - Register `Externe Aufrufe` in `Aufrufübersicht` umbenannt.
 - Einrichtungsdetails im Register `Testen` als aufklappbaren Detailbereich dargestellt.
 - Sichtbare Admin-Schutz-Texte von Admin-Token auf Admin-Passwort umgestellt; technische Header bleiben unverändert.
+- Backup-Status dauerhaft im Datenordner gespeichert und mit Hash-Vergleich backup-relevanter Konfigurationsbereiche ergänzt.
+- Statuskontrolle zeigt betroffene Backup-Bereiche an und ignoriert reine Betriebszustände wie Dry-Run/Live-Modus.
+- Systemprüfung ruhiger dargestellt: Bereiche mit Fehlern oder Hinweisen öffnen automatisch, reine OK-/Info-Bereiche bleiben geschlossen.
+- Protokollansicht fasst direkt wiederholte gleichartige Meldungen kompakt zusammen.
+- Wartungsbereich und Backup-/Admin-Karten optisch vereinheitlicht.
+- Statuskontrolle hebt optionale offene Punkte wie deaktivierten Admin-Schutz, fehlendes Backup oder deaktivierte Alexa-Funktionen sichtbar hervor.
+- Statuskontrolle priorisiert offene Punkte, macht Statuszeilen klickbar und führt direkt in den passenden Konfigurations- oder Wartungsbereich.
+- TTS-Geräteauswahl zeigt standardmässig Echo-Geräte und blendet weitere Alexa-Gerätetypen optional ein.
+- Konfigurationsspeichern zeigt vor dem Schreiben eine kurze Zusammenfassung der wichtigsten Einstellungen.
+- README um einen kurzen Schnellstart ergänzt.
+- README und INSTALL auf Backup-Status, Systemprüfung und Protokollverdichtung nachgezogen.
 
 ## 1.0.1 - 2026-05-28
 

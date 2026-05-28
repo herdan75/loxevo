@@ -444,7 +444,8 @@ async function exportBackup(res, includeCookie) {
     exportedAt,
     includeCookie,
     fileName,
-    configHash: backupRelevantConfigHash(config)
+    configHash: backupRelevantConfigHash(config),
+    sectionHashes: backupRelevantSectionHashes(config)
   });
   addEvent({ type: 'backup', status: 'exported', text: includeCookie ? 'Backup mit Cookie exportiert.' : 'Backup exportiert.' });
   return sendJsonDownload(res, backup, fileName);
@@ -1038,6 +1039,7 @@ async function getPreflightStatus() {
     backup: {
       lastExport: backupInfo.lastExport || null,
       needsBackup: Boolean(backupInfo.needsBackup),
+      changedSections: backupInfo.changedSections || [],
       localBackupCount: backupInfo.count || 0,
       latestLocalBackup: backupInfo.latest || null
     },
@@ -1110,6 +1112,8 @@ async function getCookieFileInfo(cookieFile) {
 async function getBackupInfo() {
   const exportState = await readBackupExportState();
   const currentConfigHash = backupRelevantConfigHash(config);
+  const currentSectionHashes = backupRelevantSectionHashes(config);
+  const changedSections = changedBackupSections(exportState?.sectionHashes, currentSectionHashes);
   try {
     const directory = getConfigDir();
     const files = await readdir(directory);
@@ -1141,6 +1145,7 @@ async function getBackupInfo() {
       latest: backupFiles[0] || null,
       lastExport: exportState,
       currentConfigHash,
+      changedSections,
       needsBackup: !exportState?.configHash || exportState.configHash !== currentConfigHash
     };
   } catch (error) {
@@ -1150,6 +1155,7 @@ async function getBackupInfo() {
       latest: null,
       lastExport: exportState,
       currentConfigHash,
+      changedSections,
       needsBackup: !exportState?.configHash || exportState.configHash !== currentConfigHash,
       error: error.message
     };
@@ -1162,7 +1168,8 @@ async function writeBackupExportState(state) {
     exportedAt: state.exportedAt,
     includeCookie: Boolean(state.includeCookie),
     fileName: state.fileName || null,
-    configHash: state.configHash || null
+    configHash: state.configHash || null,
+    sectionHashes: state.sectionHashes || null
   };
   await writeFile(getBackupStatePath(), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
 }
@@ -1175,7 +1182,8 @@ async function readBackupExportState() {
       exportedAt: payload.exportedAt,
       includeCookie: Boolean(payload.includeCookie),
       fileName: payload.fileName || null,
-      configHash: payload.configHash || null
+      configHash: payload.configHash || null,
+      sectionHashes: isPlainObject(payload.sectionHashes) ? payload.sectionHashes : null
     };
   } catch {
     return null;
@@ -1186,6 +1194,33 @@ function backupRelevantConfigHash(sourceConfig) {
   return createHash('sha256')
     .update(JSON.stringify(sortForStableHash(toBackupRelevantConfig(sourceConfig))))
     .digest('hex');
+}
+
+function backupRelevantSectionHashes(sourceConfig) {
+  const snapshot = toBackupRelevantConfig(sourceConfig);
+  const sections = {
+    Loxone: snapshot.loxone || {},
+    Befehle: {
+      commands: snapshot.commands || {},
+      rooms: snapshot.rooms || {}
+    },
+    'Alexa TTS': snapshot.tts || {},
+    'Virtuelle Alexa-Geräte': snapshot.alexaBridge || {},
+    Gerätesuche: snapshot.discovery || {},
+    Server: snapshot.server || {}
+  };
+
+  return Object.fromEntries(
+    Object.entries(sections).map(([name, value]) => [
+      name,
+      createHash('sha256').update(JSON.stringify(sortForStableHash(value))).digest('hex')
+    ])
+  );
+}
+
+function changedBackupSections(previousHashes, currentHashes) {
+  if (!isPlainObject(previousHashes)) return [];
+  return Object.keys(currentHashes || {}).filter((name) => previousHashes[name] !== currentHashes[name]);
 }
 
 function toBackupRelevantConfig(sourceConfig) {
@@ -1266,8 +1301,9 @@ function describeBackupInfo(info) {
   }
   if (info.lastExport?.exportedAt) {
     const cookieText = info.lastExport.includeCookie ? 'mit Alexa-Cookie' : 'ohne Alexa-Cookie';
+    const changedText = info.changedSections?.length ? ` Betroffen: ${info.changedSections.join(', ')}.` : '';
     const backupText = info.needsBackup
-      ? ' Seitdem wurden backup-relevante Einstellungen geändert; ein neues Backup wird empfohlen.'
+      ? ` Seitdem wurden backup-relevante Einstellungen geändert; ein neues Backup wird empfohlen.${changedText}`
       : ' Die backup-relevanten Einstellungen sind seitdem unverändert.';
     return `Letzter Export: ${formatDateTimeForDetail(info.lastExport.exportedAt)} (${cookieText}).${backupText}`;
   }

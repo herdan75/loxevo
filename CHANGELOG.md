@@ -4,7 +4,7 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
-- Noch keine Änderungen.
+- Leere Befehlsrubriken verschwinden direkt nach dem Entfernen des letzten Befehls aus der Konfigurationsansicht.
 
 ## 1.0.3 - 2026-05-28
 

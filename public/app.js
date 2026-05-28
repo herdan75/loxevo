@@ -2581,6 +2581,7 @@ function createCommandCard(commandKey, command) {
     event.stopPropagation();
     card.remove();
     syncConfigFromForms();
+    renderCommandEditor();
     renderCommands();
   });
 

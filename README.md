@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Status: Version 1.0.1 / erste lauffähige Version**
+> **Status: Version 1.0.2 / erste lauffähige Version**
 >
 > LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die wichtigsten Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte und Alexa-TTS sind umgesetzt und getestet. Trotzdem können noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
@@ -104,7 +104,7 @@ Wichtig für Live-Tests: Die Web-UI zeigt und speichert Loxone-Zugangsdaten. Lox
 
 Optional kann in der Web-UI unter `Wartung` ein Admin-Passwort für sensible Bereiche aktiviert werden.
 
-Wenn das Admin-Passwort gesetzt ist, verlangt LoxEvo für Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update und Dry-Run-Umschaltung technisch den Header `X-LoxEvo-Admin-Token`. Die Web-UI fragt das Admin-Passwort bei Bedarf ab und merkt es nur für die aktuelle Browser-Sitzung. Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Endpunkte, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Alexa- und Loxone-Aufrufe nicht brechen.
+Wenn das Admin-Passwort gesetzt ist, verlangt LoxEvo für Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update, Dry-Run-Umschaltung und Alexa-Gerätesuche-Start/Stopp technisch den Header `X-LoxEvo-Admin-Token`. Die Web-UI fragt das Admin-Passwort bei Bedarf ab und merkt es nur für die aktuelle Browser-Sitzung. Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Endpunkte, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Alexa- und Loxone-Aufrufe nicht brechen.
 
 Das über die Web-UI gesetzte Admin-Passwort wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab. Der normale Backup-Export enthält diesen Hash nicht. Alternativ kann der Schutz weiterhin per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser Wert hat Vorrang und wird ausserhalb der Web-UI verwaltet.
 
@@ -122,7 +122,7 @@ Die Oberfläche ist in klare Bereiche gegliedert:
 - `Statuskontrolle`: kompakter Schnellcheck, Einrichtungsassistent und Hinweise zu Backup, Alexa und Loxone
 - `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
 - `Testen`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI prüfen
-- `Aufrufübersicht`: angelegte Befehle, virtuelle Alexa-Geräte und fertige URLs für lokale Systeme ansehen, testen und kopieren
+- `Befehle & Geräte`: angelegte Loxone-Befehle, virtuelle Alexa-Geräte und fertige URLs für lokale Systeme ansehen, testen und kopieren
 - `Wartung`: Systemprüfung ausführen, Diagnose exportieren, Paketversionen prüfen, `alexa-remote2` verwalten, Backup exportieren und Backup importieren
 - `Protokoll`: zuletzt simulierte oder gesendete Aktionen filtern, durchsuchen und bei Bedarf leeren; direkt wiederholte gleichartige Meldungen werden kompakt zusammengefasst
 

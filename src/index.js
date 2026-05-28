@@ -272,6 +272,7 @@ function requiresAdminToken(req, pathParts) {
   const subAction = pathParts[3] || '';
 
   if (method === 'POST' && resource === 'admin' && action === 'token') return true;
+  if (method === 'POST' && resource === 'discovery' && ['start', 'stop'].includes(action)) return true;
   if (method === 'GET' && resource === 'config') return true;
   if (method === 'PUT' && resource === 'config') return true;
   if (method === 'GET' && resource === 'backup') return true;

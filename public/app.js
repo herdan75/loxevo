@@ -13,6 +13,7 @@ const dryRunToggle = document.querySelector('#dryRunToggle');
 const modeBanner = document.querySelector('#modeBanner');
 const modeTitle = document.querySelector('#modeTitle');
 const modeText = document.querySelector('#modeText');
+const modeSubNotice = document.querySelector('#modeSubNotice');
 const systemNotice = document.querySelector('#systemNotice');
 const dashboardCards = document.querySelector('#dashboardCards');
 const backupReminder = document.querySelector('#backupReminder');
@@ -68,9 +69,12 @@ const tabButtons = document.querySelectorAll('.tab-button');
 const views = document.querySelectorAll('.view');
 const refreshIntegrationsBtn = document.querySelector('#refreshIntegrationsBtn');
 const lightEndpoints = document.querySelector('#lightEndpoints');
+const ttsEndpoints = document.querySelector('#ttsEndpoints');
 const alexaDevices = document.querySelector('#alexaDevices');
 const integrationCommandsCount = document.querySelector('#integrationCommandsCount');
+const integrationTtsCount = document.querySelector('#integrationTtsCount');
 const integrationAlexaDevicesCount = document.querySelector('#integrationAlexaDevicesCount');
+const configDirtyNotice = document.querySelector('#configDirtyNotice');
 const configCommandsCount = document.querySelector('#configCommandsCount');
 const configTtsDevicesCount = document.querySelector('#configTtsDevicesCount');
 const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
@@ -127,6 +131,8 @@ const LAST_BACKUP_EXPORT_KEY = 'loxevoLastBackupExportAt';
 const SETUP_WIZARD_SKIPPED_KEY = 'loxevoSetupWizardSkipped';
 const SHOW_ALL_TTS_DEVICE_TYPES_KEY = 'loxevoShowAllTtsDeviceTypes';
 let wizardStepIndex = 0;
+let configDirtyRenderTimer = null;
+let jsonSyncTimer = null;
 
 load();
 
@@ -153,7 +159,7 @@ addRoomBtn.addEventListener('click', addRoom);
 refreshIntegrationsBtn.addEventListener('click', () => {
   renderIntegrations();
   loadAlexaBridgeStatus();
-  showToast('Aufrufe aktualisiert', 'ok');
+  showToast('Befehle & Geräte aktualisiert', 'ok');
 });
 setupConfigBtn.addEventListener('click', () => showView('configView'));
 refreshMaintenanceBtn.addEventListener('click', () => loadDependencyStatus(refreshMaintenanceBtn));
@@ -188,17 +194,17 @@ eventFilterButtons.forEach((button) => {
 });
 ttsDefaultVolume?.addEventListener('input', () => {
   updateTtsVolumeLabels();
-  syncJsonFromForms();
+  scheduleJsonSyncFromForms();
 });
 ttsAlarmVolume?.addEventListener('input', () => {
   updateTtsVolumeLabels();
-  syncJsonFromForms();
+  scheduleJsonSyncFromForms();
 });
 [ttsDefaultDevices, ttsAllDevices, ttsAlarmDevices].forEach((textarea) => {
   textarea?.addEventListener('input', () => {
     renderTtsDevices();
     updateConfigSectionCounts();
-    syncJsonFromForms();
+    scheduleJsonSyncFromForms();
   });
 });
 document.querySelector('#configView')?.addEventListener('input', () => markConfigDirty());
@@ -225,7 +231,6 @@ async function load() {
     await loadDiscoveryStatus();
     await loadSetupStatus();
     await loadAdminSecurityStatus();
-    await loadDependencyStatus();
     await loadPreflightStatus();
     renderCommands();
     renderCommandEditor();
@@ -308,7 +313,7 @@ async function saveConfig(button) {
     markConfigClean();
     renderDashboard();
     setButtonFeedback(button, 'success', 'Gespeichert');
-    showToast('Konfiguration gespeichert', 'ok');
+    showToast(`Konfiguration gespeichert: ${configSaveSummaryInline(config)}`, 'ok');
   } catch (error) {
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
@@ -343,7 +348,7 @@ async function saveJsonConfig(button) {
     markConfigClean();
     renderDashboard();
     setButtonFeedback(button, 'success', 'Gespeichert');
-    showToast('JSON gespeichert', 'ok');
+    showToast(`JSON gespeichert: ${configSaveSummaryInline(config)}`, 'ok');
   } catch (error) {
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
@@ -426,13 +431,30 @@ function normalizeText(value) {
 function markConfigDirty() {
   if (!config) return;
   configDirty = true;
-  renderBackupReminder();
-  renderDashboard();
+  updateConfigDirtyNotice();
+  scheduleConfigDirtyRefresh();
 }
 
 function markConfigClean() {
   configDirty = false;
+  clearTimeout(configDirtyRenderTimer);
+  configDirtyRenderTimer = null;
+  updateConfigDirtyNotice();
   renderBackupReminder();
+}
+
+function updateConfigDirtyNotice() {
+  if (!configDirtyNotice) return;
+  configDirtyNotice.hidden = !configDirty;
+}
+
+function scheduleConfigDirtyRefresh() {
+  clearTimeout(configDirtyRenderTimer);
+  configDirtyRenderTimer = setTimeout(() => {
+    configDirtyRenderTimer = null;
+    renderBackupReminder();
+    renderDashboard();
+  }, 250);
 }
 
 async function postTtsTest(kind, button) {
@@ -1200,7 +1222,7 @@ async function runDiscoveryAction(action, button) {
   const successLabel = action === 'start' ? 'Aktiviert' : 'Beendet';
   setButtonFeedback(button, 'pending', action === 'start' ? 'Startet' : 'Stoppt');
   try {
-    const response = await fetch(`/api/discovery/${action}`, { method: 'POST' });
+    const response = await adminFetch(`/api/discovery/${action}`, { method: 'POST' });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(payload.error || `HTTP ${response.status}`);
@@ -1252,13 +1274,6 @@ function renderSystemNotice() {
         title: 'Alexa-Geräte sind nicht bereit',
         text: alexaBridgeInfo.bridgeHttp.error
       });
-    } else if (alexaBridgeInfo.discoveryPaused || discoveryPortIssue) {
-      issues.push({
-        level: 'info',
-        title: '',
-        text: 'Virtuelle Alexa-Geräte sind aktiviert und funktionsfähig. SSDP/UDP 1900 ist aktuell aber belegt. Für das Suchen und Hinzufügen neuer Geräte unter Konfiguration -> Alexa-Gerätesuche aktivieren.',
-        help: 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Für den normalen Betrieb und für bereits gefundene Geräte ist ein belegter Port 1900 kein Problem. Wenn neue Geräte hinzugefügt werden sollen: Konfiguration -> Alexa-Gerätesuche öffnen, Gerätesuche aktivieren, in der Alexa-App Geräte suchen und danach die Gerätesuche wieder beenden. So wird der Zugriff auf SSDP/UDP 1900 nur temporär genutzt und anschliessend wieder an die andere Anwendung zurückgegeben.'
-      });
     } else if (!alexaBridgeInfo.ready) {
       issues.push({
         level: 'error',
@@ -1271,6 +1286,7 @@ function renderSystemNotice() {
   if (!issues.length) {
     systemNotice.hidden = true;
     systemNotice.innerHTML = '';
+    updateModeBannerNotice();
     return;
   }
 
@@ -1317,6 +1333,24 @@ function renderSystemNotice() {
 
     systemNotice.append(item);
   });
+  updateModeBannerNotice();
+}
+
+function updateModeBannerNotice() {
+  if (!modeSubNotice) return;
+  if (getModeBannerDiscoveryNotice()) {
+    modeSubNotice.textContent = 'Virtuelle Alexa-Geräte sind aktiviert und funktionsfähig. SSDP/UDP 1900 ist aktuell aber belegt. Für das Suchen und Hinzufügen neuer Geräte unter Konfiguration -> Alexa-Gerätesuche aktivieren.';
+    modeSubNotice.hidden = false;
+    return;
+  }
+  modeSubNotice.textContent = '';
+  modeSubNotice.hidden = true;
+}
+
+function getModeBannerDiscoveryNotice() {
+  if (!alexaBridgeInfo?.enabled) return false;
+  const discoveryPortIssue = !alexaBridgeInfo.ready && isDiscoveryPortIssue(alexaBridgeInfo.error);
+  return Boolean(alexaBridgeInfo.discoveryPaused || discoveryPortIssue);
 }
 
 function humanizeTtsStatusError(errorText = '') {
@@ -1796,6 +1830,9 @@ function renderDependencyStatus() {
     message.textContent = dependency.latestError
       ? `Update-Prüfung nicht möglich: ${dependency.latestError}`
       : dependency.update?.message || (dependency.updateAvailable ? 'Eine neuere Version kann installiert werden.' : 'Die installierte Version ist aktuell.');
+    if (dependency.update?.restartRequired) {
+      message.classList.add('restart-required');
+    }
 
     const actions = document.createElement('div');
     actions.className = 'actions';
@@ -1820,8 +1857,37 @@ function renderDependencyStatus() {
 
     const updateButton = document.createElement('button');
     updateButton.type = 'button';
-    updateButton.textContent = dependency.installedVersion ? 'Update installieren' : 'Installieren';
-    updateButton.disabled = dependency.update?.status === 'running' || Boolean(dependency.latestError);
+    const updateButtonState = () => {
+      const selectedVersion = versionSelect.value;
+      const installedVersion = dependency.installedVersion || '';
+      const selectedIsInstalled = installedVersion && selectedVersion === installedVersion;
+      const comparison = installedVersion && selectedVersion ? comparePackageVersions(selectedVersion, installedVersion) : 1;
+      if (dependency.update?.status === 'running') {
+        updateButton.textContent = 'Installation läuft';
+        updateButton.disabled = true;
+        return;
+      }
+      if (dependency.latestError) {
+        updateButton.textContent = dependency.installedVersion ? 'Update nicht möglich' : 'Installation nicht möglich';
+        updateButton.disabled = true;
+        return;
+      }
+      if (selectedIsInstalled) {
+        updateButton.textContent = 'Up to date';
+        updateButton.disabled = true;
+        return;
+      }
+      if (!dependency.installedVersion) {
+        updateButton.textContent = 'Installieren';
+      } else if (comparison < 0) {
+        updateButton.textContent = 'Downgrade installieren';
+      } else {
+        updateButton.textContent = 'Update installieren';
+      }
+      updateButton.disabled = false;
+    };
+    updateButtonState();
+    versionSelect.addEventListener('change', updateButtonState);
     updateButton.addEventListener('click', () => updateDependency(dependency.name, versionSelect.value, updateButton));
     actions.append(updateButton);
 
@@ -1839,7 +1905,19 @@ function renderDependencyStatus() {
   });
 }
 
+function comparePackageVersions(left, right) {
+  const leftParts = String(left || '').replace(/^[^\d]*/, '').split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
+  const rightParts = String(right || '').replace(/^[^\d]*/, '').split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
+  const maxLength = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < maxLength; index += 1) {
+    const diff = (leftParts[index] || 0) - (rightParts[index] || 0);
+    if (diff !== 0) return diff > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
 async function updateDependency(name, version, button) {
+  const requestedActionText = button?.textContent?.toLowerCase().includes('downgrade') ? 'Downgrade' : 'Update';
   setButtonFeedback(button, 'pending', 'Installiert');
   try {
     const response = await adminFetch(`/api/dependencies/${encodeURIComponent(name)}/update`, {
@@ -1852,7 +1930,7 @@ async function updateDependency(name, version, button) {
     renderDependencyStatus();
     await loadPreflightStatus();
     setButtonFeedback(button, 'success', 'Installiert');
-    showToast('Update installiert. Neustart erforderlich.', 'ok');
+    showToast(`${requestedActionText} installiert. Neustart empfohlen.`, 'ok');
   } catch (error) {
     await loadDependencyStatus();
     setButtonFeedback(button, 'error', 'Fehler');
@@ -1972,14 +2050,16 @@ async function refreshDashboard(button) {
 function renderDashboard() {
   if (!dashboardCards) return;
   const adminStatus = dashboardAdminStatus();
+  const loxoneStatus = dashboardLoxoneStatus();
+  const systemStatus = dashboardSystemStatus();
   const rows = [
-    dashboardStatusRow('Loxone', config?.loxone?.dryRun === false ? 'Live-Modus' : 'Dry-Run', config?.loxone?.dryRun === false ? 'ok' : 'info', config?.loxone?.dryRun === false ? 'Befehle werden an den Miniserver gesendet.' : 'Befehle werden nur protokolliert.', 'Zeigt, ob LoxEvo echte Befehle an den Loxone-Miniserver sendet. Dry-Run ist für Tests gedacht und protokolliert nur. Live-Modus ist für den produktiven Betrieb, sobald die Befehle geprüft sind.', 'config:Loxone'),
+    dashboardStatusRow('Loxone', loxoneStatus.value, loxoneStatus.level, loxoneStatus.detail, 'Zeigt, ob LoxEvo echte Befehle an den Loxone-Miniserver senden kann. Die Zeile prüft die wichtigsten Loxone-Grundlagen: Miniserver-URL, Zugangsdaten, konfigurierte Befehle und Betriebsmodus.', loxoneStatus.target),
     dashboardStatusRow('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'optional', ttsDeviceSummary(ttsStatus), 'Zeigt den Status der Alexa-Sprachausgabe. Bereit bedeutet, dass alexa-remote2 verbunden ist und LoxEvo die konfigurierten Echo-Geräte für normale TTS- oder Alarmmeldungen verwenden kann.', 'config:Alexa TTS'),
     dashboardStatusRow('Virtuelle Alexa-Geräte', alexaBridgeInfo?.bridgeHttp?.ready ? 'Bereit' : config?.alexaBridge?.enabled ? 'HTTP prüfen' : 'Deaktiviert', alexaBridgeInfo?.bridgeHttp?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'warning' : 'optional', `${alexaBridgeInfo?.deviceCount ?? 0} Gerät(e), Alexa/Hue-Port ${alexaBridgeInfo?.port || config?.alexaBridge?.advertisePort || 80}.`, 'Zeigt, ob LoxEvo die lokalen Hue-kompatiblen Geräte für Alexa bereitstellt. Diese Funktion ist für Sprachbefehle wie Licht ein oder aus zuständig und läuft unabhängig von Alexa TTS.', 'config:Alexa-Geräte'),
     dashboardStatusRow('Gerätesuche', alexaBridgeInfo?.ready ? 'Aktiv' : config?.alexaBridge?.enabled ? 'Optional' : 'Deaktiviert', alexaBridgeInfo?.ready ? 'ok' : config?.alexaBridge?.enabled ? 'optional' : 'info', alexaBridgeInfo?.ready ? 'Neue Geräte können gesucht werden.' : 'Für bestehende Geräte normalerweise nicht kritisch.', 'SSDP/UDP 1900 wird nur für das Suchen und Hinzufügen neuer virtueller Alexa-Geräte benötigt. Bereits gefundene Geräte funktionieren normalerweise weiter. Für neue Geräte unter Konfiguration die Alexa-Gerätesuche kurz aktivieren, in der Alexa-App suchen und danach wieder beenden.', 'config:Alexa-Gerätesuche'),
     dashboardStatusRow('Backup', backupStateTitle(), backupReminderLevel(), backupStateDetail(), 'Zeigt, ob seit dem letzten Backup backup-relevante Einstellungen geändert wurden. Backup-relevant sind Loxone-Zugang, Befehle, Räume, Alexa-Bridge, Gerätesuche, TTS-Einstellungen, Geräteauswahl, Lautstärken und Server-Einstellungen. Nicht backup-relevant ist der Betriebszustand Dry-Run/Live-Modus. Die Alexa-Cookie-Datei wird nur gesichert, wenn du sie beim Export bewusst einschliesst.', 'maintenance:maintenanceBackupPanel'),
     dashboardStatusRow('Admin-Schutz', adminStatus.value, adminStatus.level, adminStatus.detail, 'Zeigt, ob sensible Web-UI-Aktionen wie Konfiguration, Backup, Restore, Neustart oder Protokoll löschen mit einem Admin-Passwort geschützt sind. Loxone-Befehle, TTS und Alexa/Hue-Endpunkte bleiben bewusst offen für lokale Automationen.', 'maintenance:maintenanceAdminPanel'),
-    dashboardStatusRow('Systemprüfung', preflightInfo?.summary?.level === 'error' ? 'Fehler' : preflightInfo?.summary?.level === 'warning' ? 'Prüfen' : 'OK', preflightInfo?.summary?.level || 'info', preflightInfo?.summary?.text || 'Noch nicht geprüft.', 'Fasst die Systemprüfung aus Wartung zusammen. Sie prüft lokale Konfiguration, Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Details findest du im Register Wartung.', 'maintenance:maintenancePreflightPanel')
+    dashboardStatusRow('Systemprüfung', systemStatus.value, systemStatus.level, systemStatus.detail, 'Fasst technische Zusatzprüfungen aus Wartung zusammen. Hinweise, die bereits eigene Statuszeilen haben, werden hier nicht nochmals als offene Punkte gewertet. Details findest du im Register Wartung.', 'maintenance:maintenancePreflightPanel')
   ];
   dashboardCards.innerHTML = prioritizeDashboardRows(rows).join('');
   bindDashboardHelpButtons();
@@ -2015,6 +2095,97 @@ function dashboardAdminStatus() {
     level: 'optional',
     detail: adminSecurityInfo.message || 'Admin-Schutz ist deaktiviert. Sensible Web-UI-Aktionen sind ohne Admin-Passwort erreichbar.'
   };
+}
+
+function dashboardLoxoneStatus() {
+  const hasUrl = isValidHttpUrl(config?.loxone?.baseUrl || '');
+  const hasLogin = Boolean(config?.loxone?.username && config?.loxone?.password);
+  const commandCount = Object.keys(getRunnableCommands()).length;
+
+  if (!hasUrl) {
+    return {
+      value: 'Prüfen',
+      level: 'warning',
+      detail: 'Miniserver-URL fehlt oder ist ungültig.',
+      target: 'config:Loxone'
+    };
+  }
+  if (!hasLogin) {
+    return {
+      value: 'Prüfen',
+      level: 'warning',
+      detail: 'Loxone-Benutzer oder Passwort fehlen.',
+      target: 'config:Loxone'
+    };
+  }
+  if (!commandCount) {
+    return {
+      value: 'Prüfen',
+      level: 'warning',
+      detail: 'Noch keine aktiven Loxone-Befehle konfiguriert.',
+      target: 'config:Befehle und Sprachnamen'
+    };
+  }
+  return {
+    value: config?.loxone?.dryRun === false ? 'Live-Modus' : 'Dry-Run',
+    level: config?.loxone?.dryRun === false ? 'ok' : 'info',
+    detail: config?.loxone?.dryRun === false
+      ? 'Befehle werden an den Miniserver gesendet.'
+      : 'Befehle werden nur protokolliert.',
+    target: 'config:Loxone'
+  };
+}
+
+function dashboardSystemStatus() {
+  if (!preflightInfo?.sections?.length) {
+    return {
+      value: 'Prüfen',
+      level: 'info',
+      detail: 'Systemprüfung wurde noch nicht geladen.'
+    };
+  }
+
+  const relevantChecks = preflightInfo.sections
+    .flatMap((section) => (section.checks || []).map((check) => ({
+      section: section.title || '',
+      ...check
+    })))
+    .filter((check) => !isDashboardCoveredPreflightCheck(check));
+
+  const errors = relevantChecks.filter((check) => check.level === 'error');
+  if (errors.length) {
+    return {
+      value: 'Fehler',
+      level: 'error',
+      detail: `${errors.length} technische Prüfung(en) benötigen Aufmerksamkeit.`
+    };
+  }
+
+  const warnings = relevantChecks.filter((check) => check.level === 'warning');
+  if (warnings.length) {
+    return {
+      value: 'Prüfen',
+      level: 'warning',
+      detail: `${warnings.length} technische Hinweis(e) prüfen.`
+    };
+  }
+
+  return {
+    value: 'OK',
+    level: 'ok',
+    detail: 'Keine zusätzlichen technischen Probleme gefunden.'
+  };
+}
+
+function isDashboardCoveredPreflightCheck(check) {
+  const section = String(check.section || '');
+  const label = String(check.label || '');
+  if (section === 'Backup') return true;
+  if (section === 'Loxone') return true;
+  if (section === 'Alexa TTS') return true;
+  if (section === 'Virtuelle Alexa-Geräte') return true;
+  if (section === 'LoxEvo' && ['Admin-Schutz', 'Version', 'Laufzeit', 'Datenhaltung'].includes(label)) return true;
+  return false;
 }
 
 function prioritizeDashboardRows(rows) {
@@ -2086,8 +2257,18 @@ function openDashboardTarget(target) {
   }
   if (kind === 'maintenance' && value) {
     showView('maintenanceView');
-    document.getElementById(value)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    highlightTargetElement(document.getElementById(value));
   }
+}
+
+function highlightTargetElement(element) {
+  if (!element) return;
+  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  element.classList.remove('target-highlight');
+  window.setTimeout(() => {
+    element.classList.add('target-highlight');
+    window.setTimeout(() => element.classList.remove('target-highlight'), 1800);
+  }, 180);
 }
 
 function backupStateDetail() {
@@ -2117,13 +2298,8 @@ function backupChangedSectionsText() {
 
 function renderBackupReminder() {
   if (!backupReminder) return;
-  if (!configDirty && !backupNeedsExport()) {
-    backupReminder.hidden = true;
-    backupReminder.textContent = '';
-    return;
-  }
-  backupReminder.hidden = false;
-  backupReminder.textContent = 'Seit dem letzten Backup wurden Einstellungen geändert. Unter Wartung ein neues Backup exportieren.';
+  backupReminder.hidden = true;
+  backupReminder.textContent = '';
 }
 
 function renderWizardPrompt() {
@@ -2314,7 +2490,7 @@ function openConfigArea(label) {
   });
   if (target) {
     target.open = true;
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    highlightTargetElement(target);
   }
 }
 
@@ -2481,10 +2657,11 @@ function addRoom() {
 }
 
 function renderIntegrations() {
-  if (!lightEndpoints || !config) return;
+  if (!lightEndpoints || !ttsEndpoints || !config) return;
 
   const baseUrl = window.location.origin;
   lightEndpoints.innerHTML = '';
+  ttsEndpoints.innerHTML = '';
   const runnableCommands = Object.entries(getRunnableCommands());
 
   if (!runnableCommands.length) {
@@ -2511,12 +2688,18 @@ function renderIntegrations() {
     lightEndpoints.append(group);
   });
 
-  const ttsGroup = createTtsEndpointGroup(baseUrl);
-  const ttsEndpointCount = Number(ttsGroup.querySelector('.count-badge')?.textContent || 0);
-  setCountBadge(integrationCommandsCount, runnableCommands.length + ttsEndpointCount);
-  lightEndpoints.append(ttsGroup);
+  setCountBadge(integrationCommandsCount, runnableCommands.length);
+  renderTtsEndpointSection(baseUrl);
 
   renderAlexaDevices();
+}
+
+function renderTtsEndpointSection(baseUrl) {
+  if (!ttsEndpoints) return;
+  const ttsGroup = createTtsEndpointGroup(baseUrl, true);
+  const ttsEndpointCount = Number(ttsGroup.querySelector('.count-badge')?.textContent || 0);
+  setCountBadge(integrationTtsCount, ttsEndpointCount);
+  ttsEndpoints.append(ttsGroup);
 }
 
 function createTtsEndpointGroup(baseUrl, open = false) {
@@ -2873,17 +3056,30 @@ function configSaveSummary(nextConfig) {
   ].join('\n');
 }
 
+function configSaveSummaryInline(nextConfig) {
+  return configSaveSummary(nextConfig).replaceAll('\n', ', ');
+}
+
 function syncConfigFromForms() {
   config = collectConfigFromForms();
   syncJsonFromForms();
 }
 
 function syncJsonFromForms() {
+  clearTimeout(jsonSyncTimer);
+  jsonSyncTimer = null;
   try {
     configEditor.value = JSON.stringify(collectConfigFromForms(), null, 2);
   } catch {
     configEditor.value = JSON.stringify(config, null, 2);
   }
+}
+
+function scheduleJsonSyncFromForms() {
+  clearTimeout(jsonSyncTimer);
+  jsonSyncTimer = setTimeout(() => {
+    syncJsonFromForms();
+  }, 250);
 }
 
 function regenerateJsonFromForms(button) {
@@ -3165,6 +3361,7 @@ function updateDryRunUi(enabled) {
   modeText.textContent = enabled
     ? 'Loxone-Befehle werden nur simuliert und im Event-Log angezeigt.'
     : 'Aktiv: Loxone-Befehle werden wirklich an den Miniserver gesendet.';
+  updateModeBannerNotice();
 }
 
 async function loadEvents(button) {

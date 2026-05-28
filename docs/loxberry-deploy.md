@@ -111,7 +111,7 @@ So wird der LoxBerry-SSDP-Dienst nur für die eigentliche Suche pausiert.
 
 ## Backup und Deinstallation
 
-Vor grösseren Änderungen kann in der Web-UI unter `Wartung` ein Backup exportiert werden. Standardmässig enthält es `data/config.json`; die Alexa-Cookie-Datei `data/Node.txt` wird nur mit exportiert, wenn der Haken dafür gesetzt ist. Der Admin-Token-Hash wird nicht im normalen Backup exportiert. Backup-Dateien können sensible Loxone- und Alexa-Daten enthalten und sollten privat bleiben.
+Vor grösseren Änderungen kann in der Web-UI unter `Wartung` ein Backup exportiert werden. Standardmässig enthält es `data/config.json`; die Alexa-Cookie-Datei `data/Node.txt` wird nur mit exportiert, wenn der Haken dafür gesetzt ist. Der Admin-Passwort-Hash wird nicht im normalen Backup exportiert. Backup-Dateien können sensible Loxone- und Alexa-Daten enthalten und sollten privat bleiben.
 
 Für Fehlersuche kann im gleichen Register ein Diagnosepaket exportiert werden. Es enthält Statusdaten, Systemprüfung, Versionsinformationen und gekürzte letzte Ereignisse. Zugangsdaten, Token und Hostnamen werden dabei nicht im Klartext ausgegeben.
 
@@ -129,7 +129,7 @@ docker compose down
 
 1. In der Web-UI `Dry-Run aktiv` eingeschaltet lassen.
 2. Einen aktiven Befehl testen.
-3. Unter `Externe Aufrufe` die erzeugten Befehls- und TTS-Aufrufe prüfen.
+3. Unter `Befehle & Geräte` die erzeugten Befehls- und TTS-Aufrufe prüfen.
 4. Optional unter `Konfiguration -> Alexa-Geräte` die virtuellen Alexa-Geräte aktivieren und speichern.
 5. In der Alexa-App nach neuen Geräten suchen.
 6. TTS-Status kontrollieren und unter `Konfiguration -> TTS-Geräte` die Echo-Geräte aus Alexa laden.

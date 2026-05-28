@@ -22,6 +22,7 @@
         <div>
           <h2 id="modeTitle">Testmodus</h2>
           <p id="modeText">Loxone-Befehle werden nur simuliert.</p>
+          <p id="modeSubNotice" class="mode-sub-notice" hidden></p>
         </div>
         <label class="switch-row">
           <input id="dryRunToggle" type="checkbox" checked>
@@ -35,7 +36,7 @@
         <button class="tab-button active" type="button" data-tab-target="dashboardView">Statuskontrolle</button>
         <button class="tab-button" type="button" data-tab-target="configView">Konfiguration</button>
         <button class="tab-button" type="button" data-tab-target="controlView">Testen</button>
-        <button class="tab-button" type="button" data-tab-target="integrationView">Aufrufübersicht</button>
+        <button class="tab-button" type="button" data-tab-target="integrationView">Befehle & Geräte</button>
         <button class="tab-button" type="button" data-tab-target="maintenanceView">Wartung</button>
         <button class="tab-button" type="button" data-tab-target="eventsView">Protokoll</button>
       </nav>
@@ -131,23 +132,31 @@
       <section class="panel wide">
         <div class="section-head">
           <div>
-            <h2>Aufrufübersicht</h2>
-            <p>Bereits angelegte Befehle, virtuelle Alexa-Geräte und fertige URLs für lokale Systeme.</p>
+            <h2>Konfigurierte Befehle & Geräte</h2>
+            <p>Bereits angelegte Loxone-Befehle, virtuelle Alexa-Geräte und fertige URLs für lokale Systeme.</p>
           </div>
-          <button id="refreshIntegrationsBtn" type="button" class="secondary">Aufrufe aktualisieren</button>
+          <button id="refreshIntegrationsBtn" type="button" class="secondary">Übersicht aktualisieren</button>
         </div>
 
         <div class="integration-sections">
           <details class="config-section endpoint-block">
-            <summary><span class="summary-label">Befehle</span><span id="integrationCommandsCount" class="count-badge">0</span></summary>
+            <summary><span class="summary-label">Loxone-Befehle</span><span id="integrationCommandsCount" class="count-badge">0</span></summary>
             <div class="config-section-body">
-              <p>Wenn ein externes System diese URL aufruft, sendet LoxEvo den passenden Loxone-Befehl.</p>
+              <p>Diese Aufrufe lösen konfigurierte Loxone-Befehle aus. Geeignet für Loxone, Home Assistant, Node-RED oder andere lokale Systeme.</p>
               <div id="lightEndpoints" class="endpoint-list"></div>
             </div>
           </details>
 
           <details class="config-section endpoint-block">
-            <summary><span class="summary-label">Alexa-Geräte</span><span id="integrationAlexaDevicesCount" class="count-badge">0</span></summary>
+            <summary><span class="summary-label">TTS-Aufrufe</span><span id="integrationTtsCount" class="count-badge">0</span></summary>
+            <div class="config-section-body">
+              <p>Diese URLs senden Sprachausgaben, Alarmmeldungen oder Lautstärkeänderungen an die konfigurierten Echo-Geräte.</p>
+              <div id="ttsEndpoints" class="endpoint-list"></div>
+            </div>
+          </details>
+
+          <details class="config-section endpoint-block">
+            <summary><span class="summary-label">Virtuelle Alexa-Geräte</span><span id="integrationAlexaDevicesCount" class="count-badge">0</span></summary>
             <div class="config-section-body">
               <p>Diese Namen werden Alexa als virtuelle Geräte angeboten. Gesprochen wird typischerweise: „Alexa, &lt;Gerätename&gt; an”.</p>
               <div id="alexaDevices" class="endpoint-list"></div>
@@ -167,6 +176,7 @@
           </div>
           <button id="saveBtn">Konfiguration speichern</button>
         </div>
+        <div id="configDirtyNotice" class="service-status warning compact-status" hidden>Ungespeicherte Änderungen vorhanden.</div>
 
         <div class="config-sections">
           <details class="config-section">
@@ -349,7 +359,7 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
 
       <section id="maintenancePreflightPanel" class="panel wide">
         <h2>API-Kurzbeispiel</h2>
-        <p>Fertige URLs zum Kopieren stehen im Register Aufrufübersicht.</p>
+        <p>Fertige URLs zum Kopieren stehen im Register Befehle & Geräte.</p>
         <pre><code>POST http://&lt;loxberry&gt;:&lt;port&gt;/api/command
 Content-Type: application/json
 
@@ -400,7 +410,7 @@ Content-Type: application/json
           <p><strong>Wichtig:</strong> Die Web-UI lädt beim Öffnen automatisch die Konfiguration über <code>/api/config</code>. Deshalb wird bei aktivem Admin-Schutz bereits beim Öffnen der Web-UI das Admin-Passwort abgefragt.</p>
 
            <p>Geschützt sind unter anderem:
-          Konfiguration, Backup/Restore, Neustart, <code>alexa-remote2</code>-Update, Dry-Run-Umschaltung und die Admin-Passwort-Verwaltung.</p>
+          Konfiguration, Backup/Restore, Neustart, <code>alexa-remote2</code>-Update, Dry-Run-Umschaltung, Alexa-Gerätesuche-Start/Stopp und die Admin-Passwort-Verwaltung.</p>
 
           <p>Das Admin-Passwort wird absichtlich nur temporär im aktuellen Browser-Tab gespeichert (<code>sessionStorage</code>). Nach Schliessen des Tabs oder Browsers muss es erneut eingegeben werden. Es wird nicht dauerhaft im Browser gespeichert und nicht an Alexa, Loxone oder andere externe Systeme weitergegeben.</p>
 

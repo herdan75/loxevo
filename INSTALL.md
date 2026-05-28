@@ -31,7 +31,7 @@ http://<loxberry-ip>:8080
 
 Die Web-UI ist für das eigene LAN gedacht. Port `8080` sollte nicht direkt ins Internet freigegeben werden, weil darüber Loxone-Zugangsdaten und Steuerbefehle konfiguriert werden.
 
-Optional kann ein Admin-Passwort für sensible Web-UI-Aktionen direkt in der Web-UI unter `Wartung` aktiviert werden. Ohne Admin-Passwort läuft LoxEvo wie bisher. Mit aktivem Schutz fragt die Web-UI bei Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update und Dry-Run-Umschaltung nach dem Admin-Passwort. Loxone-Befehle, TTS-Aufrufe und virtuelle Alexa-Geräte bleiben weiterhin ohne Admin-Passwort erreichbar.
+Optional kann ein Admin-Passwort für sensible Web-UI-Aktionen direkt in der Web-UI unter `Wartung` aktiviert werden. Ohne Admin-Passwort läuft LoxEvo wie bisher. Mit aktivem Schutz fragt die Web-UI bei Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update, Dry-Run-Umschaltung und Alexa-Gerätesuche-Start/Stopp nach dem Admin-Passwort. Loxone-Befehle, TTS-Aufrufe und virtuelle Alexa-Geräte bleiben weiterhin ohne Admin-Passwort erreichbar.
 
 Das Web-UI-Passwort wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab und nimmt diesen nicht in den normalen Backup-Export auf. Optional kann der Schutz auch per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser technische Wert hat Vorrang und wird ausserhalb der Web-UI gepflegt.
 

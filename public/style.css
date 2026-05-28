@@ -107,6 +107,11 @@ h2 {
   color: #725000;
 }
 
+.compact-status {
+  margin-bottom: 12px;
+  padding: 9px 12px;
+}
+
 .dashboard-status-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -164,10 +169,14 @@ h2 {
   color: #0b6b3a;
 }
 
-.status-pill.warning,
-.status-pill.optional {
+.status-pill.warning {
   background: #fff1cd;
   color: #805300;
+}
+
+.status-pill.optional {
+  background: #edf1f3;
+  color: #4f5f69;
 }
 
 .status-pill.error {
@@ -213,10 +222,14 @@ h2 {
   background: #fbfefc;
 }
 
-.dashboard-status-row.warning,
-.dashboard-status-row.optional {
+.dashboard-status-row.warning {
   border-color: #ecd08e;
   background: #fffdf8;
+}
+
+.dashboard-status-row.optional {
+  border-color: #d7e0e5;
+  background: #fbfcfd;
 }
 
 .dashboard-status-row.error {
@@ -712,12 +725,12 @@ h2 {
 }
 
 .setup-check.optional.open .setup-marker {
-  background: #fff4db;
-  color: #835500;
+  background: #edf1f3;
+  color: #4f5f69;
 }
 
 .setup-check.optional.open {
-  border-color: #edd29a;
+  border-color: #d7e0e5;
   background: #ffffff;
 }
 
@@ -826,14 +839,18 @@ h2 {
 }
 
 .preflight-check.optional {
-  border-color: #edd29a;
+  border-color: #d7e0e5;
   background: #ffffff;
 }
 
-.preflight-check.warning .preflight-marker,
-.preflight-check.optional .preflight-marker {
+.preflight-check.warning .preflight-marker {
   background: #fff4db;
   color: #835500;
+}
+
+.preflight-check.optional .preflight-marker {
+  background: #edf1f3;
+  color: #4f5f69;
 }
 
 .preflight-check.info .preflight-marker {
@@ -925,6 +942,15 @@ h2 {
 .maintenance-message {
   color: var(--muted);
   font-size: 14px;
+}
+
+.maintenance-message.restart-required {
+  display: inline-block;
+  padding: 8px 10px;
+  border: 1px solid #b9d8c5;
+  border-radius: 6px;
+  background: #edf8f1;
+  color: #194f31;
 }
 
 .backup-grid {
@@ -1032,6 +1058,15 @@ main {
 
 .mode-banner p {
   font-size: 14px;
+}
+
+.mode-banner .mode-sub-notice {
+  margin-top: 5px;
+  color: #315b64;
+}
+
+.mode-banner .mode-sub-notice[hidden] {
+  display: none;
 }
 
 .switch-row {
@@ -1148,6 +1183,22 @@ legend {
 .integration-sections {
   display: grid;
   gap: 12px;
+}
+
+.target-highlight {
+  animation: targetPulse 1.8s ease-out;
+}
+
+@keyframes targetPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 111, 116, 0.36);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(37, 111, 116, 0);
+  }
+  100% {
+    box-shadow: none;
+  }
 }
 
 label {

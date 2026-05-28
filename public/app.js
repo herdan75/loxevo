@@ -1604,9 +1604,9 @@ function uniqueTtsDeviceSelectionCount() {
 
 function renderPreflightStatus() {
   if (!preflightSummary || !preflightChecks || !preflightInfo) return;
-  const summary = preflightInfo.summary || {};
+  const sections = preflightDisplaySections(preflightInfo.sections || []);
+  const summary = summarizePreflightForClient(sections);
   const counts = summary.counts || {};
-  const sections = preflightInfo.sections || [];
   if (!sections.length) {
     preflightSummary.textContent = 'Systemprüfung konnte keine Detaildaten laden. Bitte LoxEvo neu starten oder die Seite aktualisieren.';
     preflightSummary.className = 'service-status warning';
@@ -1689,6 +1689,18 @@ function renderPreflightStatus() {
 
 function preflightSectionNeedsAttention(section) {
   return (section.checks || []).some((check) => ['error', 'warning'].includes(check.level));
+}
+
+function preflightDisplaySections(sections = []) {
+  return sections
+    .map((section) => ({
+      ...section,
+      checks: (section.checks || []).filter((check) => !isDashboardCoveredPreflightCheck({
+        section: section.title || '',
+        ...check
+      }))
+    }))
+    .filter((section) => (section.checks || []).length);
 }
 
 function sectionStatusText(section) {

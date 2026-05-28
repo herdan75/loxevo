@@ -1274,7 +1274,7 @@ function renderSystemNotice() {
         title: 'Alexa-Geräte sind nicht bereit',
         text: alexaBridgeInfo.bridgeHttp.error
       });
-    } else if (!alexaBridgeInfo.ready) {
+    } else if (!alexaBridgeInfo.ready && !discoveryPortIssue) {
       issues.push({
         level: 'error',
         title: 'Alexa-Gerätesuche ist nicht bereit',
@@ -2263,12 +2263,12 @@ function openDashboardTarget(target) {
 
 function highlightTargetElement(element) {
   if (!element) return;
-  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
   element.classList.remove('target-highlight');
   window.setTimeout(() => {
+    element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
     element.classList.add('target-highlight');
-    window.setTimeout(() => element.classList.remove('target-highlight'), 1800);
-  }, 180);
+    window.setTimeout(() => element.classList.remove('target-highlight'), 2600);
+  }, 120);
 }
 
 function backupStateDetail() {

@@ -107,6 +107,33 @@ h2 {
   color: #725000;
 }
 
+.dirty-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #edd29a;
+  border-radius: 8px;
+  background: #fff8e8;
+  color: #725000;
+}
+
+.dirty-notice[hidden] {
+  display: none;
+}
+
+.dirty-notice > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.dirty-notice span {
+  color: #725000;
+  font-size: 13px;
+}
+
 .compact-status {
   margin-bottom: 12px;
   padding: 9px 12px;
@@ -1380,6 +1407,18 @@ input[type='range'] {
   margin-bottom: 12px;
 }
 
+.command-tools {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px) auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .category-group {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1499,6 +1538,21 @@ input[type='range'] {
   text-align: left;
 }
 
+.command-summary-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.command-summary-meta {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .room-card[open] {
   padding-bottom: 12px;
 }
@@ -1594,6 +1648,13 @@ input[type='range'] {
 .endpoint-card p {
   color: var(--muted);
   font-size: 13px;
+}
+
+.endpoint-body-label {
+  margin-bottom: -4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .endpoint-body {
@@ -1844,6 +1905,10 @@ pre {
 }
 
 @media (max-width: 1100px) {
+  .command-tools {
+    grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px);
+  }
+
   .dashboard-status-list {
     grid-template-columns: 1fr;
   }
@@ -1873,6 +1938,7 @@ pre {
   }
 
   .config-sections,
+  .command-tools,
   .dashboard-status-list,
   .event-toolbar,
   .wizard-prompt,
@@ -1891,6 +1957,11 @@ pre {
   .dashboard-status-row {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .dirty-notice {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .tab-nav {

@@ -75,7 +75,12 @@ const integrationCommandsCount = document.querySelector('#integrationCommandsCou
 const integrationTtsCount = document.querySelector('#integrationTtsCount');
 const integrationAlexaDevicesCount = document.querySelector('#integrationAlexaDevicesCount');
 const configDirtyNotice = document.querySelector('#configDirtyNotice');
+const dirtySaveBtn = document.querySelector('#dirtySaveBtn');
+const dirtyDiscardBtn = document.querySelector('#dirtyDiscardBtn');
 const configCommandsCount = document.querySelector('#configCommandsCount');
+const commandSearch = document.querySelector('#commandSearch');
+const commandCategoryFilter = document.querySelector('#commandCategoryFilter');
+const commandOnlyInvalid = document.querySelector('#commandOnlyInvalid');
 const configTtsDevicesCount = document.querySelector('#configTtsDevicesCount');
 const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
 const ttsHelpBtn = document.querySelector('#ttsHelpBtn');
@@ -126,6 +131,7 @@ let adminSecurityInfo = null;
 let allEvents = [];
 let activeEventFilter = 'all';
 let configDirty = false;
+let savedConfigSnapshot = null;
 const ADMIN_TOKEN_STORAGE_KEY = 'loxevoAdminToken';
 const LAST_BACKUP_EXPORT_KEY = 'loxevoLastBackupExportAt';
 const SETUP_WIZARD_SKIPPED_KEY = 'loxevoSetupWizardSkipped';
@@ -137,6 +143,8 @@ let jsonSyncTimer = null;
 load();
 
 saveBtn.addEventListener('click', () => saveConfig(saveBtn));
+dirtySaveBtn?.addEventListener('click', () => saveConfig(dirtySaveBtn));
+dirtyDiscardBtn?.addEventListener('click', () => discardConfigChanges());
 saveJsonBtn.addEventListener('click', () => saveJsonConfig(saveJsonBtn));
 reloadJsonBtn.addEventListener('click', () => regenerateJsonFromForms(reloadJsonBtn));
 speakBtn.addEventListener('click', () => postTtsTest('speak', speakBtn));
@@ -207,8 +215,18 @@ ttsAlarmVolume?.addEventListener('input', () => {
     scheduleJsonSyncFromForms();
   });
 });
-document.querySelector('#configView')?.addEventListener('input', () => markConfigDirty());
-document.querySelector('#configView')?.addEventListener('change', () => markConfigDirty());
+document.querySelector('#configView')?.addEventListener('input', (event) => {
+  if (event.target?.closest?.('.command-tools')) return;
+  markConfigDirty();
+});
+document.querySelector('#configView')?.addEventListener('change', (event) => {
+  if (event.target?.closest?.('.command-tools')) return;
+  markConfigDirty();
+});
+[commandSearch, commandCategoryFilter, commandOnlyInvalid].forEach((control) => {
+  control?.addEventListener('input', () => renderCommandEditor());
+  control?.addEventListener('change', () => renderCommandEditor());
+});
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => showView(button.dataset.tabTarget));
 });
@@ -223,6 +241,7 @@ async function load() {
     const response = await adminFetch('/api/config');
     await ensureOk(response);
     config = await response.json();
+    savedConfigSnapshot = structuredClone(config);
     populateForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     await loadTtsStatus();
@@ -298,6 +317,7 @@ async function saveConfig(button) {
     setButtonFeedback(button, 'pending', 'Speichert');
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
+    savedConfigSnapshot = structuredClone(config);
     populateForms();
     syncJsonFromForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
@@ -333,6 +353,7 @@ async function saveJsonConfig(button) {
     setButtonFeedback(button, 'pending', 'Speichert');
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
+    savedConfigSnapshot = structuredClone(config);
     populateForms();
     syncJsonFromForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
@@ -441,6 +462,21 @@ function markConfigClean() {
   configDirtyRenderTimer = null;
   updateConfigDirtyNotice();
   renderBackupReminder();
+}
+
+function discardConfigChanges() {
+  if (!savedConfigSnapshot) return;
+  if (configDirty && !window.confirm('Ungespeicherte Änderungen verwerfen?')) return;
+  config = structuredClone(savedConfigSnapshot);
+  populateForms();
+  updateDryRunUi(Boolean(config.loxone?.dryRun));
+  renderCommands();
+  renderCommandEditor();
+  renderIntegrations();
+  syncJsonFromForms();
+  markConfigClean();
+  renderDashboard();
+  showToast('Änderungen verworfen', 'ok');
 }
 
 function updateConfigDirtyNotice() {
@@ -2549,7 +2585,12 @@ function updateTtsVolumeLabels() {
 
 function renderCommandEditor() {
   roomEditor.innerHTML = '';
-  const commandGroups = groupCommandsByCategory(Object.entries(getConfiguredCommands()));
+  updateCommandCategoryFilter();
+  const filteredCommands = filterConfiguredCommands(Object.entries(getConfiguredCommands()));
+  const commandGroups = groupCommandsByCategory(filteredCommands);
+  if (!filteredCommands.length) {
+    roomEditor.innerHTML = '<p class="empty">Keine Befehle passend zum Filter gefunden.</p>';
+  }
   Object.entries(commandGroups).forEach(([category, commands]) => {
     const group = createCategoryGroup(category, commands.length);
     commands.forEach(([commandKey, command]) => {
@@ -2558,6 +2599,56 @@ function renderCommandEditor() {
     roomEditor.append(group);
   });
   updateConfigSectionCounts();
+}
+
+function updateCommandCategoryFilter() {
+  if (!commandCategoryFilter) return;
+  const selected = commandCategoryFilter.value;
+  const categories = [...new Set(Object.values(getConfiguredCommands()).map((command) => command.category || command.function || 'Allgemein'))]
+    .sort((a, b) => displayPart(a).localeCompare(displayPart(b), 'de-CH'));
+  commandCategoryFilter.innerHTML = '<option value="">Alle Rubriken</option>';
+  categories.forEach((category) => {
+    const option = document.createElement('option');
+    option.value = category;
+    option.textContent = displayPart(category) || 'Allgemein';
+    commandCategoryFilter.append(option);
+  });
+  if (categories.includes(selected)) {
+    commandCategoryFilter.value = selected;
+  }
+}
+
+function filterConfiguredCommands(entries) {
+  const query = normalizeText(commandSearch?.value || '');
+  const category = commandCategoryFilter?.value || '';
+  const onlyInvalid = Boolean(commandOnlyInvalid?.checked);
+  return entries.filter(([commandKey, command]) => {
+    if (category && (command.category || command.function || 'Allgemein') !== category) return false;
+    if (onlyInvalid && !isCommandIncomplete(command)) return false;
+    if (!query) return true;
+    const target = getCommandTarget(command);
+    return [
+      commandKey,
+      command.label,
+      command.voiceName,
+      command.category,
+      command.room,
+      command.function,
+      command.action,
+      target.type,
+      target.uuid,
+      target.value,
+      target.path
+    ].some((value) => normalizeText(value).includes(query));
+  });
+}
+
+function isCommandIncomplete(command) {
+  const target = getCommandTarget(command);
+  if (!command.label && !command.voiceName) return true;
+  if (target.type === 'raw') return !target.path;
+  if (target.type === 'pulse') return !target.uuid;
+  return !target.uuid || !target.value;
 }
 
 function createCommandCard(commandKey, command) {
@@ -2569,8 +2660,16 @@ function createCommandCard(commandKey, command) {
   const head = document.createElement('summary');
   head.className = 'room-card-head';
 
+  const titleWrap = document.createElement('div');
+  titleWrap.className = 'command-summary-main';
+
   const title = document.createElement('strong');
   title.textContent = getCommandDisplayName(commandKey, command);
+
+  const meta = document.createElement('span');
+  meta.className = 'command-summary-meta';
+  meta.textContent = commandSummaryMeta(command);
+  titleWrap.append(title, meta);
 
   const deleteButton = document.createElement('button');
   deleteButton.type = 'button';
@@ -2581,11 +2680,12 @@ function createCommandCard(commandKey, command) {
     event.stopPropagation();
     card.remove();
     syncConfigFromForms();
+    markConfigDirty();
     renderCommandEditor();
     renderCommands();
   });
 
-  head.append(title, deleteButton);
+  head.append(titleWrap, deleteButton);
 
   const fields = document.createElement('div');
   fields.className = 'form-row three';
@@ -2652,6 +2752,18 @@ function createCommandCard(commandKey, command) {
   return card;
 }
 
+function commandSummaryMeta(command) {
+  const target = getCommandTarget(command);
+  const pieces = [
+    target.type,
+    command.room && displayPart(command.room),
+    command.action && displayPart(command.action),
+    target.type === 'raw' ? target.path : target.value,
+    command.enabled === false ? 'inaktiv' : 'aktiv'
+  ].filter(Boolean);
+  return pieces.join(' · ');
+}
+
 function addRoom() {
   const nextName = uniqueCommandName('neuer_befehl');
   config.commands ||= {};
@@ -2674,6 +2786,7 @@ function addRoom() {
   renderCommands();
   renderIntegrations();
   syncJsonFromForms();
+  markConfigDirty();
 }
 
 function renderIntegrations() {
@@ -2878,10 +2991,13 @@ function createEndpointCard({ title, method, url, body, note, testLabel, testAct
   card.append(header, urlLine, actions, noteEl);
 
   if (body) {
+    const bodyLabel = document.createElement('div');
+    bodyLabel.className = 'endpoint-body-label';
+    bodyLabel.textContent = 'Loxone sendet diesen Body:';
     const bodyEl = document.createElement('pre');
     bodyEl.className = 'endpoint-body';
     bodyEl.textContent = body;
-    card.append(bodyEl);
+    card.append(bodyLabel, bodyEl);
   }
 
   return card;

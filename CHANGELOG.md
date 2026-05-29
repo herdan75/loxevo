@@ -4,6 +4,10 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+- Konfigurationsbefehle um Suche, Rubrikfilter, Prüfung unvollständiger Befehle und kompakte Zusatzinfos in eingeklappten Zeilen ergänzt.
+- Ungespeicherte Konfigurationsänderungen werden deutlicher mit Speichern- und Verwerfen-Aktion angezeigt.
+- Register `Aufrufe & Geräte` klarer als Test-/Kopieransicht gegliedert; TTS-Vorlagen zeigen den HTTP-Body explizit als Beispiel.
+
 ## 1.0.4 - 2026-05-29
 
 - Leere Befehlsrubriken verschwinden direkt nach dem Entfernen des letzten Befehls aus der Konfigurationsansicht.

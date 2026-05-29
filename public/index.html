@@ -142,7 +142,7 @@
           <details class="config-section endpoint-block">
             <summary><span class="summary-label">Loxone-Befehle</span><span id="integrationCommandsCount" class="count-badge">0</span></summary>
             <div class="config-section-body">
-              <p>Diese Aufrufe lösen konfigurierte Loxone-Befehle aus. Geeignet für Loxone, Home Assistant, Node-RED oder andere lokale Systeme.</p>
+              <p>Hier testen und kopieren, nicht konfigurieren: Diese Aufrufe lösen die gespeicherten Loxone-Befehle aus und sind für Loxone, Home Assistant, Node-RED oder andere lokale Systeme gedacht.</p>
               <div id="lightEndpoints" class="endpoint-list"></div>
             </div>
           </details>
@@ -150,7 +150,7 @@
           <details class="config-section endpoint-block">
             <summary><span class="summary-label">TTS-Vorlagen</span><span id="integrationTtsCount" class="count-badge">0</span></summary>
             <div class="config-section-body">
-              <p>Diese Vorlagen zeigen, welche URL Loxone aufruft. Der eigentliche Text oder die Lautstärke wird im HTTP-Body gesendet.</p>
+              <p>Hier testen und kopieren, nicht konfigurieren: Diese Vorlagen zeigen die feste URL. Der eigentliche Text oder die Lautstärke wird von Loxone im HTTP-Body gesendet.</p>
               <div id="ttsEndpoints" class="endpoint-list"></div>
             </div>
           </details>
@@ -158,7 +158,7 @@
           <details class="config-section endpoint-block">
             <summary><span class="summary-label">Virtuelle Alexa-Geräte</span><span id="integrationAlexaDevicesCount" class="count-badge">0</span></summary>
             <div class="config-section-body">
-              <p>Diese Namen werden Alexa als virtuelle Geräte angeboten. Gesprochen wird typischerweise: „Alexa, &lt;Gerätename&gt; an”.</p>
+              <p>Hier kontrollieren, nicht konfigurieren: Diese Namen werden Alexa als virtuelle Geräte angeboten. Gesprochen wird typischerweise: „Alexa, &lt;Gerätename&gt; an”.</p>
               <div id="alexaDevices" class="endpoint-list"></div>
             </div>
           </details>
@@ -176,7 +176,16 @@
           </div>
           <button id="saveBtn">Konfiguration speichern</button>
         </div>
-        <div id="configDirtyNotice" class="service-status warning compact-status" hidden>Ungespeicherte Änderungen vorhanden.</div>
+        <div id="configDirtyNotice" class="dirty-notice" hidden>
+          <div>
+            <strong>Ungespeicherte Änderungen</strong>
+            <span>Die Änderungen sind erst nach dem Speichern aktiv.</span>
+          </div>
+          <div class="actions">
+            <button id="dirtySaveBtn" type="button">Änderungen speichern</button>
+            <button id="dirtyDiscardBtn" type="button" class="secondary">Änderungen verwerfen</button>
+          </div>
+        </div>
 
         <div class="config-sections">
           <details class="config-section">
@@ -308,6 +317,22 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
         <details class="config-section wide-fieldset">
           <summary><span class="summary-label">Befehle und Sprachnamen</span><span id="configCommandsCount" class="count-badge">0</span></summary>
           <div class="config-section-body">
+          <div class="command-tools">
+            <label>
+              Suche
+              <input id="commandSearch" type="search" placeholder="Name, Raum, Aktion, UUID oder Wert">
+            </label>
+            <label>
+              Rubrik
+              <select id="commandCategoryFilter">
+                <option value="">Alle Rubriken</option>
+              </select>
+            </label>
+            <label class="checkbox-row inline">
+              <input id="commandOnlyInvalid" type="checkbox">
+              <span>Nur unvollständige Befehle</span>
+            </label>
+          </div>
           <div id="roomEditor" class="room-editor"></div>
           <button id="addRoomBtn" type="button" class="secondary">Befehl hinzufügen</button>
           </div>

@@ -1758,9 +1758,56 @@ async function handleAlexa2LoxCompat(req, res, url) {
 function createAlexaBridge() {
   return new AlexaBridgeService(config, {
     getCommands: () => config.commands || {},
-    executeCommand: (commandKey) => executeConfiguredCommand(commandKey, 'alexa-command'),
+    executeCommand: executeAlexaBridgeCommand,
     addEvent
   });
+}
+
+async function executeAlexaBridgeCommand(commandKey) {
+  const result = await executeConfiguredCommand(commandKey, 'alexa-command');
+  triggerAlexaCommandConfirmation(result.key || commandKey);
+  return result;
+}
+
+function triggerAlexaCommandConfirmation(commandKey) {
+  const command = config.commands?.[normalizeKey(commandKey)];
+  const confirmation = command?.confirmation;
+  if (!confirmation?.enabled) return;
+
+  const text = normalizeTtsText(confirmation.text || 'OK');
+  if (!text) return;
+
+  const status = tts.getStatus();
+  if (!config.tts?.enabled || !status.ready) {
+    addEvent({
+      type: 'alexa-confirmation',
+      status: 'ignored',
+      key: normalizeKey(commandKey),
+      text,
+      error: status.error || 'TTS ist nicht bereit.'
+    });
+    return;
+  }
+
+  const targetDevices = firstNonEmpty(config.tts?.defaultDevices);
+  if (!targetDevices.length) {
+    addEvent({
+      type: 'alexa-confirmation',
+      status: 'ignored',
+      key: normalizeKey(commandKey),
+      text,
+      error: 'Keine Standard-TTS-Geraete konfiguriert.'
+    });
+    return;
+  }
+
+  tts.speak(text, targetDevices)
+    .then(() => {
+      addEvent({ type: 'alexa-confirmation', status: 'sent', key: normalizeKey(commandKey), text, devices: targetDevices });
+    })
+    .catch((error) => {
+      addEvent({ type: 'alexa-confirmation', status: 'error', key: normalizeKey(commandKey), text, error: error.message });
+    });
 }
 
 async function initAlexaBridge() {

@@ -34,6 +34,10 @@
         "uuid": "replace-with-loxone-lightcontroller-uuid",
         "value": "777"
       },
+      "confirmation": {
+        "enabled": false,
+        "text": "OK"
+      },
       "enabled": true
     },
     "rolladen_tv_auf": {

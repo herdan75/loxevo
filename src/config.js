@@ -64,6 +64,16 @@ function validateConfig(config) {
         }
       }
 
+      if (command.confirmation?.enabled) {
+        const confirmationText = String(command.confirmation.text || '').trim();
+        if (!confirmationText) {
+          throw new Error(`Rueckmeldungstext fuer Befehl "${commandName}" fehlt.`);
+        }
+        if (confirmationText.length > 300) {
+          throw new Error(`Rueckmeldungstext fuer Befehl "${commandName}" ist zu lang.`);
+        }
+      }
+
       if (target.type === 'raw') {
         if (!target.path) {
           throw new Error(`Loxone Pfad für Befehl "${commandName}" fehlt.`);
@@ -149,6 +159,19 @@ function normalizeConfig(config) {
       }
       if (command.alexaExpose !== false) {
         delete command.alexaExpose;
+      }
+      const confirmation = command.confirmation && typeof command.confirmation === 'object'
+        ? command.confirmation
+        : {};
+      const confirmationEnabled = confirmation.enabled === true;
+      const confirmationText = String(confirmation.text || '').trim();
+      if (confirmationEnabled) {
+        command.confirmation = {
+          enabled: true,
+          text: confirmationText || 'OK'
+        };
+      } else {
+        delete command.confirmation;
       }
     }
   }

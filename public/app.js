@@ -2718,7 +2718,9 @@ function filterConfiguredCommands(entries) {
       command.function,
       command.action,
       command.offCommand,
+      command.confirmation?.text,
       command.alexaExpose === false ? 'intern' : 'alexa',
+      command.confirmation?.enabled ? 'rueckmeldung' : '',
       target.type,
       target.uuid,
       target.value,
@@ -2854,6 +2856,19 @@ function createCommandCard(commandKey, command) {
   alexa.querySelector('.command-off-command').value = command.offCommand || '';
   alexa.querySelector('.command-alexa-expose').checked = command.alexaExpose !== false;
 
+  const confirmation = document.createElement('div');
+  confirmation.className = 'form-row two';
+  confirmation.innerHTML = `
+    <label class="option-label">
+      <span class="option-label-head">Rueckmeldung<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Rueckmeldung erklaeren">i</button></span>
+      <span class="checkbox-row inline"><input class="command-confirmation-enabled" type="checkbox"><span>Nach Alexa-Befehl sprechen</span></span>
+      <span class="compact-help inline-help-text" hidden>Wenn aktiv, spricht LoxEvo nach einem erfolgreichen Alexa-Befehl den Rueckmeldungstext ueber die Standard-TTS-Geraete. Der Loxone-Befehl und die Alexa-Antwort werden dadurch nicht blockiert; die Ausgabe kommt so schnell, wie Alexa TTS gerade reagiert.</span>
+    </label>
+    <label>Rueckmeldungstext<input class="command-confirmation-text" type="text" maxlength="300" placeholder="OK"></label>
+  `;
+  confirmation.querySelector('.command-confirmation-enabled').checked = command.confirmation?.enabled === true;
+  confirmation.querySelector('.command-confirmation-text').value = command.confirmation?.text || 'OK';
+
   const raw = document.createElement('div');
   raw.className = 'form-row';
   raw.innerHTML = `
@@ -2865,7 +2880,7 @@ function createCommandCard(commandKey, command) {
   `;
   raw.querySelector('.command-path').value = target.path;
 
-  card.append(head, fields, details, loxone, alexa, raw);
+  card.append(head, fields, details, loxone, alexa, confirmation, raw);
   initInlineHelpButtons(card);
   updatePathFieldState(card);
   return card;
@@ -2891,6 +2906,7 @@ function commandSummaryMeta(command) {
     alexaMode,
     command.alexaExpose === false ? 'intern' : 'Alexa',
     command.offCommand ? `Aus: ${command.offCommand}` : '',
+    command.confirmation?.enabled ? `Rueckmeldung: ${command.confirmation.text || 'OK'}` : '',
     target.type,
     command.room && displayPart(command.room),
     command.action && displayPart(command.action),
@@ -3287,6 +3303,8 @@ function collectCommands() {
     const alexaMode = card.querySelector('.command-alexa-mode')?.value || 'switch';
     const offCommand = normalizeInputKey(card.querySelector('.command-off-command')?.value || '');
     const alexaExpose = card.querySelector('.command-alexa-expose')?.checked !== false;
+    const confirmationEnabled = card.querySelector('.command-confirmation-enabled')?.checked === true;
+    const confirmationText = card.querySelector('.command-confirmation-text')?.value.trim() || 'OK';
 
     commands[commandKey] = {
       label: card.querySelector('.command-label').value.trim() || commandKey,
@@ -3298,6 +3316,7 @@ function collectCommands() {
       ...(alexaMode === 'action' ? { alexaMode: 'action' } : {}),
       ...(offCommand ? { offCommand } : {}),
       ...(alexaExpose ? {} : { alexaExpose: false }),
+      ...(confirmationEnabled ? { confirmation: { enabled: true, text: confirmationText } } : {}),
       loxone: {
         type: loxoneType,
         uuid: normalizeLoxoneUuidInput(card.querySelector('.command-uuid').value),

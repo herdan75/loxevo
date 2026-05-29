@@ -260,6 +260,8 @@ Pro Befehl kann ausserdem gesteuert werden, ob er als eigenes Alexa-Gerät angeb
 
 Wenn ein Aus-Befehl nicht als Alexa-Gerät angeboten wird, braucht Alexa trotzdem ein sichtbares Ziel für die Sprache. Für Sätze wie `Alexa, Licht Küche aus` empfiehlt sich entweder ein sichtbares Basis-Gerät `Licht Küche` mit passendem Aus-Befehl oder eine Alexa-Gruppe `Küche`, in der die sichtbaren Küchen-Geräte liegen.
 
+Optional kann pro Befehl eine TTS-Rueckmeldung aktiviert werden. Dann spricht LoxEvo nach einem erfolgreichen Alexa-Befehl den hinterlegten Text, zum Beispiel `OK`, ueber die Standard-TTS-Geraete. Der eigentliche Loxone-Befehl und die Alexa-Antwort werden dadurch nicht blockiert; die Rueckmeldung laeuft im Hintergrund und kommt so schnell, wie Alexa TTS gerade reagiert. Das ist kein natives Alexa-Acknowledge der Hue-Emulation, sondern eine LoxEvo-Rueckmeldung ueber die konfigurierte TTS-Funktion.
+
 ### Licht aus bei Szenen
 
 Für Licht-Szenen gibt es mehrere sinnvolle Varianten. Welche besser passt, hängt davon ab, ob Alexa den Aus-Befehl als eigenes Gerät sehen soll oder ob LoxEvo ihn nur intern nutzen soll.

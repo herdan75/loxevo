@@ -2831,7 +2831,7 @@ function createCommandCard(commandKey, command) {
   loxone.querySelector('.command-type').addEventListener('change', () => updatePathFieldState(card));
 
   const alexa = document.createElement('div');
-  alexa.className = 'form-row three';
+  alexa.className = 'form-row command-alexa-grid';
   alexa.innerHTML = `
     <label class="option-label">
       <span class="option-label-head">Alexa-Modus<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Alexa-Modus erklären">i</button></span>
@@ -2851,23 +2851,20 @@ function createCommandCard(commandKey, command) {
       <span class="checkbox-row inline"><input class="command-alexa-expose" type="checkbox"><span>Als Alexa-Gerät anbieten</span></span>
       <span class="compact-help inline-help-text" hidden>Wenn aktiv, wird dieser aktive Befehl bei der Alexa-Gerätesuche als eigenes virtuelles Gerät in der Alexa-App sichtbar und kann dort für Sprache, App-Bedienung und Routinen genutzt werden. Wenn deaktiviert, bleibt der Befehl nur innerhalb von LoxEvo nutzbar, sofern Befehl verwenden aktiv ist. Befehle, die im Feld Aus-Befehl beim Ausschalten eingetragen werden, sollten meist nicht zusätzlich als Alexa-Gerät angeboten werden, sonst können Gruppen oder Routinen denselben Aus-Befehl doppelt auslösen.</span>
     </label>
+    <div class="option-label command-confirmation-block">
+      <span class="option-label-head">Rückmeldung<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Rückmeldung erklären">i</button></span>
+      <div class="command-confirmation-control">
+        <label class="checkbox-row inline"><input class="command-confirmation-enabled" type="checkbox"><span>Sprechen</span></label>
+        <input class="command-confirmation-text" type="text" maxlength="300" placeholder="OK">
+      </div>
+      <span class="compact-help inline-help-text" hidden>Wenn aktiv, spricht LoxEvo nach einem erfolgreichen Alexa-Befehl den Rückmeldungstext über die Standard-TTS-Geräte. Der Loxone-Befehl und die Alexa-Antwort werden dadurch nicht blockiert; die Ausgabe kommt so schnell, wie Alexa TTS gerade reagiert.</span>
+    </div>
   `;
   alexa.querySelector('.command-alexa-mode').value = command.alexaMode === 'action' ? 'action' : 'switch';
   alexa.querySelector('.command-off-command').value = command.offCommand || '';
   alexa.querySelector('.command-alexa-expose').checked = command.alexaExpose !== false;
-
-  const confirmation = document.createElement('div');
-  confirmation.className = 'form-row two';
-  confirmation.innerHTML = `
-    <label class="option-label">
-      <span class="option-label-head">Rueckmeldung<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Rueckmeldung erklaeren">i</button></span>
-      <span class="checkbox-row inline"><input class="command-confirmation-enabled" type="checkbox"><span>Nach Alexa-Befehl sprechen</span></span>
-      <span class="compact-help inline-help-text" hidden>Wenn aktiv, spricht LoxEvo nach einem erfolgreichen Alexa-Befehl den Rueckmeldungstext ueber die Standard-TTS-Geraete. Der Loxone-Befehl und die Alexa-Antwort werden dadurch nicht blockiert; die Ausgabe kommt so schnell, wie Alexa TTS gerade reagiert.</span>
-    </label>
-    <label>Rueckmeldungstext<input class="command-confirmation-text" type="text" maxlength="300" placeholder="OK"></label>
-  `;
-  confirmation.querySelector('.command-confirmation-enabled').checked = command.confirmation?.enabled === true;
-  confirmation.querySelector('.command-confirmation-text').value = command.confirmation?.text || 'OK';
+  alexa.querySelector('.command-confirmation-enabled').checked = command.confirmation?.enabled === true;
+  alexa.querySelector('.command-confirmation-text').value = command.confirmation?.text || 'OK';
 
   const raw = document.createElement('div');
   raw.className = 'form-row';
@@ -2880,7 +2877,7 @@ function createCommandCard(commandKey, command) {
   `;
   raw.querySelector('.command-path').value = target.path;
 
-  card.append(head, fields, details, loxone, alexa, confirmation, raw);
+  card.append(head, fields, details, loxone, alexa, raw);
   initInlineHelpButtons(card);
   updatePathFieldState(card);
   return card;

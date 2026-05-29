@@ -1349,6 +1349,26 @@ input[type='range'] {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.form-row.command-alexa-grid {
+  grid-template-columns:
+    minmax(180px, 1fr)
+    minmax(240px, 1.3fr)
+    minmax(180px, 0.9fr)
+    minmax(240px, 1.2fr);
+  align-items: start;
+}
+
+.command-confirmation-control {
+  display: grid;
+  grid-template-columns: auto minmax(110px, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.command-confirmation-control .checkbox-row.inline {
+  min-height: 42px;
+}
+
 .section-head.compact {
   align-items: center;
   gap: 12px;
@@ -1971,6 +1991,7 @@ pre {
   .form-row,
   .form-row.three,
   .form-row.four,
+  .form-row.command-alexa-grid,
   .backup-grid,
   .maintenance-tools,
   .preflight-check,

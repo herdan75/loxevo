@@ -2831,10 +2831,14 @@ function createCommandCard(commandKey, command) {
   const alexa = document.createElement('div');
   alexa.className = 'form-row three';
   alexa.innerHTML = `
-    <label>Alexa-Modus<select class="command-alexa-mode">
-      <option value="switch">Schalter: Ein/Aus</option>
-      <option value="action">Aktion: nur Einschalten ausführen</option>
-    </select></label>
+    <label class="option-label">
+      <span class="option-label-head">Alexa-Modus<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Alexa-Modus erklären">i</button></span>
+      <select class="command-alexa-mode">
+        <option value="switch">Schalter: Ein/Aus</option>
+        <option value="action">Aktion: nur Einschalten ausführen</option>
+      </select>
+      <span class="compact-help inline-help-text" hidden>Schalter verwendet Ein und Aus. Beim Ausschalten nutzt LoxEvo zuerst den optionalen Aus-Befehl, sonst einen passenden Aus-Befehl im gleichen Raum und mit gleicher Funktion. Aktion ist ein einzelnes Signal: Einschalten löst den Befehl aus, Ausschalten wird ignoriert.</span>
+    </label>
     <label class="option-label">
       <span class="option-label-head">Aus-Befehl (optional)<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Aus-Befehl erklären">i</button></span>
       <input class="command-off-command" type="text" placeholder="z. B. kueche_licht_aus">
@@ -2845,7 +2849,6 @@ function createCommandCard(commandKey, command) {
       <span class="checkbox-row inline"><input class="command-alexa-expose" type="checkbox"><span>Als Alexa-Gerät anbieten</span></span>
       <span class="compact-help inline-help-text" hidden>Wenn aktiv, wird dieser aktive Befehl bei der Alexa-Gerätesuche als eigenes virtuelles Gerät in der Alexa-App sichtbar und kann dort für Sprache, App-Bedienung und Routinen genutzt werden. Wenn deaktiviert, bleibt der Befehl nur innerhalb von LoxEvo nutzbar, sofern Befehl verwenden aktiv ist. Das ist sinnvoll für interne Hilfsbefehle, zum Beispiel einen zentralen Aus-Befehl.</span>
     </label>
-    <p class="field-hint">Schalter verwendet Ein und Aus. Beim Ausschalten nutzt LoxEvo zuerst den optionalen Aus-Befehl, sonst einen passenden Aus-Befehl im gleichen Raum und mit gleicher Funktion. Aktion ist ein einzelnes Signal: Einschalten löst den Befehl aus, Ausschalten wird ignoriert. Befehle ohne Alexa-Gerät bleiben intern aktiv und können weiter zum Testen, für URLs oder als Aus-Befehl genutzt werden.</p>
   `;
   alexa.querySelector('.command-alexa-mode').value = command.alexaMode === 'action' ? 'action' : 'switch';
   alexa.querySelector('.command-off-command').value = command.offCommand || '';
@@ -2854,8 +2857,11 @@ function createCommandCard(commandKey, command) {
   const raw = document.createElement('div');
   raw.className = 'form-row';
   raw.innerHTML = `
-    <label>Spezialpfad (nur bei raw)<input class="command-path" type="text" placeholder="Nur bei Befehlstyp raw aktiv"></label>
-    <p class="field-hint">Für changeTo, direct und pulse reichen UUID und Wert/Befehl. Raw ist nur für spezielle Loxone-Pfade gedacht, die nicht in dieses Schema passen.</p>
+    <label class="option-label">
+      <span class="option-label-head">Spezialpfad (nur bei raw)<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Spezialpfad erklären">i</button></span>
+      <input class="command-path" type="text" placeholder="Nur bei Befehlstyp raw aktiv">
+      <span class="compact-help inline-help-text" hidden>Dieses Feld wird nur beim Befehlstyp raw verwendet. Für changeTo, direct und pulse reichen UUID und Wert/Befehl. Raw ist für komplette Loxone-Pfade gedacht, zum Beispiel spezielle Befehle wie FullUp oder FullDown.</span>
+    </label>
   `;
   raw.querySelector('.command-path').value = target.path;
 

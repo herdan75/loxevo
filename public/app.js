@@ -241,7 +241,6 @@ async function load() {
     const response = await adminFetch('/api/config');
     await ensureOk(response);
     config = await response.json();
-    savedConfigSnapshot = structuredClone(config);
     populateForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     await loadTtsStatus();
@@ -256,6 +255,7 @@ async function load() {
     renderIntegrations();
     syncJsonFromForms();
     await loadEvents();
+    captureSavedConfigSnapshot();
     markConfigClean();
     renderDashboard();
   } catch (error) {
@@ -317,7 +317,6 @@ async function saveConfig(button) {
     setButtonFeedback(button, 'pending', 'Speichert');
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
-    savedConfigSnapshot = structuredClone(config);
     populateForms();
     syncJsonFromForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
@@ -330,6 +329,7 @@ async function saveConfig(button) {
     await loadSetupStatus();
     await loadPreflightStatus();
     renderIntegrations();
+    captureSavedConfigSnapshot();
     markConfigClean();
     renderDashboard();
     setButtonFeedback(button, 'success', 'Gespeichert');
@@ -353,7 +353,6 @@ async function saveJsonConfig(button) {
     setButtonFeedback(button, 'pending', 'Speichert');
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
-    savedConfigSnapshot = structuredClone(config);
     populateForms();
     syncJsonFromForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
@@ -366,6 +365,7 @@ async function saveJsonConfig(button) {
     await loadSetupStatus();
     await loadPreflightStatus();
     renderIntegrations();
+    captureSavedConfigSnapshot();
     markConfigClean();
     renderDashboard();
     setButtonFeedback(button, 'success', 'Gespeichert');
@@ -462,6 +462,14 @@ function markConfigClean() {
   configDirtyRenderTimer = null;
   updateConfigDirtyNotice();
   renderBackupReminder();
+}
+
+function captureSavedConfigSnapshot() {
+  try {
+    savedConfigSnapshot = collectConfigFromForms();
+  } catch {
+    savedConfigSnapshot = structuredClone(config);
+  }
 }
 
 function discardConfigChanges() {
@@ -652,6 +660,7 @@ async function importBackup(button) {
     renderIntegrations();
     await loadEvents();
     if (importBackupFile) importBackupFile.value = '';
+    captureSavedConfigSnapshot();
     markConfigClean();
     renderDashboard();
 

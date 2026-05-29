@@ -451,7 +451,7 @@ function normalizeText(value) {
 
 function markConfigDirty() {
   if (!config) return;
-  configDirty = true;
+  configDirty = hasConfigChangedFromSnapshot();
   updateConfigDirtyNotice();
   scheduleConfigDirtyRefresh();
 }
@@ -482,6 +482,28 @@ function discardConfigChanges() {
 function updateConfigDirtyNotice() {
   if (!configDirtyNotice) return;
   configDirtyNotice.hidden = !configDirty;
+}
+
+function hasConfigChangedFromSnapshot() {
+  if (!savedConfigSnapshot) return false;
+  try {
+    return stableJsonStringify(collectConfigFromForms()) !== stableJsonStringify(savedConfigSnapshot);
+  } catch {
+    return true;
+  }
+}
+
+function stableJsonStringify(value) {
+  return JSON.stringify(sortJsonValue(value));
+}
+
+function sortJsonValue(value) {
+  if (Array.isArray(value)) return value.map(sortJsonValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.keys(value).sort().reduce((result, key) => {
+    result[key] = sortJsonValue(value[key]);
+    return result;
+  }, {});
 }
 
 function scheduleConfigDirtyRefresh() {
@@ -903,16 +925,18 @@ function setButtonFeedback(button, state, label) {
     button.disabled = true;
     button.textContent = label;
     button.classList.add('action-pending');
+    button.classList.add('is-loading');
     return;
   }
 
   button.disabled = false;
+  button.classList.remove('is-loading');
   button.textContent = label;
   button.classList.add(state === 'error' ? 'action-error' : 'action-success');
 
   button.dataset.feedbackTimer = String(window.setTimeout(() => {
     button.textContent = button.dataset.defaultLabel;
-    button.classList.remove('action-pending', 'action-success', 'action-error');
+    button.classList.remove('action-pending', 'action-success', 'action-error', 'is-loading');
     button.style.minWidth = '';
     delete button.dataset.feedbackWidth;
     delete button.dataset.feedbackTimer;

@@ -1730,8 +1730,12 @@ button:hover {
 }
 
 button:disabled {
-  cursor: wait;
+  cursor: default;
   opacity: 0.92;
+}
+
+button.is-loading:disabled {
+  cursor: wait;
 }
 
 button.secondary {

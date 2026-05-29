@@ -2842,12 +2842,12 @@ function createCommandCard(commandKey, command) {
     <label class="option-label">
       <span class="option-label-head">Aus-Befehl (optional)<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Aus-Befehl erklären">i</button></span>
       <input class="command-off-command" type="text" placeholder="z. B. kueche_licht_aus">
-      <span class="compact-help inline-help-text" hidden>Dieser Befehl wird ausgeführt, wenn dieses Alexa-Schaltergerät ausgeschaltet wird. Der eingetragene Aus-Befehl muss in LoxEvo vorhanden und aktiv sein. Er muss nicht als Alexa-Gerät angeboten werden; er kann also intern bleiben.</span>
+      <span class="compact-help inline-help-text" hidden>Dieser Befehl wird ausgeführt, wenn dieses Alexa-Schaltergerät ausgeschaltet wird. Der eingetragene Aus-Befehl muss in LoxEvo vorhanden und aktiv sein. Er muss normalerweise nicht als Alexa-Gerät angeboten werden; für interne Aus-Befehle ist es meist besser, ihn in Alexa auszublenden.</span>
     </label>
     <label class="option-label">
       <span class="option-label-head">Alexa-Gerät<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Alexa-Gerät anbieten erklären">i</button></span>
       <span class="checkbox-row inline"><input class="command-alexa-expose" type="checkbox"><span>Als Alexa-Gerät anbieten</span></span>
-      <span class="compact-help inline-help-text" hidden>Wenn aktiv, wird dieser aktive Befehl bei der Alexa-Gerätesuche als eigenes virtuelles Gerät in der Alexa-App sichtbar und kann dort für Sprache, App-Bedienung und Routinen genutzt werden. Wenn deaktiviert, bleibt der Befehl nur innerhalb von LoxEvo nutzbar, sofern Befehl verwenden aktiv ist. Das ist sinnvoll für interne Hilfsbefehle, zum Beispiel einen zentralen Aus-Befehl.</span>
+      <span class="compact-help inline-help-text" hidden>Wenn aktiv, wird dieser aktive Befehl bei der Alexa-Gerätesuche als eigenes virtuelles Gerät in der Alexa-App sichtbar und kann dort für Sprache, App-Bedienung und Routinen genutzt werden. Wenn deaktiviert, bleibt der Befehl nur innerhalb von LoxEvo nutzbar, sofern Befehl verwenden aktiv ist. Interne Aus-Befehle sollten meist nicht zusätzlich als Alexa-Gerät angeboten werden, sonst können Gruppen oder Routinen denselben Aus-Befehl doppelt auslösen.</span>
     </label>
   `;
   alexa.querySelector('.command-alexa-mode').value = command.alexaMode === 'action' ? 'action' : 'switch';

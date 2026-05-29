@@ -1262,6 +1262,28 @@ label.is-disabled {
   line-height: 1.35;
 }
 
+.option-label {
+  align-content: start;
+}
+
+.option-label-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.option-label .inline-help-button {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+}
+
+.option-label .compact-help {
+  margin-top: 2px;
+  font-weight: 400;
+}
+
 .section-note {
   margin: 10px 0 12px;
   color: var(--muted);

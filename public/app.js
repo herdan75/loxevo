@@ -2807,7 +2807,11 @@ function createCommandCard(commandKey, command) {
     </select></label>
     <label>Loxone UUID (nur UUID)<input class="command-uuid" type="text" placeholder="2030c0ad-02a5-5919-ffffba27bfcae6ca"></label>
     <label>Wert/Befehl<input class="command-value" type="text"></label>
-    <label>Aktiv<span class="checkbox-row inline"><input class="command-enabled" type="checkbox"><span>Befehl verwenden</span></span></label>
+    <label class="option-label">
+      <span class="option-label-head">Aktiv<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Befehl verwenden erklären">i</button></span>
+      <span class="checkbox-row inline"><input class="command-enabled" type="checkbox"><span>Befehl verwenden</span></span>
+      <span class="compact-help inline-help-text" hidden>Aktiv bedeutet: LoxEvo darf diesen Befehl ausführen und in Tests, Aufrufen und internen Zuordnungen verwenden. Ist der Haken entfernt, bleibt der Eintrag gespeichert, wird aber nicht ausgeführt und nicht als Alexa-Gerät angeboten.</span>
+    </label>
   `;
   loxone.querySelector('.command-type').value = target.type;
   const uuidInput = loxone.querySelector('.command-uuid');
@@ -2832,7 +2836,11 @@ function createCommandCard(commandKey, command) {
       <option value="action">Aktion: nur Einschalten ausführen</option>
     </select></label>
     <label>Aus-Befehl (optional)<input class="command-off-command" type="text" placeholder="z. B. kueche_licht_aus"></label>
-    <label>Alexa-Gerät<span class="checkbox-row inline"><input class="command-alexa-expose" type="checkbox"><span>Als Alexa-Gerät anbieten</span></span></label>
+    <label class="option-label">
+      <span class="option-label-head">Alexa-Gerät<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Alexa-Gerät anbieten erklären">i</button></span>
+      <span class="checkbox-row inline"><input class="command-alexa-expose" type="checkbox"><span>Als Alexa-Gerät anbieten</span></span>
+      <span class="compact-help inline-help-text" hidden>Wenn aktiv, wird dieser Befehl bei der Alexa-Gerätesuche als eigenes virtuelles Gerät sichtbar. Wenn deaktiviert, bleibt der Befehl in LoxEvo aktiv, erscheint aber nicht in der Alexa-App. Das ist sinnvoll für interne Hilfsbefehle, zum Beispiel einen zentralen Aus-Befehl.</span>
+    </label>
     <p class="field-hint">Schalter verwendet Ein und Aus. Beim Ausschalten nutzt LoxEvo zuerst den optionalen Aus-Befehl, sonst einen passenden Aus-Befehl im gleichen Raum und mit gleicher Funktion. Aktion ist ein einzelnes Signal: Einschalten löst den Befehl aus, Ausschalten wird ignoriert. Befehle ohne Alexa-Gerät bleiben intern aktiv und können weiter zum Testen, für URLs oder als Aus-Befehl genutzt werden.</p>
   `;
   alexa.querySelector('.command-alexa-mode').value = command.alexaMode === 'action' ? 'action' : 'switch';
@@ -2848,8 +2856,22 @@ function createCommandCard(commandKey, command) {
   raw.querySelector('.command-path').value = target.path;
 
   card.append(head, fields, details, loxone, alexa, raw);
+  initInlineHelpButtons(card);
   updatePathFieldState(card);
   return card;
+}
+
+function initInlineHelpButtons(scope) {
+  scope.querySelectorAll('.inline-help-button').forEach((button) => {
+    const help = button.closest('.option-label')?.querySelector('.inline-help-text');
+    if (!help) return;
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      help.hidden = !help.hidden;
+      button.setAttribute('aria-expanded', String(!help.hidden));
+    });
+  });
 }
 
 function commandSummaryMeta(command) {

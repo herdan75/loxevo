@@ -271,6 +271,12 @@ export class AlexaBridgeService {
     const source = commands[commandKey];
     if (!source || isOffAction(source.action)) return null;
 
+    const explicitOffCommand = normalizeCommandKey(source.offCommand);
+    if (explicitOffCommand) {
+      const target = commands[explicitOffCommand];
+      if (target?.enabled !== false) return explicitOffCommand;
+    }
+
     const sourceRoom = normalizeCommandPart(source.room);
     const sourceFunction = normalizeCommandPart(source.function);
     if (!sourceRoom || !sourceFunction) return null;
@@ -547,7 +553,7 @@ export class AlexaBridgeService {
     const bridgeId = this.getBridgeId();
     const usedIds = new Set();
     return Object.entries(commands)
-      .filter(([, command]) => command.enabled !== false)
+      .filter(([, command]) => command.enabled !== false && command.alexaExpose !== false)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([commandKey, command]) => {
         const id = makeStableDeviceId(commandKey, usedIds);
@@ -657,6 +663,10 @@ function displayPart(value) {
 
 function normalizeCommandPart(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function normalizeCommandKey(value) {
+  return String(value || '').trim();
 }
 
 function isOffAction(value) {

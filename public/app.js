@@ -2717,6 +2717,8 @@ function filterConfiguredCommands(entries) {
       command.room,
       command.function,
       command.action,
+      command.offCommand,
+      command.alexaExpose === false ? 'intern' : 'alexa',
       target.type,
       target.uuid,
       target.value,
@@ -2823,15 +2825,19 @@ function createCommandCard(commandKey, command) {
   loxone.querySelector('.command-type').addEventListener('change', () => updatePathFieldState(card));
 
   const alexa = document.createElement('div');
-  alexa.className = 'form-row';
+  alexa.className = 'form-row three';
   alexa.innerHTML = `
     <label>Alexa-Modus<select class="command-alexa-mode">
       <option value="switch">Schalter: Ein/Aus</option>
       <option value="action">Aktion: nur Einschalten ausführen</option>
     </select></label>
-    <p class="field-hint">Schalter sucht beim Ausschalten einen passenden Aus-Befehl im gleichen Raum und mit gleicher Funktion. Aktion ist für Taster, Szenen oder Roboterbefehle gedacht: Einschalten löst aus, Ausschalten wird ignoriert.</p>
+    <label>Aus-Befehl (optional)<input class="command-off-command" type="text" placeholder="z. B. kueche_licht_aus"></label>
+    <label>Alexa-Gerät<span class="checkbox-row inline"><input class="command-alexa-expose" type="checkbox"><span>Als Alexa-Gerät anbieten</span></span></label>
+    <p class="field-hint">Schalter sucht beim Ausschalten zuerst den optionalen Aus-Befehl, sonst einen passenden Aus-Befehl im gleichen Raum und mit gleicher Funktion. Aktion ist für Taster, Szenen oder Roboterbefehle gedacht: Einschalten löst aus, Ausschalten wird ignoriert. Befehle ohne Alexa-Gerät bleiben intern aktiv und können weiter zum Testen, für URLs oder als Aus-Befehl genutzt werden.</p>
   `;
   alexa.querySelector('.command-alexa-mode').value = command.alexaMode === 'action' ? 'action' : 'switch';
+  alexa.querySelector('.command-off-command').value = command.offCommand || '';
+  alexa.querySelector('.command-alexa-expose').checked = command.alexaExpose !== false;
 
   const raw = document.createElement('div');
   raw.className = 'form-row';
@@ -2850,6 +2856,8 @@ function commandSummaryMeta(command) {
   const alexaMode = command.alexaMode === 'action' ? 'Aktion' : 'Schalter';
   const pieces = [
     alexaMode,
+    command.alexaExpose === false ? 'intern' : 'Alexa',
+    command.offCommand ? `Aus: ${command.offCommand}` : '',
     target.type,
     command.room && displayPart(command.room),
     command.action && displayPart(command.action),
@@ -3243,6 +3251,9 @@ function collectCommands() {
     const commandKey = normalizeInputKey(card.querySelector('.command-key').value);
     if (!commandKey) return;
     const loxoneType = card.querySelector('.command-type').value;
+    const alexaMode = card.querySelector('.command-alexa-mode')?.value || 'switch';
+    const offCommand = normalizeInputKey(card.querySelector('.command-off-command')?.value || '');
+    const alexaExpose = card.querySelector('.command-alexa-expose')?.checked !== false;
 
     commands[commandKey] = {
       label: card.querySelector('.command-label').value.trim() || commandKey,
@@ -3251,7 +3262,9 @@ function collectCommands() {
       room: normalizeInputKey(card.querySelector('.command-room').value),
       function: normalizeInputKey(card.querySelector('.command-function').value),
       action: normalizeInputKey(card.querySelector('.command-action').value),
-      ...(card.querySelector('.command-alexa-mode')?.value === 'action' ? { alexaMode: 'action' } : {}),
+      ...(alexaMode === 'action' ? { alexaMode: 'action' } : {}),
+      ...(offCommand ? { offCommand } : {}),
+      ...(alexaExpose ? {} : { alexaExpose: false }),
       loxone: {
         type: loxoneType,
         uuid: normalizeLoxoneUuidInput(card.querySelector('.command-uuid').value),
@@ -3274,16 +3287,17 @@ function configSaveSummary(nextConfig) {
   const commandCount = activeCommands.length;
   const actionCount = activeCommands.filter((command) => command?.alexaMode === 'action').length;
   const switchCount = commandCount - actionCount;
+  const exposedCount = activeCommands.filter((command) => command?.alexaExpose !== false).length;
   const defaultCount = Array.isArray(nextConfig.tts?.defaultDevices) ? nextConfig.tts.defaultDevices.length : 0;
   const allCount = Array.isArray(nextConfig.tts?.allDevices) ? nextConfig.tts.allDevices.length : 0;
   const alarmCount = Array.isArray(nextConfig.tts?.alarmDevices) ? nextConfig.tts.alarmDevices.length : 0;
-  const virtualDeviceCount = nextConfig.alexaBridge?.enabled ? commandCount : 0;
+  const virtualDeviceCount = nextConfig.alexaBridge?.enabled ? exposedCount : 0;
   const modeText = nextConfig.loxone?.dryRun === false ? 'Live-Modus aktiv' : 'Dry-Run aktiv';
   const ttsText = nextConfig.tts?.enabled
     ? `${defaultCount} Standard-, ${allCount} Alle- und ${alarmCount} Alarm-Gerät(e)`
     : 'TTS deaktiviert';
   const bridgeText = nextConfig.alexaBridge?.enabled
-    ? `${virtualDeviceCount} virtuelle Alexa-Gerät(e)`
+    ? `${virtualDeviceCount} virtuelle Alexa-Gerät(e) aus ${commandCount} aktiven Befehl(en)`
     : 'Virtuelle Alexa-Geräte deaktiviert';
 
   return [

@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: Source available](https://img.shields.io/badge/License-source--available-orange.svg)](LICENSE)
 
-> **Status: Version 1.0.5 / erste lauffähige Version**
+> **Status: Version 1.0.6 / erste lauffähige Version**
 >
 > LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die wichtigsten Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte und Alexa-TTS sind umgesetzt und getestet. Trotzdem können noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
@@ -255,6 +255,70 @@ Alexa, <Gerätename> an
 
 LoxEvo bietet zwei Alexa-Modi pro Befehl. Ohne Angabe gilt `switch`: `an` löst den Befehl aus, `aus` sucht einen passenden Aus-Befehl mit gleichem Raum und gleicher Funktion. Für Taster, Szenen, Roboter- oder andere Einmalaktionen kann in der Web-UI `action` gewählt werden. Dann löst nur `an` den Befehl aus, `aus` wird bewusst ignoriert und der interne virtuelle Zustand wird kurz danach wieder zurückgesetzt.
 Wichtig: Wegen der lokalen Hue-Emulation sieht Alexa auch `action` weiterhin als On/Off-Gerät. Ein echter Alexa-Button oder Skill-Gerätetyp kann über diese Schnittstelle nicht übergeben werden.
+
+Pro Befehl kann ausserdem gesteuert werden, ob er als eigenes Alexa-Gerät angeboten wird. Das ist vor allem für interne Aus-Befehle praktisch: Ein Befehl wie `kueche_licht_aus` kann aktiv bleiben, muss aber nicht als separates Gerät in der Alexa-App erscheinen. Sichtbare `switch`-Befehle können über `Aus-Befehl (optional)` explizit auf diesen internen Aus-Befehl verweisen; ohne Angabe sucht LoxEvo weiterhin automatisch nach einem aktiven Aus-Befehl mit gleichem Raum und gleicher Funktion. `action`-Befehle nutzen keinen Aus-Befehl, damit Einmalaktionen wie Roboter, Szenen oder Taster nicht versehentlich beim Ausschalten etwas auslösen.
+
+Wenn ein Aus-Befehl nicht als Alexa-Gerät angeboten wird, braucht Alexa trotzdem ein sichtbares Ziel für die Sprache. Für Sätze wie `Alexa, Licht Küche aus` empfiehlt sich entweder ein sichtbares Basis-Gerät `Licht Küche` mit passendem Aus-Befehl oder eine Alexa-Gruppe `Küche`, in der die sichtbaren Küchen-Geräte liegen.
+
+### Licht aus bei Szenen
+
+Für Licht-Szenen gibt es mehrere sinnvolle Varianten. Welche besser passt, hängt davon ab, ob Alexa den Aus-Befehl als eigenes Gerät sehen soll oder ob LoxEvo ihn nur intern nutzen soll.
+
+Variante 1: Separates Alexa-Gerät für `Aus`.
+
+Beispiel:
+
+```text
+Licht Küche Ambient
+Licht Küche Hell
+Licht Küche Nacht
+Licht Küche Aus
+```
+
+Vorteil: Der Aus-Befehl ist in der Alexa-App sichtbar und kann direkt in Routinen verwendet werden. Nachteil: In der Alexa-App erscheint ein zusätzliches Gerät, das eigentlich nur ein interner Loxone-Befehl ist. Das kann bei vielen Räumen unübersichtlich werden.
+
+Variante 2: Interner Aus-Befehl in LoxEvo, aber nicht als Alexa-Gerät anbieten.
+
+Beispiel:
+
+```text
+kueche_licht_aus
+Aktiv: ja
+Als Alexa-Gerät anbieten: nein
+```
+
+Die sichtbaren Szenen bleiben `switch`-Befehle und verweisen über `Aus-Befehl (optional)` auf `kueche_licht_aus`:
+
+```text
+kueche_licht_ambient -> Aus-Befehl: kueche_licht_aus
+kueche_licht_hell    -> Aus-Befehl: kueche_licht_aus
+kueche_licht_nacht   -> Aus-Befehl: kueche_licht_aus
+```
+
+Vorteil: Alexa sieht nur die wirklich bedienbaren Szenen, der Aus-Befehl bleibt zentral und wartbar in LoxEvo. Nachteil: Der versteckte Aus-Befehl kann in Alexa nicht direkt als Routine-Ziel ausgewählt werden. Routinen müssen stattdessen ein sichtbares Szenen-Gerät ausschalten; LoxEvo führt dann intern den hinterlegten Aus-Befehl aus.
+
+Variante 3: Alexa-Gruppe oder Routine für den kurzen Sprachbefehl.
+
+Wenn der Sprachbefehl `Alexa, Licht Küche aus` ohne separates Gerät funktionieren soll, braucht Alexa ein sichtbares Ziel. Dafür gibt es zwei praktische Wege:
+
+```text
+Alexa-Gruppe "Küche" mit den sichtbaren Geräten:
+- Licht Küche Ambient
+- Licht Küche Hell
+- Licht Küche Nacht
+```
+
+oder eine Alexa-Routine:
+
+```text
+Wenn gesagt wird: "Licht Küche aus"
+Dann: Licht Küche Ambient ausschalten
+Dann: Licht Küche Hell ausschalten
+Dann: Licht Küche Nacht ausschalten
+```
+
+In beiden Fällen sendet Alexa `aus` an sichtbare Geräte. LoxEvo übersetzt dieses `aus` intern auf den zentralen Aus-Befehl. Das ist meistens die aufgeräumteste Lösung, solange man akzeptiert, dass Alexa den versteckten Aus-Befehl selbst nicht als eigenes Gerät kennt.
+
 Wenn während der Entwicklung Geräte mehrfach gefunden wurden, alte LoxEvo-Testgeräte in der Alexa-App löschen und danach erneut suchen. Die aktuellen Geräte-IDs sind pro Befehl stabil, damit spätere Konfigurationsänderungen weniger Durcheinander erzeugen.
 
 ## TTS-API

@@ -50,6 +50,19 @@ function validateConfig(config) {
       if (!['switch', 'action'].includes(alexaMode)) {
         throw new Error(`Unbekannter Alexa-Modus "${command.alexaMode}" fÃ¼r Befehl "${commandName}".`);
       }
+      const offCommand = normalizeConfigCommandKey(command.offCommand);
+      if (offCommand) {
+        if (offCommand === commandName) {
+          throw new Error(`Aus-Befehl "${offCommand}" fÃ¼r Befehl "${commandName}" darf nicht auf sich selbst zeigen.`);
+        }
+        const targetCommand = config.commands[offCommand];
+        if (!targetCommand) {
+          throw new Error(`Aus-Befehl "${offCommand}" fÃ¼r Befehl "${commandName}" wurde nicht gefunden.`);
+        }
+        if (targetCommand.enabled === false) {
+          throw new Error(`Aus-Befehl "${offCommand}" fÃ¼r Befehl "${commandName}" ist deaktiviert.`);
+        }
+      }
 
       if (target.type === 'raw') {
         if (!target.path) {
@@ -128,6 +141,27 @@ function normalizeConfig(config) {
       } else {
         delete command.alexaMode;
       }
+      const offCommand = normalizeConfigCommandKey(command.offCommand);
+      if (offCommand) {
+        command.offCommand = offCommand;
+      } else {
+        delete command.offCommand;
+      }
+      if (command.alexaExpose !== false) {
+        delete command.alexaExpose;
+      }
     }
   }
+}
+
+function normalizeConfigCommandKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replaceAll(' ', '_')
+    .replaceAll('ä', 'ae')
+    .replaceAll('ö', 'oe')
+    .replaceAll('ü', 'ue')
+    .replaceAll('\u00df', 'ss')
+    .replace(/[^a-z0-9_-]/g, '');
 }

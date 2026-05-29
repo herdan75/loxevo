@@ -1190,7 +1190,7 @@ function renderAlexaBridgeStatus() {
 
   if (!status.ready) {
     alexaBridgeStatus.textContent = humanizeAlexaBridgeError(status.error);
-    alexaBridgeStatus.className = isDiscoveryPortIssue(status.error) ? 'service-status disabled' : 'service-status error';
+    alexaBridgeStatus.className = isExpectedDiscoveryInactive(status) ? 'service-status disabled' : 'service-status error';
     renderAlexaDevices();
     renderDiscoveryStatus();
     renderSystemNotice();
@@ -1336,14 +1336,13 @@ function renderSystemNotice() {
   }
 
   if (alexaBridgeInfo?.enabled) {
-    const discoveryPortIssue = !alexaBridgeInfo.ready && isDiscoveryPortIssue(alexaBridgeInfo.error);
     if (alexaBridgeInfo.bridgeHttp?.error) {
       issues.push({
         level: 'error',
         title: 'Alexa-Geräte sind nicht bereit',
         text: alexaBridgeInfo.bridgeHttp.error
       });
-    } else if (!alexaBridgeInfo.ready && !discoveryPortIssue) {
+    } else if (!alexaBridgeInfo.ready && !isExpectedDiscoveryInactive(alexaBridgeInfo)) {
       issues.push({
         level: 'error',
         title: 'Alexa-Gerätesuche ist nicht bereit',
@@ -1418,8 +1417,7 @@ function updateModeBannerNotice() {
 
 function getModeBannerDiscoveryNotice() {
   if (!alexaBridgeInfo?.enabled) return false;
-  const discoveryPortIssue = !alexaBridgeInfo.ready && isDiscoveryPortIssue(alexaBridgeInfo.error);
-  return Boolean(alexaBridgeInfo.discoveryPaused || discoveryPortIssue);
+  return isExpectedDiscoveryInactive(alexaBridgeInfo);
 }
 
 function humanizeTtsStatusError(errorText = '') {
@@ -1445,10 +1443,20 @@ function humanizeTtsStatusError(errorText = '') {
 
 function humanizeAlexaBridgeError(errorText = '') {
   const text = String(errorText || '');
+  if (!text.trim()) {
+    return 'Gerätesuche ist aktuell nicht aktiv. Vorhandene Alexa-Geräte können weiter funktionieren.';
+  }
   if (isDiscoveryPortIssue(text)) {
     return 'SSDP/UDP-Port 1900 konnte nicht geöffnet werden. Der Port ist vermutlich durch LoxBerry-ssdpd oder einen anderen SSDP-Dienst belegt. Vorhandene Alexa-Geräte funktionieren weiter; für neue Geräte muss die Gerätesuche kurz aktiviert werden.';
   }
   return `Alexa-Geräte sind aktiviert, aber noch nicht bereit: ${text || 'Status unbekannt'}`;
+}
+
+function isExpectedDiscoveryInactive(status = {}) {
+  if (!status?.enabled || status.ready) return false;
+  if (status.discoveryPaused) return true;
+  if (isDiscoveryPortIssue(status.error)) return true;
+  return !String(status.error || '').trim();
 }
 
 function isDiscoveryPortIssue(errorText = '') {
@@ -2133,6 +2141,7 @@ function renderDashboard() {
   const adminStatus = dashboardAdminStatus();
   const loxoneStatus = dashboardLoxoneStatus();
   const systemStatus = dashboardSystemStatus();
+  const alexaBridgeStatus = dashboardAlexaBridgeStatus();
   const rows = [
     dashboardStatusRow('Loxone', loxoneStatus.value, loxoneStatus.level, loxoneStatus.detail, 'Zeigt, ob LoxEvo echte Befehle an den Loxone-Miniserver senden kann. Die Zeile prüft die wichtigsten Loxone-Grundlagen: Miniserver-URL, Zugangsdaten, konfigurierte Befehle und Betriebsmodus.', loxoneStatus.target),
     dashboardStatusRow('Alexa TTS', ttsStatus?.ready ? 'Bereit' : config?.tts?.enabled ? 'Prüfen' : 'Deaktiviert', ttsStatus?.ready ? 'ok' : config?.tts?.enabled ? 'warning' : 'optional', ttsDeviceSummary(ttsStatus), 'Zeigt den Status der Alexa-Sprachausgabe. Bereit bedeutet, dass alexa-remote2 verbunden ist und LoxEvo die konfigurierten Echo-Geräte für normale TTS- oder Alarmmeldungen verwenden kann.', 'config:Alexa TTS'),
@@ -2142,6 +2151,10 @@ function renderDashboard() {
     dashboardStatusRow('Admin-Schutz', adminStatus.value, adminStatus.level, adminStatus.detail, 'Zeigt, ob sensible Web-UI-Aktionen wie Konfiguration, Backup, Restore, Neustart oder Protokoll löschen mit einem Admin-Passwort geschützt sind. Loxone-Befehle, TTS und Alexa/Hue-Endpunkte bleiben bewusst offen für lokale Automationen.', 'maintenance:maintenanceAdminPanel'),
     dashboardStatusRow('Systemprüfung', systemStatus.value, systemStatus.level, systemStatus.detail, 'Fasst technische Zusatzprüfungen aus Wartung zusammen. Hinweise, die bereits eigene Statuszeilen haben, werden hier nicht nochmals als offene Punkte gewertet. Details findest du im Register Wartung.', 'maintenance:maintenanceSystemCheckPanel')
   ];
+  const bridgeRowIndex = rows.findIndex((row) => row.includes('Virtuelle Alexa-Ger'));
+  if (bridgeRowIndex >= 0) {
+    rows[bridgeRowIndex] = dashboardStatusRow('Virtuelle Alexa-Geräte', alexaBridgeStatus.value, alexaBridgeStatus.level, alexaBridgeStatus.detail, 'Zeigt, ob LoxEvo die lokalen Hue-kompatiblen Geräte für Alexa bereitstellt. Diese Funktion ist für Sprachbefehle wie Licht ein oder aus zuständig und läuft unabhängig von Alexa TTS.', 'config:Alexa-Geräte');
+  }
   dashboardCards.innerHTML = prioritizeDashboardRows(rows).join('');
   bindDashboardHelpButtons();
   bindDashboardRowNavigation();
@@ -2175,6 +2188,42 @@ function dashboardAdminStatus() {
     value: 'Optional',
     level: 'optional',
     detail: adminSecurityInfo.message || 'Admin-Schutz ist deaktiviert. Sensible Web-UI-Aktionen sind ohne Admin-Passwort erreichbar.'
+  };
+}
+
+function dashboardAlexaBridgeStatus() {
+  if (!config?.alexaBridge?.enabled) {
+    return {
+      value: 'Deaktiviert',
+      level: 'optional',
+      detail: 'Virtuelle Alexa-Geräte sind deaktiviert.'
+    };
+  }
+
+  const status = alexaBridgeInfo || {};
+  const port = status.port || config?.alexaBridge?.advertisePort || 80;
+  const deviceCount = status.deviceCount ?? 0;
+
+  if (status.bridgeHttp?.error) {
+    return {
+      value: 'HTTP prüfen',
+      level: 'warning',
+      detail: status.bridgeHttp.error
+    };
+  }
+
+  if (status.bridgeHttp?.ready || Number(port) === Number(config?.server?.port)) {
+    return {
+      value: 'Bereit',
+      level: 'ok',
+      detail: `${deviceCount} Gerät(e), Alexa/Hue-Port ${port}.`
+    };
+  }
+
+  return {
+    value: 'Prüfen',
+    level: 'warning',
+    detail: `${deviceCount} Gerät(e), Alexa/Hue-Port ${port}. HTTP-Status noch nicht geladen.`
   };
 }
 

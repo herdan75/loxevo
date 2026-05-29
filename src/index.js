@@ -1424,7 +1424,7 @@ function bridgeDiscoveryLevel(status) {
   if (status.ready) return 'ok';
   if (status.discoveryPaused || isDiscoveryPortIssue(status.error)) return 'optional';
   if (status.error) return 'error';
-  return 'warning';
+  return 'optional';
 }
 
 function bridgeDiscoveryDetail(status) {
@@ -1437,7 +1437,7 @@ function bridgeDiscoveryDetail(status) {
   if (status.discoveryPaused || isDiscoveryPortIssue(status.error)) {
     return 'SSDP/UDP 1900 ist aktuell nicht für LoxEvo frei. Für den normalen Betrieb mit bereits gefundenen Geräten ist das kein Problem. Nur wenn neue virtuelle Alexa-Geräte hinzugefügt werden sollen, unter Konfiguration -> Alexa-Gerätesuche kurz aktivieren, in der Alexa-App Geräte suchen und danach die Gerätesuche wieder beenden, damit der Port an die andere Anwendung zurückgegeben wird.';
   }
-  return status.error || 'Gerätesuche ist noch nicht bereit.';
+  return status.error || 'Gerätesuche ist aktuell nicht aktiv. Vorhandene Alexa-Geräte können weiter funktionieren.';
 }
 
 function discoveryHelperLevel(status) {

@@ -18,6 +18,7 @@ export class AlexaBridgeService {
     this.ssdpBindAddress = '';
     this.ssdpMode = '';
     this.lastCommandAt = new Map();
+    this.deviceStates = new Map();
     this.commandCooldownMs = 1500;
     this.retryTimer = null;
     this.retryDelayMs = 30000;
@@ -205,17 +206,65 @@ export class AlexaBridgeService {
       return helpers.sendJson(res, [{ error: { type: 3, description: 'resource not available' } }], 404);
     }
 
-    if (body.on === true) {
-      if (this.shouldExecuteCommand(device.commandKey)) {
-        await this.handlers.executeCommand(device.commandKey);
-      } else {
-        console.log(`Alexa-Bridge duplicate command ignored: ${device.commandKey}`);
+    const requestedState = typeof body.on === 'boolean' ? body.on : undefined;
+    if (requestedState !== undefined) {
+      this.deviceStates.set(id, { on: requestedState, updatedAt: Date.now() });
+      const commandKey = requestedState ? device.commandKey : this.findPairedOffCommandKey(device.commandKey);
+      if (commandKey) {
+        this.executeHueCommand(commandKey);
       }
     }
 
-    return helpers.sendJson(res, [
-      { success: { [`/lights/${id}/state/on`]: Boolean(body.on) } }
-    ]);
+    const response = Object.entries(body || {}).map(([key, value]) => ({
+      success: { [`/lights/${id}/state/${key}`]: value }
+    }));
+
+    if (!response.length) {
+      response.push({ success: { [`/lights/${id}/state/on`]: this.getDeviceOnState(id) } });
+    }
+
+    return helpers.sendJson(res, response);
+  }
+
+  executeHueCommand(commandKey) {
+    if (!this.shouldExecuteCommand(commandKey)) {
+      console.log(`Alexa-Bridge duplicate command ignored: ${commandKey}`);
+      return;
+    }
+
+    this.handlers.executeCommand(commandKey).catch((error) => {
+      console.warn(`Alexa-Bridge command failed (${commandKey}): ${error.message}`);
+      this.handlers.addEvent?.({
+        type: 'alexa-command',
+        status: 'error',
+        key: commandKey,
+        text: error.message
+      });
+    });
+  }
+
+  findPairedOffCommandKey(commandKey) {
+    const commands = this.handlers.getCommands?.() || {};
+    const source = commands[commandKey];
+    if (!source || isOffAction(source.action)) return null;
+
+    const sourceRoom = normalizeCommandPart(source.room);
+    const sourceFunction = normalizeCommandPart(source.function);
+    if (!sourceRoom || !sourceFunction) return null;
+
+    const match = Object.entries(commands).find(([candidateKey, candidate]) => (
+      candidateKey !== commandKey &&
+      candidate?.enabled !== false &&
+      normalizeCommandPart(candidate.room) === sourceRoom &&
+      normalizeCommandPart(candidate.function) === sourceFunction &&
+      isOffAction(candidate.action)
+    ));
+
+    return match?.[0] || null;
+  }
+
+  getDeviceOnState(id) {
+    return Boolean(this.deviceStates.get(id)?.on);
   }
 
   shouldExecuteCommand(commandKey) {
@@ -455,17 +504,16 @@ export class AlexaBridgeService {
   toHueLight(device) {
     return {
       state: {
-        on: false,
-        bri: 254,
+        on: this.getDeviceOnState(device.id),
         alert: 'none',
         mode: 'homeautomation',
         reachable: true
       },
-      type: 'Dimmable light',
+      type: 'On/Off light',
       name: device.name,
-      modelid: 'LWB010',
+      modelid: 'HASS321',
       manufacturername: 'LoxEvo',
-      productname: 'LoxEvo command',
+      productname: 'On/Off light',
       uniqueid: device.uniqueId,
       swversion: '1.0'
     };
@@ -577,6 +625,14 @@ function displayPart(value) {
     .filter(Boolean)
     .map((word) => word.toUpperCase() === word ? word : word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+}
+
+function normalizeCommandPart(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isOffAction(value) {
+  return ['aus', 'off'].includes(normalizeCommandPart(value));
 }
 
 function firstLanAddress() {

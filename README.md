@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/herdan75/loxevo/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/herdan75/loxevo/actions/workflows/ci.yml)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: Source available](https://img.shields.io/badge/License-source--available-orange.svg)](LICENSE)
 
-> **Status: Version 1.0.4 / erste lauffähige Version**
+> **Status: Version 1.0.5 / erste lauffähige Version**
 >
 > LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die wichtigsten Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte und Alexa-TTS sind umgesetzt und getestet. Trotzdem können noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
@@ -488,4 +488,4 @@ Hinweis: Auch dieser kompatible Einstieg nutzt die TTS-Gerätelisten aus der Web
 
 ## Lizenz
 
-Die aktuelle Lizenz steht in [LICENSE](LICENSE).
+LoxEvo ist source-available veröffentlicht: Der Code darf auf GitHub gelesen und geprüft werden, ist aber ohne separate schriftliche Erlaubnis nicht zur Nutzung, Weitergabe, Veröffentlichung, zum Betrieb in eigenen Installationen oder zur Erstellung abgeleiteter Versionen freigegeben. Details stehen in [LICENSE](LICENSE).

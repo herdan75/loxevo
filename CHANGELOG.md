@@ -4,6 +4,9 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.5 - 2026-05-29
+
+- MIT-Lizenz durch eine eingeschränkte Source-Available-Lizenz ersetzt, damit der Code sichtbar bleibt, aber nicht automatisch frei genutzt oder weiterverbreitet werden darf.
 - Konfigurationsbefehle um Suche, Rubrikfilter, Prüfung unvollständiger Befehle und kompakte Zusatzinfos in eingeklappten Zeilen ergänzt.
 - Ungespeicherte Konfigurationsänderungen werden deutlicher mit Speichern- und Verwerfen-Aktion angezeigt.
 - Register `Aufrufe & Geräte` klarer als Test-/Kopieransicht gegliedert; TTS-Vorlagen zeigen den HTTP-Body explizit als Beispiel.

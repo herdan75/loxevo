@@ -1,21 +1,30 @@
-MIT License
+LoxEvo Source Available License
 
 Copyright (c) 2026 Daniel Hermann
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This repository is published for transparency, review, learning, and private
+evaluation only. The source code may be viewed on GitHub.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Unless the copyright holder grants separate written permission, you may not:
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+- use the software in your own installation, product, service, automation, or
+  commercial environment
+- copy, redistribute, publish, mirror, or sublicense the software
+- sell, rent, host, package, or otherwise provide the software to third parties
+- create or distribute modified versions or derivative works
+- remove copyright notices or present the project as your own work
+
+You may:
+
+- read and inspect the source code
+- reference the project for evaluation or discussion
+- submit issues, suggestions, or pull requests to this repository
+
+No rights are granted beyond the permissions listed above. All other rights are
+reserved by the copyright holder.
+
+THE SOFTWARE IS PROVIDED FOR REVIEW "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, SECURITY, AVAILABILITY, OR
+NONINFRINGEMENT. THE COPYRIGHT HOLDER IS NOT LIABLE FOR ANY CLAIM, DAMAGE, OR
+OTHER LIABILITY ARISING FROM VIEWING, EVALUATING, OR DISCUSSING THE SOFTWARE.

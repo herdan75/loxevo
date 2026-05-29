@@ -4,7 +4,10 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.4 - 2026-05-29
+
 - Leere Befehlsrubriken verschwinden direkt nach dem Entfernen des letzten Befehls aus der Konfigurationsansicht.
+- Register `Befehle & Geräte` in `Aufrufe & Geräte` umbenannt und TTS-Beispiele klar als Muster/Testaufrufe beschrieben.
 
 ## 1.0.3 - 2026-05-28
 

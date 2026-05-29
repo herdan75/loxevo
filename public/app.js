@@ -159,7 +159,7 @@ addRoomBtn.addEventListener('click', addRoom);
 refreshIntegrationsBtn.addEventListener('click', () => {
   renderIntegrations();
   loadAlexaBridgeStatus();
-  showToast('Befehle & Geräte aktualisiert', 'ok');
+  showToast('Aufrufe & Geräte aktualisiert', 'ok');
 });
 setupConfigBtn.addEventListener('click', () => showView('configView'));
 refreshMaintenanceBtn.addEventListener('click', () => loadDependencyStatus(refreshMaintenanceBtn));
@@ -2724,23 +2724,26 @@ function renderTtsEndpointSection(baseUrl) {
 
 function createTtsEndpointGroup(baseUrl, open = false) {
   const cards = createTtsEndpointCards(baseUrl);
-  const group = createCategoryGroup('TTS', cards.length, open);
+  const group = createCategoryGroup('TTS-Vorlagen', cards.length, open);
   const status = document.createElement('div');
   const statusView = ttsStatusView();
   status.className = statusView.className;
   status.textContent = statusView.text;
-  group.append(status, ...cards);
+  const hint = document.createElement('p');
+  hint.className = 'section-note';
+  hint.textContent = 'Diese Einträge sind Muster und Testaufrufe. Sie werden nicht als feste Meldungen gespeichert; Loxone sendet den eigentlichen Text oder die Lautstärke im HTTP-Body.';
+  group.append(status, hint, ...cards);
   return group;
 }
 
 function createTtsEndpointCards(baseUrl) {
   return [
     createEndpointCard({
-      title: 'TTS normal',
+      title: 'Vorlage: TTS normal',
       method: 'POST',
       url: `${baseUrl}/tts/speak`,
       body: 'Geschirrspüler ist fertig.',
-      note: 'Schnelle Sprachausgabe ohne Lautstärke-Vorbefehl.',
+      note: 'Muster für normale Sprachausgabe. Loxone ruft diese URL per POST auf und sendet den zu sprechenden Text im HTTP-Body.',
       testLabel: 'TTS testen',
       testAction: (button) => testEndpoint({
         method: 'POST',
@@ -2751,11 +2754,11 @@ function createTtsEndpointCards(baseUrl) {
       }, button)
     }),
     createEndpointCard({
-      title: 'Loxone Kurzpfad',
+      title: 'Vorlage: Loxone Kurzpfad',
       method: 'POST',
       url: `${baseUrl}/meldung`,
       body: 'Geschirrspüler ist fertig.',
-      note: 'Loxone-Kurzpfad: POST /<name> mit Text im Body spricht auf den Standard-Geräten. Die HTTP-Antwort kommt sofort, die Ausgabe läuft im Hintergrund.',
+      note: 'Muster für frei benannte Loxone-Kurzpfade wie /meldung oder /geschirrspueler. Der Pfad ist nur der Auslöser; der gesprochene Text kommt aus dem HTTP-Body.',
       testLabel: 'Kurzpfad testen',
       testAction: (button) => testEndpoint({
         method: 'POST',
@@ -2766,11 +2769,11 @@ function createTtsEndpointCards(baseUrl) {
       }, button)
     }),
     createEndpointCard({
-      title: 'Alarm',
+      title: 'Vorlage: Alarm',
       method: 'POST',
       url: `${baseUrl}/tts/alarm`,
       body: 'Achtung, Alarm wurde ausgelöst.',
-      note: 'Nutzt die Alarm-Geräteliste und erzwingt die Alarm-Lautstärke.',
+      note: 'Muster für Alarm-Sprachausgabe. Nutzt die Alarm-Geräteliste und erzwingt die Alarm-Lautstärke; der Alarmtext oder SSML kommt aus dem HTTP-Body.',
       testLabel: 'Alarm testen',
       testAction: (button) => testEndpoint({
         method: 'POST',
@@ -2781,11 +2784,11 @@ function createTtsEndpointCards(baseUrl) {
       }, button)
     }),
     createEndpointCard({
-      title: 'Alarm Kurzpfad',
+      title: 'Vorlage: Alarm Kurzpfad',
       method: 'POST',
       url: `${baseUrl}/alarm`,
       body: 'Achtung, Alarm wurde ausgelöst.',
-      note: 'Loxone-Kurzpfad: POST /alarm nutzt die Alarm-Geräte und die Alarm-Lautstärke.',
+      note: 'Muster für den kurzen Loxone-Alarmpfad. POST /alarm nutzt Alarm-Geräte und Alarm-Lautstärke; der Text oder SSML steht im HTTP-Body.',
       testLabel: 'Alarm Kurzpfad',
       testAction: (button) => testEndpoint({
         method: 'POST',
@@ -2796,11 +2799,11 @@ function createTtsEndpointCards(baseUrl) {
       }, button)
     }),
     createEndpointCard({
-      title: 'Lautstärke setzen',
+      title: 'Vorlage: Lautstärke setzen',
       method: 'POST',
       url: `${baseUrl}/tts/volume`,
       body: String(ttsDefaultVolume?.value || 40),
-      note: 'Setzt die Lautstärke der Alle-Geräte, sonst der Standard-Geräte. Das ist bewusst getrennt von normaler TTS.',
+      note: 'Muster zum Setzen der Alexa-Lautstärke. Loxone sendet die gewünschte Zahl im HTTP-Body; gesprochen wird dabei nichts.',
       testLabel: 'Lautstärke setzen',
       testAction: (button) => testEndpoint({
         method: 'POST',
@@ -2811,11 +2814,11 @@ function createTtsEndpointCards(baseUrl) {
       }, button)
     }),
     createEndpointCard({
-      title: 'Lautstärke Kurzpfad',
+      title: 'Vorlage: Lautstärke Kurzpfad',
       method: 'POST',
       url: `${baseUrl}/lautstaerke`,
       body: String(ttsDefaultVolume?.value || 40),
-      note: 'Loxone-Kurzpfad: POST /lautstaerke mit Zahl im Body setzt die Lautstärke der Alle-Geräte, sonst der Standard-Geräte.',
+      note: 'Muster für den kurzen Loxone-Lautstärkepfad. POST /lautstaerke mit Zahl im HTTP-Body setzt die Lautstärke.',
       testLabel: 'Kurzpfad setzen',
       testAction: (button) => testEndpoint({
         method: 'POST',
@@ -2826,11 +2829,11 @@ function createTtsEndpointCards(baseUrl) {
       }, button)
     }),
     createEndpointCard({
-      title: 'Alexa2Lox-kompatibel',
+      title: 'Vorlage: Alexa2Lox-kompatibel',
       method: 'GET',
       url: `${baseUrl}/admin/plugins/alexa2lox/tts.php?device=ALL&text=Hallo&vol=50`,
       body: '',
-      note: 'Kompatibler Einstieg für bestehende Loxone-Aufrufe.',
+      note: 'Muster für bestehende Alexa2Lox-Aufrufe. Geeignet, wenn alte Loxone-URLs möglichst unverändert weiterverwendet werden sollen.',
       testLabel: 'Compat testen',
       testAction: (button) => testEndpoint({
         method: 'GET',

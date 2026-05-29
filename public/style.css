@@ -1235,6 +1235,13 @@ label.is-disabled {
   line-height: 1.35;
 }
 
+.section-note {
+  margin: 10px 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .range-value {
   justify-self: start;
   min-width: 48px;

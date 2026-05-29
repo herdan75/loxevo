@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Status: Version 1.0.3 / erste lauffähige Version**
+> **Status: Version 1.0.4 / erste lauffähige Version**
 >
 > LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die wichtigsten Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte und Alexa-TTS sind umgesetzt und getestet. Trotzdem können noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
@@ -122,7 +122,7 @@ Die Oberfläche ist in klare Bereiche gegliedert:
 - `Statuskontrolle`: kompakter Schnellcheck, Einrichtungsassistent und Hinweise zu Backup, Alexa und Loxone
 - `Konfiguration`: Loxone, frei definierbare Befehle und TTS pflegen
 - `Testen`: Loxone-Befehle und Alexa-TTS direkt aus der Web-UI prüfen
-- `Befehle & Geräte`: angelegte Loxone-Befehle, virtuelle Alexa-Geräte und fertige URLs für lokale Systeme ansehen, testen und kopieren
+- `Aufrufe & Geräte`: fertige Schnittstellen aus der Konfiguration ansehen, Loxone-Befehle testen, URLs kopieren, TTS-Aufrufe prüfen und virtuelle Alexa-Geräte kontrollieren
 - `Wartung`: Systemprüfung ausführen, Diagnose exportieren, Paketversionen prüfen, `alexa-remote2` verwalten, Backup exportieren und Backup importieren
 - `Protokoll`: zuletzt simulierte oder gesendete Aktionen filtern, durchsuchen und bei Bedarf leeren; direkt wiederholte gleichartige Meldungen werden kompakt zusammengefasst
 

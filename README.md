@@ -113,7 +113,7 @@ Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell können dort gepflegt w
 - Loxone-Miniserver URL, Benutzer und Passwort
 - Dry-Run/Live-Modus
 - virtuelle Alexa-Geräte aus aktiven Befehlen
-- frei definierbare Rubriken und Befehle mit Sprachname, Raum, Funktion, Aktion, Loxone-Typ, UUID, Wert oder Pfad
+- frei definierbare Rubriken und Befehle mit Sprachname, Raum, Funktion, Aktion, Alexa-Modus, Loxone-Typ, UUID, Wert oder Pfad
 - TTS-Aktivierung, Cookie-Datei, Lautstärken und Alexa-Gerätelisten
 - TTS-Status mit klarer Fehlermeldung, falls Alexa noch nicht bereit ist
 
@@ -218,6 +218,7 @@ Die alte Kurzform `/light/<raum>/<szene>` bleibt vorerst als Legacy-Einstieg erh
 Wenn `alexaBridge.enabled` aktiv ist, bietet LoxEvo jeden aktiven Befehl als virtuelles Alexa-Gerät an. In der Web-UI unter `Konfiguration -> Alexa-Geräte` kann die lokale Brücke aktiviert werden.
 
 Technisch ist das ein lokaler Hue-kompatibler V1-Bridge-Eingang nur für Alexa-Discovery und Ein/Aus-Befehle. Es wird keine Hue-Bridge und keine Hue-Lampe benötigt; LoxEvo nutzt nur das lokale Discovery/API-Verhalten, damit Alexa ohne eigene Cloud-Skill-Entwicklung virtuelle Geräte finden kann.
+Alexa merkt sich bereits gefundene Geräte und deren Typ teilweise dauerhaft. Wenn Gerätenamen, Befehle oder der Gerätetyp geändert wurden, sollten die alten LoxEvo-Geräte in der Alexa-App gelöscht und danach neu gesucht werden.
 
 Für die Gerätesuche muss LoxEvo im gleichen LAN wie die Echo-Geräte erreichbar sein. Im Docker/LoxBerry-Betrieb ist `network_mode: host` deshalb der empfohlene Modus, weil SSDP/UDP 1900 sonst oft nicht sauber bis in den Container gelangt.
 Für neuere Echo-Geräte sollte die Alexa-Bridge über Port 80 erreichbar sein. Die Web-UI kann weiter auf Port 8080 laufen; LoxEvo startet bei abweichendem `alexaBridge.advertisePort` einen zusätzlichen Alexa/Hue-HTTP-Listener.
@@ -252,7 +253,8 @@ Danach kann ein Befehl über den angezeigten Gerätenamen ausgelöst werden:
 Alexa, <Gerätename> an
 ```
 
-LoxEvo behandelt diese Geräte als Taster: `an` löst den hinterlegten Befehl aus. `aus` setzt nur den virtuellen Zustand zurück.
+LoxEvo bietet zwei Alexa-Modi pro Befehl. Ohne Angabe gilt `switch`: `an` löst den Befehl aus, `aus` sucht einen passenden Aus-Befehl mit gleichem Raum und gleicher Funktion. Für Taster, Szenen, Roboter- oder andere Einmalaktionen kann in der Web-UI `action` gewählt werden. Dann löst nur `an` den Befehl aus, `aus` wird bewusst ignoriert und der interne virtuelle Zustand wird kurz danach wieder zurückgesetzt.
+Wichtig: Wegen der lokalen Hue-Emulation sieht Alexa auch `action` weiterhin als On/Off-Gerät. Ein echter Alexa-Button oder Skill-Gerätetyp kann über diese Schnittstelle nicht übergeben werden.
 Wenn während der Entwicklung Geräte mehrfach gefunden wurden, alte LoxEvo-Testgeräte in der Alexa-App löschen und danach erneut suchen. Die aktuellen Geräte-IDs sind pro Befehl stabil, damit spätere Konfigurationsänderungen weniger Durcheinander erzeugen.
 
 ## TTS-API

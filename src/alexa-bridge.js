@@ -20,6 +20,8 @@ export class AlexaBridgeService {
     this.lastCommandAt = new Map();
     this.deviceStates = new Map();
     this.commandCooldownMs = 1500;
+    this.actionResetDelayMs = 1200;
+    this.actionResetTimers = new Map();
     this.retryTimer = null;
     this.retryDelayMs = 30000;
     this.discoveryPaused = false;
@@ -135,6 +137,7 @@ export class AlexaBridgeService {
       devices: devices.map((device) => ({
         id: device.id,
         name: device.name,
+        alexaMode: device.alexaMode,
         command: device.commandKey
       }))
     };
@@ -209,7 +212,11 @@ export class AlexaBridgeService {
     const requestedState = typeof body.on === 'boolean' ? body.on : undefined;
     if (requestedState !== undefined) {
       this.deviceStates.set(id, { on: requestedState, updatedAt: Date.now() });
-      const commandKey = requestedState ? device.commandKey : this.findPairedOffCommandKey(device.commandKey);
+      if (requestedState && device.alexaMode === 'action') {
+        this.scheduleActionStateReset(id);
+      }
+
+      const commandKey = this.resolveHueCommandKey(device, requestedState);
       if (commandKey) {
         this.executeHueCommand(commandKey);
       }
@@ -224,6 +231,22 @@ export class AlexaBridgeService {
     }
 
     return helpers.sendJson(res, response);
+  }
+
+  resolveHueCommandKey(device, requestedState) {
+    if (requestedState === undefined) return null;
+    if (requestedState) return device.commandKey;
+    if (device.alexaMode === 'action') return null;
+    return this.findPairedOffCommandKey(device.commandKey);
+  }
+
+  scheduleActionStateReset(id) {
+    clearTimeout(this.actionResetTimers.get(id));
+    const timer = setTimeout(() => {
+      this.actionResetTimers.delete(id);
+      this.deviceStates.set(id, { on: false, updatedAt: Date.now() });
+    }, this.actionResetDelayMs);
+    this.actionResetTimers.set(id, timer);
   }
 
   executeHueCommand(commandKey) {
@@ -532,6 +555,7 @@ export class AlexaBridgeService {
           id,
           commandKey,
           name: getAlexaDeviceName(command, commandKey),
+          alexaMode: getAlexaMode(command),
           uniqueId: makeLightUniqueId(bridgeId, id)
         };
       });
@@ -587,6 +611,10 @@ export class AlexaBridgeService {
 function getAlexaDeviceName(command, commandKey) {
   const raw = String(command.alexaName || buildCommandDisplayName(command) || command.voiceName || command.label || commandKey).trim();
   return raw.replace(/\s+(an|ein|einschalten)$/i, '') || commandKey;
+}
+
+function getAlexaMode(command) {
+  return String(command?.alexaMode || '').trim().toLowerCase() === 'action' ? 'action' : 'switch';
 }
 
 function buildCommandDisplayName(command) {

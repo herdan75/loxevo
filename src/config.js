@@ -46,6 +46,11 @@ function validateConfig(config) {
         throw new Error(`Unbekannter Loxone-Befehlstyp "${target.type}" für Befehl "${commandName}".`);
       }
 
+      const alexaMode = String(command.alexaMode || 'switch').trim().toLowerCase();
+      if (!['switch', 'action'].includes(alexaMode)) {
+        throw new Error(`Unbekannter Alexa-Modus "${command.alexaMode}" fÃ¼r Befehl "${commandName}".`);
+      }
+
       if (target.type === 'raw') {
         if (!target.path) {
           throw new Error(`Loxone Pfad für Befehl "${commandName}" fehlt.`);
@@ -114,4 +119,15 @@ function normalizeConfig(config) {
   config.discovery.helperUrl ||= 'http://127.0.0.1:18091';
   config.discovery.helperToken ||= '';
   config.discovery.helperTimeoutMs = Number(config.discovery.helperTimeoutMs || 5000);
+  if (config.commands && typeof config.commands === 'object') {
+    for (const command of Object.values(config.commands)) {
+      if (!command || typeof command !== 'object') continue;
+      const alexaMode = String(command.alexaMode || '').trim().toLowerCase();
+      if (alexaMode === 'action') {
+        command.alexaMode = 'action';
+      } else {
+        delete command.alexaMode;
+      }
+    }
+  }
 }

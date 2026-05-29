@@ -2773,6 +2773,17 @@ function createCommandCard(commandKey, command) {
   loxone.querySelector('.command-enabled').checked = command.enabled !== false;
   loxone.querySelector('.command-type').addEventListener('change', () => updatePathFieldState(card));
 
+  const alexa = document.createElement('div');
+  alexa.className = 'form-row';
+  alexa.innerHTML = `
+    <label>Alexa-Modus<select class="command-alexa-mode">
+      <option value="switch">Schalter: Ein/Aus</option>
+      <option value="action">Aktion: nur Einschalten ausführen</option>
+    </select></label>
+    <p class="field-hint">Schalter sucht beim Ausschalten einen passenden Aus-Befehl im gleichen Raum und mit gleicher Funktion. Aktion ist für Taster, Szenen oder Roboterbefehle gedacht: Einschalten löst aus, Ausschalten wird ignoriert.</p>
+  `;
+  alexa.querySelector('.command-alexa-mode').value = command.alexaMode === 'action' ? 'action' : 'switch';
+
   const raw = document.createElement('div');
   raw.className = 'form-row';
   raw.innerHTML = `
@@ -2780,14 +2791,16 @@ function createCommandCard(commandKey, command) {
   `;
   raw.querySelector('.command-path').value = target.path;
 
-  card.append(head, fields, details, loxone, raw);
+  card.append(head, fields, details, loxone, alexa, raw);
   updatePathFieldState(card);
   return card;
 }
 
 function commandSummaryMeta(command) {
   const target = getCommandTarget(command);
+  const alexaMode = command.alexaMode === 'action' ? 'Aktion' : 'Schalter';
   const pieces = [
+    alexaMode,
     target.type,
     command.room && displayPart(command.room),
     command.action && displayPart(command.action),
@@ -3189,6 +3202,7 @@ function collectCommands() {
       room: normalizeInputKey(card.querySelector('.command-room').value),
       function: normalizeInputKey(card.querySelector('.command-function').value),
       action: normalizeInputKey(card.querySelector('.command-action').value),
+      ...(card.querySelector('.command-alexa-mode')?.value === 'action' ? { alexaMode: 'action' } : {}),
       loxone: {
         type: loxoneType,
         uuid: normalizeLoxoneUuidInput(card.querySelector('.command-uuid').value),
@@ -3207,7 +3221,10 @@ function confirmConfigSave(nextConfig) {
 }
 
 function configSaveSummary(nextConfig) {
-  const commandCount = Object.values(nextConfig.commands || {}).filter((command) => command?.enabled !== false).length;
+  const activeCommands = Object.values(nextConfig.commands || {}).filter((command) => command?.enabled !== false);
+  const commandCount = activeCommands.length;
+  const actionCount = activeCommands.filter((command) => command?.alexaMode === 'action').length;
+  const switchCount = commandCount - actionCount;
   const defaultCount = Array.isArray(nextConfig.tts?.defaultDevices) ? nextConfig.tts.defaultDevices.length : 0;
   const allCount = Array.isArray(nextConfig.tts?.allDevices) ? nextConfig.tts.allDevices.length : 0;
   const alarmCount = Array.isArray(nextConfig.tts?.alarmDevices) ? nextConfig.tts.alarmDevices.length : 0;
@@ -3222,6 +3239,7 @@ function configSaveSummary(nextConfig) {
 
   return [
     `${commandCount} aktive Loxone-Befehl(e)`,
+    `Alexa-Modus: ${switchCount} Schalter, ${actionCount} Aktion(en)`,
     bridgeText,
     `Alexa TTS: ${ttsText}`,
     modeText
@@ -3508,7 +3526,10 @@ function renderAlexaDevices() {
     const title = document.createElement('strong');
     title.textContent = device.name;
     const note = document.createElement('p');
-    note.textContent = `Sprachbeispiel: Alexa, ${device.name} an | Befehl: ${device.command}`;
+    const modeText = device.alexaMode === 'action'
+      ? 'Aktion: Einschalten löst aus, Ausschalten wird ignoriert'
+      : 'Schalter: Ein/Aus';
+    note.textContent = `Sprachbeispiel: Alexa, ${device.name} an | ${modeText} | Befehl: ${device.command}`;
     card.append(title, note);
     alexaDevices.append(card);
   });

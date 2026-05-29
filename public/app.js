@@ -2833,7 +2833,7 @@ function createCommandCard(commandKey, command) {
     </select></label>
     <label>Aus-Befehl (optional)<input class="command-off-command" type="text" placeholder="z. B. kueche_licht_aus"></label>
     <label>Alexa-Gerät<span class="checkbox-row inline"><input class="command-alexa-expose" type="checkbox"><span>Als Alexa-Gerät anbieten</span></span></label>
-    <p class="field-hint">Schalter sucht beim Ausschalten zuerst den optionalen Aus-Befehl, sonst einen passenden Aus-Befehl im gleichen Raum und mit gleicher Funktion. Aktion ist für Taster, Szenen oder Roboterbefehle gedacht: Einschalten löst aus, Ausschalten wird ignoriert. Befehle ohne Alexa-Gerät bleiben intern aktiv und können weiter zum Testen, für URLs oder als Aus-Befehl genutzt werden.</p>
+    <p class="field-hint">Schalter verwendet Ein und Aus. Beim Ausschalten nutzt LoxEvo zuerst den optionalen Aus-Befehl, sonst einen passenden Aus-Befehl im gleichen Raum und mit gleicher Funktion. Aktion ist ein einzelnes Signal: Einschalten löst den Befehl aus, Ausschalten wird ignoriert. Befehle ohne Alexa-Gerät bleiben intern aktiv und können weiter zum Testen, für URLs oder als Aus-Befehl genutzt werden.</p>
   `;
   alexa.querySelector('.command-alexa-mode').value = command.alexaMode === 'action' ? 'action' : 'switch';
   alexa.querySelector('.command-off-command').value = command.offCommand || '';
@@ -2842,7 +2842,8 @@ function createCommandCard(commandKey, command) {
   const raw = document.createElement('div');
   raw.className = 'form-row';
   raw.innerHTML = `
-    <label>Loxone Pfad / Spezialpfad<input class="command-path" type="text" placeholder="Nur für Befehlstyp raw"></label>
+    <label>Spezialpfad (nur bei raw)<input class="command-path" type="text" placeholder="Nur bei Befehlstyp raw aktiv"></label>
+    <p class="field-hint">Für changeTo, direct und pulse reichen UUID und Wert/Befehl. Raw ist nur für spezielle Loxone-Pfade gedacht, die nicht in dieses Schema passen.</p>
   `;
   raw.querySelector('.command-path').value = target.path;
 
@@ -3523,7 +3524,7 @@ function updatePathFieldState(card) {
   pathInput.disabled = !isRaw;
   pathInput.placeholder = isRaw
     ? '/jdev/sps/io/{uuid}/pulse oder kompletter Spezialpfad'
-    : 'Nur für Befehlstyp raw';
+    : 'Nur bei Befehlstyp raw aktiv';
   pathInput.closest('label')?.classList.toggle('is-disabled', !isRaw);
 }
 

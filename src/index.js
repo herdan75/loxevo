@@ -74,6 +74,10 @@ async function handleRequest(req, res, { bridgeOnly = false } = {}) {
       return serveStatic(res, 'index.html');
     }
 
+    if (req.method === 'GET' && url.pathname === '/favicon.ico') {
+      return serveStatic(res, 'loxevo-logo.png');
+    }
+
     if (req.method === 'GET' && url.pathname.startsWith('/assets/')) {
       return serveStatic(res, url.pathname.replace('/assets/', ''));
     }

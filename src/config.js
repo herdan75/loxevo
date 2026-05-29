@@ -48,19 +48,19 @@ function validateConfig(config) {
 
       const alexaMode = String(command.alexaMode || 'switch').trim().toLowerCase();
       if (!['switch', 'action'].includes(alexaMode)) {
-        throw new Error(`Unbekannter Alexa-Modus "${command.alexaMode}" fÃ¼r Befehl "${commandName}".`);
+        throw new Error(`Unbekannter Alexa-Modus "${command.alexaMode}" für Befehl "${commandName}".`);
       }
       const offCommand = normalizeConfigCommandKey(command.offCommand);
       if (offCommand) {
         if (offCommand === commandName) {
-          throw new Error(`Aus-Befehl "${offCommand}" fÃ¼r Befehl "${commandName}" darf nicht auf sich selbst zeigen.`);
+          throw new Error(`Aus-Befehl "${offCommand}" für Befehl "${commandName}" darf nicht auf sich selbst zeigen.`);
         }
         const targetCommand = config.commands[offCommand];
         if (!targetCommand) {
-          throw new Error(`Aus-Befehl "${offCommand}" fÃ¼r Befehl "${commandName}" wurde nicht gefunden.`);
+          throw new Error(`Aus-Befehl "${offCommand}" für Befehl "${commandName}" wurde nicht gefunden.`);
         }
         if (targetCommand.enabled === false) {
-          throw new Error(`Aus-Befehl "${offCommand}" fÃ¼r Befehl "${commandName}" ist deaktiviert.`);
+          throw new Error(`Aus-Befehl "${offCommand}" für Befehl "${commandName}" ist deaktiviert.`);
         }
       }
 

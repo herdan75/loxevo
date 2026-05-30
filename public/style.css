@@ -1349,6 +1349,17 @@ input[type='range'] {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.bridge-id-row {
+  grid-template-columns: minmax(260px, 1fr) auto;
+  align-items: end;
+}
+
+.bridge-id-action {
+  display: flex;
+  align-items: end;
+  min-height: 64px;
+}
+
 .form-row.command-alexa-grid {
   grid-template-columns:
     minmax(180px, 1fr)

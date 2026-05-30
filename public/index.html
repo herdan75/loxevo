@@ -232,7 +232,17 @@
                 <input id="alexaBridgeAdvertisePort" type="number" min="1" max="65535" placeholder="80">
               </label>
             </div>
-            <p class="field-hint">Nach dem Speichern in der Alexa-App nach neuen Geräten suchen. Jeder aktive Befehl wird als virtuelles Gerät angeboten. Alexa/Hue sollte Port 80 verwenden; die Web-UI kann weiter auf Port 8080 laufen. Bei mehreren Netzwerkschnittstellen hier die echte LAN-IP eintragen.</p>
+            <div class="form-row bridge-id-row">
+              <label>
+                Alexa-Bridge-ID
+                <input id="alexaBridgeId" type="text" placeholder="Automatisch">
+              </label>
+              <div class="bridge-id-action">
+                <button id="regenerateBridgeIdBtn" type="button" class="secondary">Neue Bridge-ID erzeugen</button>
+              </div>
+            </div>
+            <p class="field-hint">Als Alexa-Gerät erscheinen nur aktive Befehle, bei denen „Als Alexa-Gerät anbieten” aktiv ist. Wenn Alexa gelöschte alte Geräte trotzdem wiederfindet, kann eine neue Bridge-ID helfen. Danach Konfiguration speichern, LoxEvo neu starten, alte LoxEvo-Geräte in Alexa löschen und neu suchen lassen.</p>
+            <p class="field-hint">Nach dem Speichern in der Alexa-App nach neuen Geräten suchen. Alexa/Hue sollte Port 80 verwenden; die Web-UI kann weiter auf Port 8080 laufen. Bei mehreren Netzwerkschnittstellen hier die echte LAN-IP eintragen.</p>
             <p class="field-hint">Alexa merkt sich gefundene Geräte und deren Typ. Wenn Gerätenamen, Befehle oder der Gerätetyp geändert wurden, alte LoxEvo-Geräte in der Alexa-App löschen und danach neu suchen lassen.</p>
             <p class="field-hint">Pro Befehl kann unter „Befehle und Sprachnamen” der Alexa-Modus gewählt werden: „Schalter” für Ein/Aus-Befehle oder „Aktion” für einzelne Auslöser, bei denen nur Einschalten relevant ist.</p>
             </div>

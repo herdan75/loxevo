@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: Source available](https://img.shields.io/badge/License-source--available-orange.svg)](LICENSE)
 
-> **Status: Version 1.0.7 / getestete lauffähige Version**
+> **Status: Version 1.0.8 / getestete lauffähige Version**
 >
 > LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte, Alexa-Gerätesuche, Alexa-TTS, Rückmeldungen, Backup und Web-UI wurden soweit möglich getestet. Trotzdem können in einzelnen Loxone-/Alexa-Umgebungen noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
@@ -219,6 +219,7 @@ Wenn `alexaBridge.enabled` aktiv ist, bietet LoxEvo jeden aktiven Befehl als vir
 
 Technisch ist das ein lokaler Hue-kompatibler V1-Bridge-Eingang nur für Alexa-Discovery und Ein/Aus-Befehle. Es wird keine Hue-Bridge und keine Hue-Lampe benötigt; LoxEvo nutzt nur das lokale Discovery/API-Verhalten, damit Alexa ohne eigene Cloud-Skill-Entwicklung virtuelle Geräte finden kann.
 Alexa merkt sich bereits gefundene Geräte und deren Typ teilweise dauerhaft. Wenn Gerätenamen, Befehle oder der Gerätetyp geändert wurden, sollten die alten LoxEvo-Geräte in der Alexa-App gelöscht und danach neu gesucht werden.
+Wenn Alexa gelöschte alte Geräte trotz bereinigter LoxEvo-Geräteliste wiederfindet, kann unter `Konfiguration -> Alexa-Geräte` eine neue Alexa-Bridge-ID erzeugt werden. Danach die Konfiguration speichern, LoxEvo neu starten, alte LoxEvo-Geräte in Alexa löschen und die Gerätesuche erneut starten.
 
 Für die Gerätesuche muss LoxEvo im gleichen LAN wie die Echo-Geräte erreichbar sein. Im Docker/LoxBerry-Betrieb ist `network_mode: host` deshalb der empfohlene Modus, weil SSDP/UDP 1900 sonst oft nicht sauber bis in den Container gelangt.
 Für neuere Echo-Geräte sollte die Alexa-Bridge über Port 80 erreichbar sein. Die Web-UI kann weiter auf Port 8080 laufen; LoxEvo startet bei abweichendem `alexaBridge.advertisePort` einen zusätzlichen Alexa/Hue-HTTP-Listener.

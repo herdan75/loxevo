@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.8 - 2026-05-30
+
+- Web-UI um eine Aktion zum Erzeugen einer neuen Alexa-Bridge-ID erweitert, damit Alexa alte gelöschte Hue-/LoxEvo-Geräte nicht wieder aus der bisherigen Bridge-Historie hochzieht.
+- Hinweise zur Alexa-Gerätesuche präzisiert: Nur aktive Befehle mit `Als Alexa-Gerät anbieten` werden als virtuelle Alexa-Geräte angeboten.
+
 ## 1.0.7 - 2026-05-30
 
 - Alexa-Gerätenamen priorisieren jetzt den gepflegten Sprachnamen und Anzeigenamen, damit automatisch zusammengesetzte Doppelungen wie `Reinigung Bad Bad` vermieden werden.

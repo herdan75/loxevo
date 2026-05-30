@@ -40,6 +40,8 @@ const alexaBridgeEnabled = document.querySelector('#alexaBridgeEnabled');
 const alexaBridgeName = document.querySelector('#alexaBridgeName');
 const alexaBridgeAdvertiseIp = document.querySelector('#alexaBridgeAdvertiseIp');
 const alexaBridgeAdvertisePort = document.querySelector('#alexaBridgeAdvertisePort');
+const alexaBridgeId = document.querySelector('#alexaBridgeId');
+const regenerateBridgeIdBtn = document.querySelector('#regenerateBridgeIdBtn');
 const discoveryStatus = document.querySelector('#discoveryStatus');
 const discoveryHelpBtn = document.querySelector('#discoveryHelpBtn');
 const discoveryHelpText = document.querySelector('#discoveryHelpText');
@@ -187,6 +189,7 @@ ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
 discoveryHelpBtn?.addEventListener('click', () => toggleDiscoveryHelp());
 startDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('start', startDiscoveryBtn));
 stopDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('stop', stopDiscoveryBtn));
+regenerateBridgeIdBtn?.addEventListener('click', () => regenerateAlexaBridgeId());
 refreshTtsDevicesBtn?.addEventListener('click', () => loadTtsDevices(refreshTtsDevicesBtn));
 showAllTtsDeviceTypes?.addEventListener('change', () => {
   localStorage.setItem(SHOW_ALL_TTS_DEVICE_TYPES_KEY, showAllTtsDeviceTypes.checked ? 'true' : 'false');
@@ -1485,6 +1488,30 @@ function toggleDiscoveryHelp() {
   toggleHelpBox(discoveryHelpBtn, discoveryHelpText);
 }
 
+function regenerateAlexaBridgeId() {
+  if (!alexaBridgeId) return;
+  alexaBridgeId.value = createAlexaBridgeId();
+  showToast('Neue Bridge-ID erzeugt. Bitte Konfiguration speichern und LoxEvo neu starten.', 'ok');
+  markConfigDirty();
+  scheduleJsonSyncFromForms();
+}
+
+function createAlexaBridgeId() {
+  const bytes = new Uint8Array(3);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  const suffix = Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
+  return `001788FFFE${suffix}`;
+}
+
 function toggleHelpBox(button, helpText) {
   if (!button || !helpText) return;
   const nextHidden = !helpText.hidden;
@@ -2640,6 +2667,7 @@ function populateForms() {
   alexaBridgeName.value = config.alexaBridge?.name || 'LoxEvo';
   alexaBridgeAdvertiseIp.value = config.alexaBridge?.advertiseIp || '';
   alexaBridgeAdvertisePort.value = config.alexaBridge?.advertisePort ?? 80;
+  if (alexaBridgeId) alexaBridgeId.value = config.alexaBridge?.bridgeId || '';
 
   ttsEnabled.checked = Boolean(config.tts?.enabled);
   ttsCookieFile.value = config.tts?.cookieFile || '';
@@ -3270,7 +3298,7 @@ function collectConfigFromForms() {
   nextConfig.alexaBridge.name = alexaBridgeName.value.trim() || 'LoxEvo';
   nextConfig.alexaBridge.advertiseIp = alexaBridgeAdvertiseIp.value.trim();
   nextConfig.alexaBridge.advertisePort = numberInRange(alexaBridgeAdvertisePort.value, 80, 1, 65535);
-  nextConfig.alexaBridge.bridgeId ||= '';
+  nextConfig.alexaBridge.bridgeId = normalizeBridgeIdInput(alexaBridgeId?.value || '');
 
   nextConfig.commands = collectCommands();
   delete nextConfig.rooms;
@@ -3554,6 +3582,10 @@ function normalizeLoxoneUuidInput(value) {
   const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   if (match) return match[0].toLowerCase();
   return raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
+}
+
+function normalizeBridgeIdInput(value) {
+  return String(value || '').replace(/[^0-9a-f]/gi, '').toUpperCase().slice(0, 16);
 }
 
 function formatCommandTarget(command) {

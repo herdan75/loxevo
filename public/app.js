@@ -498,6 +498,7 @@ function discardConfigChanges() {
 function updateConfigDirtyNotice() {
   if (!configDirtyNotice) return;
   configDirtyNotice.hidden = !configDirty;
+  if (saveBtn) saveBtn.hidden = configDirty;
 }
 
 function hasConfigChangedFromSnapshot() {

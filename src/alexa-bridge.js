@@ -615,7 +615,7 @@ export class AlexaBridgeService {
 }
 
 function getAlexaDeviceName(command, commandKey) {
-  const raw = String(command.alexaName || buildCommandDisplayName(command) || command.voiceName || command.label || commandKey).trim();
+  const raw = String(command.voiceName || command.alexaName || command.label || buildCommandDisplayName(command) || commandKey).trim();
   return raw.replace(/\s+(an|ein|einschalten)$/i, '') || commandKey;
 }
 

@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.7 - 2026-05-30
+
+- Alexa-Gerätenamen priorisieren jetzt den gepflegten Sprachnamen und Anzeigenamen, damit automatisch zusammengesetzte Doppelungen wie `Reinigung Bad Bad` vermieden werden.
+- Infotext zu `Befehl verwenden` präzisiert: deaktivierte Befehle werden nicht ausgeführt und erscheinen auch dann nicht in der Alexa-Gerätesuche, wenn `Als Alexa-Gerät anbieten` gesetzt ist.
+- README-Status auf den getesteten Stand aktualisiert und die Beschreibung für virtuelle Alexa-Geräte an `Als Alexa-Gerät anbieten` angepasst.
+
 ## 1.0.5 - 2026-05-29
 
 - MIT-Lizenz durch eine eingeschränkte Source-Available-Lizenz ersetzt, damit der Code sichtbar bleibt, aber nicht automatisch frei genutzt oder weiterverbreitet werden darf.

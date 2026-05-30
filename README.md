@@ -4,9 +4,9 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: Source available](https://img.shields.io/badge/License-source--available-orange.svg)](LICENSE)
 
-> **Status: Version 1.0.6 / erste lauffähige Version**
+> **Status: Version 1.0.7 / getestete lauffähige Version**
 >
-> LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die wichtigsten Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte und Alexa-TTS sind umgesetzt und getestet. Trotzdem können noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
+> LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte, Alexa-Gerätesuche, Alexa-TTS, Rückmeldungen, Backup und Web-UI wurden soweit möglich getestet. Trotzdem können in einzelnen Loxone-/Alexa-Umgebungen noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
 Eigene LoxBerry-Zentrale für Alexa, Echo-TTS und Loxone.
 
@@ -215,7 +215,7 @@ Die alte Kurzform `/light/<raum>/<szene>` bleibt vorerst als Legacy-Einstieg erh
 
 ## Virtuelle Alexa-Geräte
 
-Wenn `alexaBridge.enabled` aktiv ist, bietet LoxEvo jeden aktiven Befehl als virtuelles Alexa-Gerät an. In der Web-UI unter `Konfiguration -> Alexa-Geräte` kann die lokale Brücke aktiviert werden.
+Wenn `alexaBridge.enabled` aktiv ist, bietet LoxEvo jeden aktiven Befehl als virtuelles Alexa-Gerät an, bei dem `Als Alexa-Gerät anbieten` aktiv ist. In der Web-UI unter `Konfiguration -> Alexa-Geräte` kann die lokale Brücke aktiviert werden.
 
 Technisch ist das ein lokaler Hue-kompatibler V1-Bridge-Eingang nur für Alexa-Discovery und Ein/Aus-Befehle. Es wird keine Hue-Bridge und keine Hue-Lampe benötigt; LoxEvo nutzt nur das lokale Discovery/API-Verhalten, damit Alexa ohne eigene Cloud-Skill-Entwicklung virtuelle Geräte finden kann.
 Alexa merkt sich bereits gefundene Geräte und deren Typ teilweise dauerhaft. Wenn Gerätenamen, Befehle oder der Gerätetyp geändert wurden, sollten die alten LoxEvo-Geräte in der Alexa-App gelöscht und danach neu gesucht werden.

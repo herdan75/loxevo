@@ -2812,7 +2812,7 @@ function createCommandCard(commandKey, command) {
     <label class="option-label">
       <span class="option-label-head">Aktiv<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Befehl verwenden erklären">i</button></span>
       <span class="checkbox-row inline"><input class="command-enabled" type="checkbox"><span>Befehl verwenden</span></span>
-      <span class="compact-help inline-help-text" hidden>Befehl verwenden aktiviert diesen Eintrag in LoxEvo. Nur aktive Befehle können getestet, per URL aufgerufen, von Alexa ausgelöst oder als interner Aus-Befehl verwendet werden. Wenn der Haken entfernt ist, bleibt der Eintrag gespeichert, wird aber nicht ausgeführt.</span>
+      <span class="compact-help inline-help-text" hidden>Befehl verwenden aktiviert diesen Eintrag in LoxEvo. Nur aktive Befehle können getestet, per URL aufgerufen, von Alexa ausgelöst oder als interner Aus-Befehl verwendet werden. Wenn der Haken entfernt ist, bleibt der Eintrag gespeichert, wird aber nicht ausgeführt und erscheint auch nicht bei der Alexa-Gerätesuche, selbst wenn Als Alexa-Gerät anbieten aktiv ist.</span>
     </label>
   `;
   loxone.querySelector('.command-type').value = target.type;

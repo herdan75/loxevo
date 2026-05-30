@@ -18,6 +18,26 @@ export function readCommandTarget(command = {}) {
   };
 }
 
+export function readCommandOffTarget(command = {}) {
+  const loxone = command.loxone || {};
+  const target = readCommandTarget(command);
+  const type = target.type;
+
+  return {
+    type,
+    uuid: normalizeLoxoneUuid(loxone.offUuid || target.uuid || ''),
+    value: loxone.offValue ?? loxone.offCommand ?? '',
+    path: loxone.offPath || ''
+  };
+}
+
+export function hasCommandOffTarget(command = {}) {
+  const target = readCommandOffTarget(command);
+  if (target.type === 'raw') return Boolean(String(target.path || '').trim());
+  if (target.type === 'pulse') return false;
+  return Boolean(String(target.value || '').trim());
+}
+
 export function normalizeCommandType(value) {
   const raw = String(value || '').trim().toLowerCase();
   if (raw === 'changeto' || raw === 'change_to') return 'changeTo';

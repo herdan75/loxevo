@@ -266,6 +266,17 @@ Optional kann pro Befehl eine TTS-Rueckmeldung aktiviert werden. Dann spricht Lo
 
 ### Licht aus bei Szenen
 
+Empfohlen fÃ¼r einfache Lichtbausteine: Ein sichtbares RaumgerÃ¤t kann direkt einen eigenen Aus-Wert haben. Beispiel: `Licht KÃ¼che` sendet bei `ein` den Wert `1` fÃ¼r Ambient und bei `aus` den `Aus-Wert/Pfad` `778`. DafÃ¼r ist kein separater Hilfsbefehl `kueche_licht_aus` nÃ¶tig.
+
+```text
+Befehl: kueche_licht
+Sprachname: Licht KÃ¼che
+Wert/Befehl: 1
+Aus-Wert/Pfad: 778
+Alexa-Modus: Schalter
+Als Alexa-GerÃ¤t anbieten: ja
+```
+
 Für Licht-Szenen gibt es mehrere sinnvolle Varianten. Welche besser passt, hängt davon ab, ob Alexa den Aus-Befehl als eigenes Gerät sehen soll oder ob LoxEvo ihn nur intern nutzen soll.
 
 Variante 1: Separates Alexa-Gerät für `Aus`.

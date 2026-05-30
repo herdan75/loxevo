@@ -161,6 +161,20 @@ function normalizeConfig(config) {
       if (command.alexaExpose !== false) {
         delete command.alexaExpose;
       }
+      if (command.loxone && typeof command.loxone === 'object') {
+        const offValue = String(command.loxone.offValue ?? '').trim();
+        const offPath = String(command.loxone.offPath || '').trim();
+        if (offValue) {
+          command.loxone.offValue = offValue;
+        } else {
+          delete command.loxone.offValue;
+        }
+        if (offPath) {
+          command.loxone.offPath = offPath;
+        } else {
+          delete command.loxone.offPath;
+        }
+      }
       const confirmation = command.confirmation && typeof command.confirmation === 'object'
         ? command.confirmation
         : {};

@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
+import { hasCommandOffTarget } from './command-utils.js';
 
 const SSDP_ADDRESS = '239.255.255.250';
 const SSDP_PORT = 1900;
@@ -222,9 +223,9 @@ export class AlexaBridgeService {
         this.scheduleActionStateReset(id);
       }
 
-      const commandKey = this.resolveHueCommandKey(device, requestedState);
-      if (commandKey) {
-        this.executeHueCommand(commandKey);
+      const commandRequest = this.resolveHueCommand(device, requestedState);
+      if (commandRequest) {
+        this.executeHueCommand(commandRequest);
       }
     }
 
@@ -239,11 +240,15 @@ export class AlexaBridgeService {
     return helpers.sendJson(res, response);
   }
 
-  resolveHueCommandKey(device, requestedState) {
+  resolveHueCommand(device, requestedState) {
     if (requestedState === undefined) return null;
-    if (requestedState) return device.commandKey;
+    if (requestedState) return { commandKey: device.commandKey };
     if (device.alexaMode === 'action') return null;
-    return this.findPairedOffCommandKey(device.commandKey);
+    if (this.hasInlineOffTarget(device.commandKey)) {
+      return { commandKey: device.commandKey, offTarget: true };
+    }
+    const pairedCommandKey = this.findPairedOffCommandKey(device.commandKey);
+    return pairedCommandKey ? { commandKey: pairedCommandKey } : null;
   }
 
   scheduleActionStateReset(id) {
@@ -255,13 +260,15 @@ export class AlexaBridgeService {
     this.actionResetTimers.set(id, timer);
   }
 
-  executeHueCommand(commandKey) {
-    if (!this.shouldExecuteCommand(commandKey)) {
-      console.log(`Alexa-Bridge duplicate command ignored: ${commandKey}`);
+  executeHueCommand(commandRequest) {
+    const commandKey = commandRequest.commandKey;
+    const cooldownKey = commandRequest.offTarget ? `${commandKey}:off` : commandKey;
+    if (!this.shouldExecuteCommand(cooldownKey)) {
+      console.log(`Alexa-Bridge duplicate command ignored: ${cooldownKey}`);
       return;
     }
 
-    this.handlers.executeCommand(commandKey).catch((error) => {
+    this.handlers.executeCommand(commandKey, { offTarget: commandRequest.offTarget === true }).catch((error) => {
       console.warn(`Alexa-Bridge command failed (${commandKey}): ${error.message}`);
       this.handlers.addEvent?.({
         type: 'alexa-command',
@@ -270,6 +277,13 @@ export class AlexaBridgeService {
         text: error.message
       });
     });
+  }
+
+  hasInlineOffTarget(commandKey) {
+    const commands = this.handlers.getCommands?.() || {};
+    const source = commands[commandKey];
+    if (!source || isOffAction(source.action)) return false;
+    return hasCommandOffTarget(source);
   }
 
   findPairedOffCommandKey(commandKey) {

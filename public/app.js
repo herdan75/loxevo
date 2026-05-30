@@ -2786,7 +2786,9 @@ function filterConfiguredCommands(entries) {
       target.type,
       target.uuid,
       target.value,
-      target.path
+      target.path,
+      target.offValue,
+      target.offPath
     ].some((value) => normalizeText(value).includes(query));
   });
 }
@@ -2924,6 +2926,16 @@ function createCommandCard(commandKey, command) {
   `;
   alexa.querySelector('.command-alexa-mode').value = command.alexaMode === 'action' ? 'action' : 'switch';
   alexa.querySelector('.command-off-command').value = command.offCommand || '';
+  const offTargetLabel = document.createElement('label');
+  offTargetLabel.className = 'option-label';
+  offTargetLabel.innerHTML = `
+    <span class="option-label-head">Aus-Wert/Pfad (optional)<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Aus-Wert oder Aus-Pfad erklÃ¤ren">i</button></span>
+    <input class="command-off-target" type="text" placeholder="z. B. 778">
+    <span class="compact-help inline-help-text" hidden>Einfacher Ausschaltwert direkt am selben Alexa-Schalter. FÃ¼r changeTo/direct wird dieser Wert mit derselben UUID gesendet, zum Beispiel Ein=1 und Aus=778. Bei raw ist hier ein kompletter Aus-Pfad mÃ¶glich. Wenn dieses Feld gefÃ¼llt ist, braucht es fÃ¼r diesen Schalter keinen separaten internen Aus-Befehl.</span>
+  `;
+  const alexaExposeLabel = alexa.querySelector('.command-alexa-expose')?.closest('.option-label');
+  alexa.insertBefore(offTargetLabel, alexaExposeLabel || alexa.firstChild);
+  alexa.querySelector('.command-off-target').value = target.type === 'raw' ? target.offPath : target.offValue;
   alexa.querySelector('.command-alexa-expose').checked = command.alexaExpose !== false;
   alexa.querySelector('.command-confirmation-enabled').checked = command.confirmation?.enabled === true;
   alexa.querySelector('.command-confirmation-text').value = command.confirmation?.text || 'OK';
@@ -2965,6 +2977,8 @@ function commandSummaryMeta(command) {
     alexaMode,
     command.alexaExpose === false ? 'intern' : 'Alexa',
     command.offCommand ? `Aus: ${command.offCommand}` : '',
+    target.offValue ? `Aus-Wert: ${target.offValue}` : '',
+    target.offPath ? `Aus-Pfad: ${target.offPath}` : '',
     command.confirmation?.enabled ? `Rueckmeldung: ${command.confirmation.text || 'OK'}` : '',
     target.type,
     command.room && displayPart(command.room),
@@ -3362,6 +3376,7 @@ function collectCommands() {
     const loxoneType = card.querySelector('.command-type').value;
     const alexaMode = card.querySelector('.command-alexa-mode')?.value || 'switch';
     const offCommand = normalizeInputKey(card.querySelector('.command-off-command')?.value || '');
+    const offTarget = card.querySelector('.command-off-target')?.value.trim() || '';
     const alexaExpose = card.querySelector('.command-alexa-expose')?.checked !== false;
     const confirmationEnabled = card.querySelector('.command-confirmation-enabled')?.checked === true;
     const confirmationText = card.querySelector('.command-confirmation-text')?.value.trim() || 'OK';
@@ -3381,7 +3396,9 @@ function collectCommands() {
         type: loxoneType,
         uuid: normalizeLoxoneUuidInput(card.querySelector('.command-uuid').value),
         value: card.querySelector('.command-value').value.trim(),
-        path: loxoneType === 'raw' ? card.querySelector('.command-path').value.trim() : ''
+        path: loxoneType === 'raw' ? card.querySelector('.command-path').value.trim() : '',
+        ...(offTarget && loxoneType === 'raw' ? { offPath: offTarget } : {}),
+        ...(offTarget && loxoneType !== 'raw' ? { offValue: offTarget } : {})
       },
       enabled: card.querySelector('.command-enabled').checked
     };
@@ -3504,7 +3521,9 @@ function getCommandTarget(command) {
     type,
     uuid: loxone.uuid || command.loxoneUuid || '',
     value: loxone.value ?? loxone.command ?? command.loxoneCommand ?? '',
-    path: loxone.path || command.loxonePath || ''
+    path: loxone.path || command.loxonePath || '',
+    offValue: loxone.offValue ?? '',
+    offPath: loxone.offPath || ''
   };
 }
 
@@ -3633,6 +3652,7 @@ function formatCommandTarget(command) {
 function updatePathFieldState(card) {
   const type = card.querySelector('.command-type')?.value;
   const pathInput = card.querySelector('.command-path');
+  const offTargetInput = card.querySelector('.command-off-target');
   if (!pathInput) return;
 
   const isRaw = type === 'raw';
@@ -3641,6 +3661,11 @@ function updatePathFieldState(card) {
     ? '/jdev/sps/io/{uuid}/pulse oder kompletter Spezialpfad'
     : 'Nur bei Befehlstyp raw aktiv';
   pathInput.closest('label')?.classList.toggle('is-disabled', !isRaw);
+  if (offTargetInput) {
+    offTargetInput.placeholder = isRaw
+      ? '/jdev/sps/io/{uuid}/FullDown'
+      : 'z. B. 778';
+  }
 }
 
 function groupCommandsByCategory(entries) {

@@ -33,7 +33,8 @@
       "loxone": {
         "type": "changeTo",
         "uuid": "replace-with-loxone-lightcontroller-uuid",
-        "value": "777"
+        "value": "777",
+        "offValue": "778"
       },
       "confirmation": {
         "enabled": false,

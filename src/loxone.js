@@ -1,4 +1,4 @@
-import { normalizeCommandType, normalizeLoxoneUuid, readCommandTarget } from './command-utils.js';
+import { hasCommandOffTarget, normalizeCommandType, normalizeLoxoneUuid, readCommandOffTarget, readCommandTarget } from './command-utils.js';
 
 export class LoxoneClient {
   constructor(config) {
@@ -28,6 +28,34 @@ export class LoxoneClient {
       room: command.room || '',
       functionName: command.function || '',
       action: command.action || '',
+      type: target.type,
+      uuid: target.uuid,
+      command: target.value,
+      path: target.path
+    });
+  }
+
+  async runCommandOff(commandKey) {
+    const command = this.commands[commandKey];
+    if (!command) {
+      throw new Error(`Unbekannter Befehl: ${commandKey}`);
+    }
+    if (command.enabled === false) {
+      throw new Error(`Befehl ist deaktiviert: ${commandKey}`);
+    }
+    if (!hasCommandOffTarget(command)) {
+      throw new Error(`Ausschaltwert fehlt fÃ¼r Befehl: ${commandKey}`);
+    }
+
+    const target = readCommandOffTarget(command);
+    return await this.sendLoxoneCommand({
+      key: commandKey,
+      label: command.label || commandKey,
+      voiceName: command.voiceName || command.label || commandKey,
+      category: command.category || command.function || 'allgemein',
+      room: command.room || '',
+      functionName: command.function || '',
+      action: 'aus',
       type: target.type,
       uuid: target.uuid,
       command: target.value,

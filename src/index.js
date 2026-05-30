@@ -726,8 +726,11 @@ async function runConfiguredCommand(res, commandKey) {
   return sendJson(res, { ok: true, result });
 }
 
-async function executeConfiguredCommand(commandKey, source) {
-  const result = await loxone.runCommand(normalizeKey(commandKey));
+async function executeConfiguredCommand(commandKey, source, options = {}) {
+  const normalizedCommandKey = normalizeKey(commandKey);
+  const result = options.offTarget
+    ? await loxone.runCommandOff(normalizedCommandKey)
+    : await loxone.runCommand(normalizedCommandKey);
   addEvent({
     type: source,
     status: result.dryRun ? 'dry-run' : 'sent',
@@ -1763,8 +1766,8 @@ function createAlexaBridge() {
   });
 }
 
-async function executeAlexaBridgeCommand(commandKey) {
-  const result = await executeConfiguredCommand(commandKey, 'alexa-command');
+async function executeAlexaBridgeCommand(commandKey, options = {}) {
+  const result = await executeConfiguredCommand(commandKey, 'alexa-command', options);
   triggerAlexaCommandConfirmation(result.key || commandKey);
   return result;
 }

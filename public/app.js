@@ -141,9 +141,11 @@ const ADMIN_TOKEN_STORAGE_KEY = 'loxevoAdminToken';
 const LAST_BACKUP_EXPORT_KEY = 'loxevoLastBackupExportAt';
 const SETUP_WIZARD_SKIPPED_KEY = 'loxevoSetupWizardSkipped';
 const SHOW_ALL_TTS_DEVICE_TYPES_KEY = 'loxevoShowAllTtsDeviceTypes';
+const HELP_TOOLTIP_MARGIN = 10;
 let wizardStepIndex = 0;
 let configDirtyRenderTimer = null;
 let jsonSyncTimer = null;
+let activeHelpTooltip = null;
 
 load();
 
@@ -192,6 +194,7 @@ saveAdminTokenBtn?.addEventListener('click', () => saveAdminToken(saveAdminToken
 disableAdminTokenBtn?.addEventListener('click', () => disableAdminToken(disableAdminTokenBtn));
 ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
 discoveryHelpBtn?.addEventListener('click', () => toggleDiscoveryHelp());
+bindStaticHelpTooltips();
 startDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('start', startDiscoveryBtn));
 stopDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('stop', stopDiscoveryBtn));
 regenerateBridgeIdBtn?.addEventListener('click', () => regenerateAlexaBridgeId());
@@ -239,10 +242,19 @@ tabButtons.forEach((button) => {
   button.addEventListener('click', () => showView(button.dataset.tabTarget));
 });
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') hideHelpTooltip();
   if (event.key === 'Escape' && wizardModal && !wizardModal.hidden) {
     closeWizard();
   }
 });
+document.addEventListener('click', (event) => {
+  if (!activeHelpTooltip) return;
+  if (event.target.closest?.('.help-tooltip')) return;
+  if (event.target.closest?.('.info-button')) return;
+  hideHelpTooltip();
+});
+window.addEventListener('resize', () => hideHelpTooltip());
+window.addEventListener('scroll', () => hideHelpTooltip(), true);
 
 async function load() {
   try {
@@ -1400,10 +1412,7 @@ function renderSystemNotice() {
       help.textContent = issue.help;
       help.hidden = true;
 
-      button.addEventListener('click', () => {
-        help.hidden = !help.hidden;
-        button.setAttribute('aria-expanded', String(!help.hidden));
-      });
+      bindHelpTooltip(button, () => help.textContent);
 
       item.append(button, help);
     }
@@ -1520,9 +1529,97 @@ function createAlexaBridgeId() {
 
 function toggleHelpBox(button, helpText) {
   if (!button || !helpText) return;
-  const nextHidden = !helpText.hidden;
-  helpText.hidden = nextHidden;
-  button.setAttribute('aria-expanded', String(!nextHidden));
+  const content = helpText.innerHTML || helpText.textContent || '';
+  toggleHelpTooltip(button, content);
+}
+
+function bindHelpTooltip(button, getContent) {
+  if (!button || button.dataset.tooltipBound === 'true') return;
+  button.dataset.tooltipBound = 'true';
+  button.addEventListener('mouseenter', () => {
+    const content = getContent?.();
+    if (content) showHelpTooltip(button, content, false);
+  });
+  button.addEventListener('mouseleave', () => {
+    if (activeHelpTooltip?.button === button && !activeHelpTooltip.pinned) hideHelpTooltip();
+  });
+  button.addEventListener('focus', () => {
+    const content = getContent?.();
+    if (content) showHelpTooltip(button, content, false);
+  });
+  button.addEventListener('blur', () => {
+    if (activeHelpTooltip?.button === button && !activeHelpTooltip.pinned) hideHelpTooltip();
+  });
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const content = getContent?.();
+    if (content) toggleHelpTooltip(button, content);
+  });
+}
+
+function bindStaticHelpTooltips(scope = document) {
+  scope.querySelectorAll('.info-button[aria-controls]').forEach((button) => {
+    const helpId = button.getAttribute('aria-controls');
+    const helpText = helpId ? document.getElementById(helpId) : null;
+    if (!helpText || button.dataset.tooltipHoverBound === 'true') return;
+    button.dataset.tooltipHoverBound = 'true';
+    button.addEventListener('mouseenter', () => showHelpTooltip(button, helpText.innerHTML || helpText.textContent || '', false));
+    button.addEventListener('mouseleave', () => {
+      if (activeHelpTooltip?.button === button && !activeHelpTooltip.pinned) hideHelpTooltip();
+    });
+    button.addEventListener('focus', () => showHelpTooltip(button, helpText.innerHTML || helpText.textContent || '', false));
+    button.addEventListener('blur', () => {
+      if (activeHelpTooltip?.button === button && !activeHelpTooltip.pinned) hideHelpTooltip();
+    });
+  });
+}
+
+function toggleHelpTooltip(button, content) {
+  if (activeHelpTooltip?.button === button && activeHelpTooltip.pinned) {
+    hideHelpTooltip();
+    return;
+  }
+  showHelpTooltip(button, content, true);
+}
+
+function showHelpTooltip(button, content, pinned = false) {
+  if (!button || !String(content || '').trim()) return;
+  hideHelpTooltip();
+  const tooltip = document.createElement('div');
+  tooltip.className = 'help-tooltip';
+  tooltip.setAttribute('role', 'tooltip');
+  tooltip.innerHTML = content;
+  document.body.append(tooltip);
+  activeHelpTooltip = { button, tooltip, pinned };
+  button.setAttribute('aria-expanded', 'true');
+  positionHelpTooltip(button, tooltip);
+}
+
+function hideHelpTooltip() {
+  if (!activeHelpTooltip) return;
+  activeHelpTooltip.button?.setAttribute('aria-expanded', 'false');
+  activeHelpTooltip.tooltip?.remove();
+  activeHelpTooltip = null;
+}
+
+function positionHelpTooltip(button, tooltip) {
+  const buttonRect = button.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
+  const belowTop = buttonRect.bottom + HELP_TOOLTIP_MARGIN;
+  const aboveTop = buttonRect.top - tooltipRect.height - HELP_TOOLTIP_MARGIN;
+  const top = belowTop + tooltipRect.height < viewportHeight - HELP_TOOLTIP_MARGIN
+    ? belowTop
+    : Math.max(HELP_TOOLTIP_MARGIN, aboveTop);
+  const preferredLeft = buttonRect.left + (buttonRect.width / 2) - (tooltipRect.width / 2);
+  const left = Math.min(
+    Math.max(HELP_TOOLTIP_MARGIN, preferredLeft),
+    Math.max(HELP_TOOLTIP_MARGIN, viewportWidth - tooltipRect.width - HELP_TOOLTIP_MARGIN)
+  );
+  tooltip.style.top = `${Math.round(top + window.scrollY)}px`;
+  tooltip.style.left = `${Math.round(left + window.scrollX)}px`;
 }
 
 function showView(viewId) {
@@ -1780,10 +1877,7 @@ function renderPreflightStatus() {
       help.className = 'preflight-help';
       help.textContent = helpText;
       help.hidden = true;
-      helpButton.addEventListener('click', () => {
-        help.hidden = !help.hidden;
-        helpButton.setAttribute('aria-expanded', String(!help.hidden));
-      });
+      bindHelpTooltip(helpButton, () => help.textContent);
       titleRow.append(label, helpButton);
       content.append(titleRow, detail, help);
 
@@ -2407,11 +2501,7 @@ function bindDashboardHelpButtons() {
     const help = button.getAttribute('aria-controls')
       ? document.getElementById(button.getAttribute('aria-controls'))
       : null;
-    button.addEventListener('click', () => {
-      if (!help) return;
-      help.hidden = !help.hidden;
-      button.setAttribute('aria-expanded', String(!help.hidden));
-    });
+    bindHelpTooltip(button, () => help?.innerHTML || help?.textContent || '');
   });
 }
 
@@ -2961,12 +3051,7 @@ function initInlineHelpButtons(scope) {
   scope.querySelectorAll('.inline-help-button').forEach((button) => {
     const help = button.closest('.option-label')?.querySelector('.inline-help-text');
     if (!help) return;
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      help.hidden = !help.hidden;
-      button.setAttribute('aria-expanded', String(!help.hidden));
-    });
+    bindHelpTooltip(button, () => help.innerHTML || help.textContent || '');
   });
 }
 

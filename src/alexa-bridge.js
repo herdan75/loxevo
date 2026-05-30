@@ -178,7 +178,9 @@ export class AlexaBridgeService {
     }
 
     if (req.method === 'GET' && pathParts.length === 2) {
-      return helpers.sendJson(res, { lights: this.getHueLights(), config: this.getHueConfig() });
+      const lights = this.getHueLights();
+      this.logHueListResponse(lights);
+      return helpers.sendJson(res, { lights, config: this.getHueConfig() });
     }
 
     if (req.method === 'GET' && pathParts.length === 3 && pathParts[2] === 'config') {
@@ -186,11 +188,15 @@ export class AlexaBridgeService {
     }
 
     if (req.method === 'GET' && pathParts.length === 3 && pathParts[2] === 'lights') {
-      return helpers.sendJson(res, this.getHueLights());
+      const lights = this.getHueLights();
+      this.logHueListResponse(lights);
+      return helpers.sendJson(res, lights);
     }
 
     if (req.method === 'GET' && pathParts.length === 4 && pathParts[2] === 'lights') {
-      const light = this.getHueLights()[pathParts[3]];
+      const lights = this.getHueLights();
+      const light = lights[pathParts[3]];
+      this.logHueLightResponse(pathParts[3], light);
       if (!light) return helpers.sendJson(res, [{ error: { type: 3, description: 'resource not available' } }], 404);
       return helpers.sendJson(res, light);
     }
@@ -615,6 +621,31 @@ export class AlexaBridgeService {
     this.handlers.addEvent?.({
       type: 'alexa-bridge-http',
       status: 'received',
+      text
+    });
+  }
+
+  logHueListResponse(lights) {
+    const values = Object.values(lights || {});
+    const dimmableCount = values.filter((light) => String(light?.type || '').toLowerCase().includes('dimmable')).length;
+    const brightnessCount = values.filter((light) => light?.state && Object.prototype.hasOwnProperty.call(light.state, 'bri')).length;
+    const text = `Alexa-Bridge liefert ${values.length} Gerät(e), ${dimmableCount} dimmbar, ${brightnessCount} mit Helligkeit.`;
+    console.log(text);
+    this.handlers.addEvent?.({
+      type: 'alexa-bridge-http',
+      status: 'response',
+      text
+    });
+  }
+
+  logHueLightResponse(id, light) {
+    const text = light
+      ? `Alexa-Bridge Gerät ${id}: ${light.name} (${light.type}, ${light.productname})`
+      : `Alexa-Bridge Gerät ${id}: nicht gefunden (404).`;
+    console.log(text);
+    this.handlers.addEvent?.({
+      type: 'alexa-bridge-http',
+      status: light ? 'response' : 'not-found',
       text
     });
   }

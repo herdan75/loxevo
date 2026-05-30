@@ -615,6 +615,7 @@ export class AlexaBridgeService {
   }
 
   logHueHttp(req, url) {
+    if (!this.isDebugEnabled()) return;
     const remote = String(req.socket?.remoteAddress || 'unknown').replace(/^::ffff:/, '');
     const text = `Alexa-Bridge HTTP ${req.method} ${url.pathname} von ${remote}`;
     console.log(text);
@@ -626,6 +627,7 @@ export class AlexaBridgeService {
   }
 
   logHueListResponse(lights) {
+    if (!this.isDebugEnabled()) return;
     const values = Object.values(lights || {});
     const dimmableCount = values.filter((light) => String(light?.type || '').toLowerCase().includes('dimmable')).length;
     const brightnessCount = values.filter((light) => light?.state && Object.prototype.hasOwnProperty.call(light.state, 'bri')).length;
@@ -639,6 +641,7 @@ export class AlexaBridgeService {
   }
 
   logHueLightResponse(id, light) {
+    if (!this.isDebugEnabled()) return;
     const text = light
       ? `Alexa-Bridge Gerät ${id}: ${light.name} (${light.type}, ${light.productname})`
       : `Alexa-Bridge Gerät ${id}: nicht gefunden (404).`;
@@ -648,6 +651,10 @@ export class AlexaBridgeService {
       status: light ? 'response' : 'not-found',
       text
     });
+  }
+
+  isDebugEnabled() {
+    return this.config.alexaBridge?.debug === true;
   }
 }
 

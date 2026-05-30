@@ -4,6 +4,10 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.9 - 2026-05-30
+
+- Alexa-Bridge-HTTP-Diagnose ist jetzt optional: Detailabfragen werden nur noch protokolliert, wenn unter `Konfiguration -> Alexa-Geräte` das Debug-Protokoll aktiviert ist.
+
 ## 1.0.8 - 2026-05-30
 
 - Web-UI um eine Aktion zum Erzeugen einer neuen Alexa-Bridge-ID erweitert, damit Alexa alte gelöschte Hue-/LoxEvo-Geräte nicht wieder aus der bisherigen Bridge-Historie hochzieht.

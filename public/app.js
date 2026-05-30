@@ -41,6 +41,7 @@ const alexaBridgeName = document.querySelector('#alexaBridgeName');
 const alexaBridgeAdvertiseIp = document.querySelector('#alexaBridgeAdvertiseIp');
 const alexaBridgeAdvertisePort = document.querySelector('#alexaBridgeAdvertisePort');
 const alexaBridgeId = document.querySelector('#alexaBridgeId');
+const alexaBridgeDebug = document.querySelector('#alexaBridgeDebug');
 const regenerateBridgeIdBtn = document.querySelector('#regenerateBridgeIdBtn');
 const discoveryStatus = document.querySelector('#discoveryStatus');
 const discoveryHelpBtn = document.querySelector('#discoveryHelpBtn');
@@ -2668,6 +2669,7 @@ function populateForms() {
   alexaBridgeAdvertiseIp.value = config.alexaBridge?.advertiseIp || '';
   alexaBridgeAdvertisePort.value = config.alexaBridge?.advertisePort ?? 80;
   if (alexaBridgeId) alexaBridgeId.value = config.alexaBridge?.bridgeId || '';
+  if (alexaBridgeDebug) alexaBridgeDebug.checked = config.alexaBridge?.debug === true;
 
   ttsEnabled.checked = Boolean(config.tts?.enabled);
   ttsCookieFile.value = config.tts?.cookieFile || '';
@@ -3299,6 +3301,7 @@ function collectConfigFromForms() {
   nextConfig.alexaBridge.advertiseIp = alexaBridgeAdvertiseIp.value.trim();
   nextConfig.alexaBridge.advertisePort = numberInRange(alexaBridgeAdvertisePort.value, 80, 1, 65535);
   nextConfig.alexaBridge.bridgeId = normalizeBridgeIdInput(alexaBridgeId?.value || '');
+  nextConfig.alexaBridge.debug = alexaBridgeDebug?.checked === true;
 
   nextConfig.commands = collectCommands();
   delete nextConfig.rooms;

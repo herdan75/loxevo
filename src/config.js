@@ -138,6 +138,7 @@ function normalizeConfig(config) {
   config.alexaBridge.advertiseIp ||= '';
   config.alexaBridge.advertisePort = Number(config.alexaBridge.advertisePort || 80);
   config.alexaBridge.bridgeId ||= '';
+  config.alexaBridge.debug = config.alexaBridge.debug === true;
   config.discovery ||= {};
   config.discovery.helperUrl ||= 'http://127.0.0.1:18091';
   config.discovery.helperToken ||= '';

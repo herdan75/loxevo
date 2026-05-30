@@ -14,7 +14,8 @@
     "name": "LoxEvo",
     "advertiseIp": "",
     "advertisePort": 80,
-    "bridgeId": ""
+    "bridgeId": "",
+    "debug": false
   },
   "discovery": {
     "helperUrl": "http://127.0.0.1:18091",

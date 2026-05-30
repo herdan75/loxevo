@@ -610,7 +610,13 @@ export class AlexaBridgeService {
 
   logHueHttp(req, url) {
     const remote = String(req.socket?.remoteAddress || 'unknown').replace(/^::ffff:/, '');
-    console.log(`Alexa-Bridge HTTP ${req.method} ${url.pathname} from ${remote}`);
+    const text = `Alexa-Bridge HTTP ${req.method} ${url.pathname} von ${remote}`;
+    console.log(text);
+    this.handlers.addEvent?.({
+      type: 'alexa-bridge-http',
+      status: 'received',
+      text
+    });
   }
 }
 

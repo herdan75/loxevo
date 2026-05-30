@@ -1536,6 +1536,7 @@ function toggleHelpBox(button, helpText) {
 function bindHelpTooltip(button, getContent) {
   if (!button || button.dataset.tooltipBound === 'true') return;
   button.dataset.tooltipBound = 'true';
+  button.removeAttribute('title');
   button.addEventListener('mouseenter', () => {
     const content = getContent?.();
     if (content) showHelpTooltip(button, content, false);
@@ -1564,6 +1565,7 @@ function bindStaticHelpTooltips(scope = document) {
     const helpText = helpId ? document.getElementById(helpId) : null;
     if (!helpText || button.dataset.tooltipHoverBound === 'true') return;
     button.dataset.tooltipHoverBound = 'true';
+    button.removeAttribute('title');
     button.addEventListener('mouseenter', () => showHelpTooltip(button, helpText.innerHTML || helpText.textContent || '', false));
     button.addEventListener('mouseleave', () => {
       if (activeHelpTooltip?.button === button && !activeHelpTooltip.pinned) hideHelpTooltip();

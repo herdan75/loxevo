@@ -580,9 +580,9 @@ h2 {
 }
 
 .system-notice-info-button {
-  width: 24px;
-  height: 24px;
-  font-size: 12px;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
 }
 
 .system-notice-help {
@@ -606,22 +606,36 @@ h2 {
 }
 
 .info-button {
-  width: 26px;
-  height: 26px;
-  border: 1px solid #b9d0d2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #9fbec6;
   border-radius: 50%;
-  background: #eef7f7;
-  color: var(--accent-strong);
-  font-size: 12px;
+  background: #ffffff;
+  color: #267a7c;
+  font-size: 10px;
   font-weight: 700;
+  line-height: 1;
   cursor: pointer;
 }
 
 .info-button:hover,
 .info-button:focus-visible {
   border-color: var(--accent);
-  background: #e0f1f1;
+  background: #f1fbfb;
+  color: #1f696a;
   outline: none;
+}
+
+#closeWizardBtn {
+  width: 28px;
+  height: 28px;
+  border-color: #b9d0d2;
+  background: #eef7f7;
+  font-size: 18px;
 }
 
 .help-box {
@@ -867,9 +881,9 @@ h2 {
 
 .preflight-info-button {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  font-size: 12px;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
 }
 
 .preflight-marker {
@@ -1078,9 +1092,9 @@ h2 {
 
 .info-button-small {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  font-size: 11px;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
 }
 
 .compact-help {
@@ -1310,12 +1324,12 @@ label.is-disabled {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 6px;
+  gap: 5px;
 }
 
 .option-label .inline-help-button {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   font-size: 10px;
 }
 

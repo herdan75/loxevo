@@ -3643,12 +3643,60 @@ function updatePathFieldState(card) {
 }
 
 function groupCommandsByCategory(entries) {
-  return entries.reduce((groups, [commandKey, command]) => {
+  const sortedEntries = [...entries].sort(compareConfiguredCommands);
+  return sortedEntries.reduce((groups, [commandKey, command]) => {
     const category = command.category || command.function || 'Allgemein';
     groups[category] ||= [];
     groups[category].push([commandKey, command]);
     return groups;
   }, {});
+}
+
+function compareConfiguredCommands([leftKey, leftCommand], [rightKey, rightCommand]) {
+  const parts = [
+    compareDisplay(leftCommand.category || leftCommand.function || 'Allgemein', rightCommand.category || rightCommand.function || 'Allgemein'),
+    compareDisplay(leftCommand.room, rightCommand.room),
+    compareDisplay(leftCommand.function, rightCommand.function),
+    compareAction(leftCommand.action, rightCommand.action),
+    compareDisplay(leftCommand.label || leftCommand.voiceName || leftKey, rightCommand.label || rightCommand.voiceName || rightKey),
+    compareDisplay(leftKey, rightKey)
+  ];
+  return parts.find((result) => result !== 0) || 0;
+}
+
+function compareAction(leftAction, rightAction) {
+  const leftRank = commandActionSortRank(leftAction);
+  const rightRank = commandActionSortRank(rightAction);
+  if (leftRank !== rightRank) return leftRank - rightRank;
+  return compareDisplay(leftAction, rightAction);
+}
+
+function commandActionSortRank(action) {
+  const normalized = normalizeInputKey(action);
+  const ranks = {
+    ambient: 10,
+    hell: 20,
+    nacht: 30,
+    an: 40,
+    ein: 40,
+    on: 40,
+    bewegung: 45,
+    auf: 50,
+    up: 50,
+    zu: 60,
+    down: 60,
+    aus: 90,
+    off: 90,
+    stop: 95
+  };
+  return ranks[normalized] ?? 70;
+}
+
+function compareDisplay(left, right) {
+  return displayPart(left).localeCompare(displayPart(right), 'de-CH', {
+    numeric: true,
+    sensitivity: 'base'
+  });
 }
 
 function listToLines(value) {

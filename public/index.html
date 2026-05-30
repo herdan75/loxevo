@@ -241,11 +241,6 @@
                 <button id="regenerateBridgeIdBtn" type="button" class="secondary">Neue Bridge-ID erzeugen</button>
               </div>
             </div>
-            <label class="checkbox-row">
-              <input id="alexaBridgeDebug" type="checkbox">
-              <span>Alexa-Bridge Debug-Protokoll aktivieren</span>
-            </label>
-            <p class="field-hint">Nur zur Fehlersuche aktivieren. Dann protokolliert LoxEvo einzelne Alexa/Hue-Abfragen und Antworten; im Normalbetrieb bleibt das Protokoll dadurch deutlich ruhiger.</p>
             <p class="field-hint">Als Alexa-Gerät erscheinen nur aktive Befehle, bei denen „Als Alexa-Gerät anbieten” aktiv ist. Wenn Alexa gelöschte alte Geräte trotzdem wiederfindet, kann eine neue Bridge-ID helfen. Danach Konfiguration speichern, LoxEvo neu starten, alte LoxEvo-Geräte in Alexa löschen und neu suchen lassen.</p>
             <p class="field-hint">Nach dem Speichern in der Alexa-App nach neuen Geräten suchen. Alexa/Hue sollte Port 80 verwenden; die Web-UI kann weiter auf Port 8080 laufen. Bei mehreren Netzwerkschnittstellen hier die echte LAN-IP eintragen.</p>
             <p class="field-hint">Alexa merkt sich gefundene Geräte und deren Typ. Wenn Gerätenamen, Befehle oder der Gerätetyp geändert wurden, alte LoxEvo-Geräte in der Alexa-App löschen und danach neu suchen lassen.</p>
@@ -568,6 +563,16 @@ Content-Type: application/json
           <button type="button" class="event-filter" data-event-filter="tts">TTS</button>
           <button type="button" class="event-filter" data-event-filter="backup">Backup</button>
           <input id="eventSearch" type="search" placeholder="Protokoll durchsuchen">
+        </div>
+        <div class="event-debug-row">
+          <label class="checkbox-row inline">
+            <input id="alexaBridgeDebug" type="checkbox">
+            <span>Alexa-Bridge Debug-Protokoll</span>
+          </label>
+          <button id="alexaBridgeDebugHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="alexaBridgeDebugHelpText" aria-label="Alexa-Bridge Debug-Protokoll erklären">i</button>
+          <div id="alexaBridgeDebugHelpText" class="help-box" hidden>
+            <p>Nur zur Fehlersuche aktivieren. Dann protokolliert LoxEvo einzelne Alexa/Hue-Abfragen und Antworten, zum Beispiel gefundene Geräte, alte Geräte-IDs und 404-Antworten. Im Normalbetrieb sollte die Option aus bleiben, damit das Protokoll übersichtlich bleibt.</p>
+          </div>
         </div>
         <div id="events" class="events"></div>
       </section>

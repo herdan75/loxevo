@@ -42,6 +42,8 @@ const alexaBridgeAdvertiseIp = document.querySelector('#alexaBridgeAdvertiseIp')
 const alexaBridgeAdvertisePort = document.querySelector('#alexaBridgeAdvertisePort');
 const alexaBridgeId = document.querySelector('#alexaBridgeId');
 const alexaBridgeDebug = document.querySelector('#alexaBridgeDebug');
+const alexaBridgeDebugHelpBtn = document.querySelector('#alexaBridgeDebugHelpBtn');
+const alexaBridgeDebugHelpText = document.querySelector('#alexaBridgeDebugHelpText');
 const regenerateBridgeIdBtn = document.querySelector('#regenerateBridgeIdBtn');
 const discoveryStatus = document.querySelector('#discoveryStatus');
 const discoveryHelpBtn = document.querySelector('#discoveryHelpBtn');
@@ -154,6 +156,7 @@ speakBtn.addEventListener('click', () => postTtsTest('speak', speakBtn));
 alarmBtn.addEventListener('click', () => postTtsTest('alarm', alarmBtn));
 refreshEventsBtn.addEventListener('click', () => loadEvents(refreshEventsBtn));
 clearEventsBtn?.addEventListener('click', () => clearEvents(clearEventsBtn));
+alexaBridgeDebug?.addEventListener('change', () => setAlexaBridgeDebug(alexaBridgeDebug.checked));
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 refreshDashboardBtn?.addEventListener('click', () => refreshDashboard(refreshDashboardBtn));
 openWizardBtn?.addEventListener('click', () => openWizard(0));
@@ -184,6 +187,7 @@ backupExportHelpBtn?.addEventListener('click', () => toggleHelpBox(backupExportH
 backupImportHelpBtn?.addEventListener('click', () => toggleHelpBox(backupImportHelpBtn, backupImportHelpText));
 adminTokenHelpBtn?.addEventListener('click', () => toggleHelpBox(adminTokenHelpBtn, adminTokenHelpText));
 adminDisableHelpBtn?.addEventListener('click', () => toggleHelpBox(adminDisableHelpBtn, adminDisableHelpText));
+alexaBridgeDebugHelpBtn?.addEventListener('click', () => toggleHelpBox(alexaBridgeDebugHelpBtn, alexaBridgeDebugHelpText));
 saveAdminTokenBtn?.addEventListener('click', () => saveAdminToken(saveAdminTokenBtn));
 disableAdminTokenBtn?.addEventListener('click', () => disableAdminToken(disableAdminTokenBtn));
 ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
@@ -2081,6 +2085,33 @@ async function setDryRun(enabled) {
     showToast(result.dryRun ? 'Dry-Run aktiv' : 'Live-Modus aktiv', result.dryRun ? 'ok' : 'ok');
   } catch (error) {
     dryRunToggle.checked = Boolean(config.loxone?.dryRun);
+    showToast(error.message, 'error');
+  }
+}
+
+async function setAlexaBridgeDebug(enabled) {
+  const previous = config?.alexaBridge?.debug === true;
+  if (configDirty) {
+    if (alexaBridgeDebug) alexaBridgeDebug.checked = previous;
+    showToast('Bitte zuerst ungespeicherte Konfigurationsänderungen speichern oder verwerfen.', 'error');
+    return;
+  }
+  try {
+    const nextConfig = structuredClone(config);
+    nextConfig.alexaBridge ||= {};
+    nextConfig.alexaBridge.debug = enabled === true;
+    const result = await putJson('/api/config', nextConfig);
+    config = result.config;
+    populateForms();
+    syncJsonFromForms();
+    captureSavedConfigSnapshot();
+    markConfigClean();
+    await loadAlexaBridgeStatus();
+    await loadEvents();
+    renderDashboard();
+    showToast(enabled ? 'Alexa-Bridge Debug-Protokoll aktiv' : 'Alexa-Bridge Debug-Protokoll aus', 'ok');
+  } catch (error) {
+    if (alexaBridgeDebug) alexaBridgeDebug.checked = previous;
     showToast(error.message, 'error');
   }
 }

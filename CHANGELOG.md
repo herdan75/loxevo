@@ -4,9 +4,13 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.10 - 2026-05-30
+
+- Alexa-Bridge-Debug-Schalter in das Register `Protokoll` verschoben und mit einem Info-Button erklärt, damit die Diagnose direkt dort steuerbar ist, wo die Einträge erscheinen.
+
 ## 1.0.9 - 2026-05-30
 
-- Alexa-Bridge-HTTP-Diagnose ist jetzt optional: Detailabfragen werden nur noch protokolliert, wenn unter `Konfiguration -> Alexa-Geräte` das Debug-Protokoll aktiviert ist.
+- Alexa-Bridge-HTTP-Diagnose ist jetzt optional: Detailabfragen werden nur noch protokolliert, wenn im Register `Protokoll` das Debug-Protokoll aktiviert ist.
 
 ## 1.0.8 - 2026-05-30
 

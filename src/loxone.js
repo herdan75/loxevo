@@ -44,7 +44,7 @@ export class LoxoneClient {
       throw new Error(`Befehl ist deaktiviert: ${commandKey}`);
     }
     if (!hasCommandOffTarget(command)) {
-      throw new Error(`Ausschaltwert fehlt fÃ¼r Befehl: ${commandKey}`);
+      throw new Error(`Ausschaltwert fehlt fuer Befehl: ${commandKey}`);
     }
 
     const target = readCommandOffTarget(command);

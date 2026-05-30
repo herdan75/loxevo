@@ -2929,9 +2929,9 @@ function createCommandCard(commandKey, command) {
   const offTargetLabel = document.createElement('label');
   offTargetLabel.className = 'option-label';
   offTargetLabel.innerHTML = `
-    <span class="option-label-head">Aus-Wert/Pfad (optional)<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Aus-Wert oder Aus-Pfad erklÃ¤ren">i</button></span>
+    <span class="option-label-head">Aus-Wert/Pfad (optional)<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Aus-Wert oder Aus-Pfad erklaeren">i</button></span>
     <input class="command-off-target" type="text" placeholder="z. B. 778">
-    <span class="compact-help inline-help-text" hidden>Einfacher Ausschaltwert direkt am selben Alexa-Schalter. FÃ¼r changeTo/direct wird dieser Wert mit derselben UUID gesendet, zum Beispiel Ein=1 und Aus=778. Bei raw ist hier ein kompletter Aus-Pfad mÃ¶glich. Wenn dieses Feld gefÃ¼llt ist, braucht es fÃ¼r diesen Schalter keinen separaten internen Aus-Befehl.</span>
+    <span class="compact-help inline-help-text" hidden>Einfacher Ausschaltwert direkt am selben Alexa-Schalter. Fuer changeTo/direct wird dieser Wert mit derselben UUID gesendet, zum Beispiel Ein=1 und Aus=778. Bei raw ist hier ein kompletter Aus-Pfad moeglich. Wenn dieses Feld gefuellt ist, braucht es fuer diesen Schalter keinen separaten internen Aus-Befehl.</span>
   `;
   const alexaExposeLabel = alexa.querySelector('.command-alexa-expose')?.closest('.option-label');
   alexa.insertBefore(offTargetLabel, alexaExposeLabel || alexa.firstChild);

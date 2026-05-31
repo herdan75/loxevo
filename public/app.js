@@ -2849,7 +2849,7 @@ function renderCommandEditor(openCommandKey = '') {
   updateCommandCategoryFilter();
   const filteredCommands = filterConfiguredCommands(Object.entries(getConfiguredCommands()));
   roomEditor.dataset.renderedCommands = JSON.stringify(filteredCommands.map(([commandKey]) => commandKey));
-  const commandGroups = groupCommandsByCategory(filteredCommands);
+  const commandGroups = groupCommandsByCategory(filteredCommands, { newCommandsFirst: true });
   if (!filteredCommands.length) {
     roomEditor.innerHTML = '<p class="empty">Keine Befehle passend zum Filter gefunden.</p>';
   }
@@ -3957,8 +3957,8 @@ function updatePathFieldState(card) {
   }
 }
 
-function groupCommandsByCategory(entries) {
-  const sortedEntries = [...entries].sort(compareConfiguredCommands);
+function groupCommandsByCategory(entries, options = {}) {
+  const sortedEntries = [...entries].sort((left, right) => compareConfiguredCommands(left, right, options));
   return sortedEntries.reduce((groups, [commandKey, command]) => {
     const category = command.category || command.function || 'Allgemein';
     groups[category] ||= [];
@@ -3967,9 +3967,9 @@ function groupCommandsByCategory(entries) {
   }, {});
 }
 
-function compareConfiguredCommands([leftKey, leftCommand], [rightKey, rightCommand]) {
+function compareConfiguredCommands([leftKey, leftCommand], [rightKey, rightCommand], options = {}) {
   const parts = [
-    compareDisplay(leftCommand.category || leftCommand.function || 'Allgemein', rightCommand.category || rightCommand.function || 'Allgemein'),
+    compareCommandCategory(leftCommand.category || leftCommand.function || 'Allgemein', rightCommand.category || rightCommand.function || 'Allgemein', options),
     compareDisplay(leftCommand.room, rightCommand.room),
     compareDisplay(leftCommand.function, rightCommand.function),
     compareAction(leftCommand.action, rightCommand.action),
@@ -3977,6 +3977,15 @@ function compareConfiguredCommands([leftKey, leftCommand], [rightKey, rightComma
     compareDisplay(leftKey, rightKey)
   ];
   return parts.find((result) => result !== 0) || 0;
+}
+
+function compareCommandCategory(leftCategory, rightCategory, options = {}) {
+  if (options.newCommandsFirst) {
+    const leftIsNew = leftCategory === NEW_COMMAND_CATEGORY;
+    const rightIsNew = rightCategory === NEW_COMMAND_CATEGORY;
+    if (leftIsNew !== rightIsNew) return leftIsNew ? -1 : 1;
+  }
+  return compareDisplay(leftCategory, rightCategory);
 }
 
 function compareAction(leftAction, rightAction) {

@@ -146,6 +146,8 @@ const HELP_TOOLTIP_MARGIN = 10;
 const NEW_COMMAND_CATEGORY = 'Neue Befehle';
 const NEW_COMMAND_LABEL = 'Neuer noch nicht konfigurierter Befehl';
 const LOXONE_UUID_PATTERN = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-(?:[0-9a-f]{16}|[0-9a-f]{4}-[0-9a-f]{12}))$/i;
+const draftCommandKeys = new Map();
+let draftCommandSequence = 0;
 let wizardStepIndex = 0;
 let configDirtyRenderTimer = null;
 let jsonSyncTimer = null;
@@ -347,6 +349,7 @@ async function saveConfig(button) {
     setButtonFeedback(button, 'pending', 'Speichert');
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
+    clearDraftCommands();
     populateForms();
     syncJsonFromForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
@@ -383,6 +386,7 @@ async function saveJsonConfig(button) {
     setButtonFeedback(button, 'pending', 'Speichert');
     const result = await putJson('/api/config', nextConfig);
     config = result.config;
+    clearDraftCommands();
     populateForms();
     syncJsonFromForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
@@ -502,6 +506,40 @@ function markConfigClean() {
   renderBackupReminder();
 }
 
+function markDraftCommand(commandKey, order = draftCommandSequence + 1) {
+  const key = normalizeInputKey(commandKey);
+  if (!key) return;
+  draftCommandSequence = Math.max(draftCommandSequence, order);
+  draftCommandKeys.set(key, order);
+}
+
+function moveDraftCommand(oldKey, newKey) {
+  const oldCommandKey = normalizeInputKey(oldKey);
+  const newCommandKey = normalizeInputKey(newKey);
+  if (!oldCommandKey || !newCommandKey || oldCommandKey === newCommandKey || !draftCommandKeys.has(oldCommandKey)) return;
+  const order = draftCommandKeys.get(oldCommandKey);
+  draftCommandKeys.delete(oldCommandKey);
+  draftCommandKeys.set(newCommandKey, order);
+}
+
+function unmarkDraftCommand(commandKey) {
+  const key = normalizeInputKey(commandKey);
+  if (key) draftCommandKeys.delete(key);
+}
+
+function isDraftCommand(commandKey) {
+  return draftCommandKeys.has(normalizeInputKey(commandKey));
+}
+
+function draftCommandOrder(commandKey) {
+  return draftCommandKeys.get(normalizeInputKey(commandKey)) ?? Number.MAX_SAFE_INTEGER;
+}
+
+function clearDraftCommands() {
+  draftCommandKeys.clear();
+  draftCommandSequence = 0;
+}
+
 function captureSavedConfigSnapshot() {
   try {
     savedConfigSnapshot = collectConfigFromForms();
@@ -513,6 +551,7 @@ function captureSavedConfigSnapshot() {
 function discardConfigChanges() {
   if (!savedConfigSnapshot) return;
   if (configDirty && !window.confirm('Ungespeicherte Änderungen verwerfen?')) return;
+  clearDraftCommands();
   config = structuredClone(savedConfigSnapshot);
   populateForms();
   updateDryRunUi(Boolean(config.loxone?.dryRun));
@@ -2982,6 +3021,8 @@ function createCommandCard(commandKey, command) {
   deleteButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
+    unmarkDraftCommand(card.dataset.commandOriginal);
+    unmarkDraftCommand(card.querySelector('.command-key')?.value || '');
     card.remove();
     syncConfigFromForms();
     markConfigDirty();
@@ -3288,6 +3329,7 @@ function addRoom() {
     },
     enabled: false
   };
+  markDraftCommand(nextName);
   if (commandCategoryFilter && commandCategoryFilter.value && commandCategoryFilter.value !== NEW_COMMAND_CATEGORY) {
     commandCategoryFilter.value = '';
   }
@@ -3666,6 +3708,8 @@ function collectCommands() {
   roomEditor.querySelectorAll('.room-card').forEach((card) => {
     const commandKey = normalizeInputKey(card.querySelector('.command-key').value);
     if (!commandKey) return;
+    moveDraftCommand(card.dataset.commandOriginal || '', commandKey);
+    card.dataset.commandOriginal = commandKey;
     commands[commandKey] = collectCommandFromCard(card, commandKey);
   });
   return commands;
@@ -3973,7 +4017,7 @@ function updatePathFieldState(card) {
 function groupCommandsByCategory(entries, options = {}) {
   const sortedEntries = [...entries].sort((left, right) => compareConfiguredCommands(left, right, options));
   return sortedEntries.reduce((groups, [commandKey, command]) => {
-    const category = command.category || command.function || 'Allgemein';
+    const category = commandGroupCategory(commandKey, command, options);
     groups[category] ||= [];
     groups[category].push([commandKey, command]);
     return groups;
@@ -3981,8 +4025,17 @@ function groupCommandsByCategory(entries, options = {}) {
 }
 
 function compareConfiguredCommands([leftKey, leftCommand], [rightKey, rightCommand], options = {}) {
+  if (options.newCommandsFirst) {
+    const leftIsDraft = isDraftCommand(leftKey);
+    const rightIsDraft = isDraftCommand(rightKey);
+    if (leftIsDraft !== rightIsDraft) return leftIsDraft ? -1 : 1;
+    if (leftIsDraft && rightIsDraft) {
+      const orderResult = draftCommandOrder(leftKey) - draftCommandOrder(rightKey);
+      if (orderResult !== 0) return orderResult;
+    }
+  }
   const parts = [
-    compareCommandCategory(leftCommand.category || leftCommand.function || 'Allgemein', rightCommand.category || rightCommand.function || 'Allgemein', options),
+    compareCommandCategory(commandGroupCategory(leftKey, leftCommand, options), commandGroupCategory(rightKey, rightCommand, options), options),
     compareDisplay(leftCommand.room, rightCommand.room),
     compareDisplay(leftCommand.function, rightCommand.function),
     compareAction(leftCommand.action, rightCommand.action),
@@ -3990,6 +4043,11 @@ function compareConfiguredCommands([leftKey, leftCommand], [rightKey, rightComma
     compareDisplay(leftKey, rightKey)
   ];
   return parts.find((result) => result !== 0) || 0;
+}
+
+function commandGroupCategory(commandKey, command, options = {}) {
+  if (options.newCommandsFirst && isDraftCommand(commandKey)) return NEW_COMMAND_CATEGORY;
+  return command.category || command.function || 'Allgemein';
 }
 
 function compareCommandCategory(leftCategory, rightCategory, options = {}) {

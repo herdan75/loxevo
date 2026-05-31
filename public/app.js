@@ -2854,7 +2854,8 @@ function renderCommandEditor(openCommandKey = '') {
     roomEditor.innerHTML = '<p class="empty">Keine Befehle passend zum Filter gefunden.</p>';
   }
   Object.entries(commandGroups).forEach(([category, commands]) => {
-    const group = createCategoryGroup(category, commands.length);
+    const groupShouldOpen = commands.some(([commandKey]) => commandKey === openCommandKey || openCommandKeys.has(commandKey));
+    const group = createCategoryGroup(category, commands.length, groupShouldOpen);
     const notice = createCommandValidationNotice(commands);
     if (notice) group.append(notice);
     commands.forEach(([commandKey, command]) => {

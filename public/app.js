@@ -4029,15 +4029,27 @@ function renderAlexaDevices() {
   alexaDevices.innerHTML = '';
   devices.forEach((device) => {
     const card = document.createElement('div');
-    card.className = 'endpoint-card';
+    card.className = 'endpoint-card alexa-device-card';
+    const header = document.createElement('div');
+    header.className = 'endpoint-card-head';
+
     const title = document.createElement('strong');
     title.textContent = device.name;
+
+    const badges = document.createElement('div');
+    badges.className = 'command-summary-badges';
+    badges.append(
+      createCommandBadge(device.alexaMode === 'action' ? 'Aktion' : 'Schalter', device.alexaMode === 'action' ? 'action' : 'switch'),
+      createCommandBadge('Alexa', 'alexa'),
+      createCommandBadge(device.command || 'ohne Befehl', 'technical')
+    );
+    header.append(title, badges);
     const note = document.createElement('p');
     const modeText = device.alexaMode === 'action'
       ? 'Aktion: Einschalten löst aus, Ausschalten wird ignoriert'
       : 'Schalter: Ein/Aus';
-    note.textContent = `Sprachbeispiel: Alexa, ${device.name} an | ${modeText} | Befehl: ${device.command}`;
-    card.append(title, note);
+    note.textContent = `Sprachbeispiel: Alexa, ${device.name} an. ${modeText}.`;
+    card.append(header, note);
     alexaDevices.append(card);
   });
 }

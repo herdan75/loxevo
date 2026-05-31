@@ -3145,34 +3145,16 @@ function renderCommandValidationSummary() {
     : `${warnings.length} Hinweis(e) zur Befehls-Konfiguration`;
   commandValidationSummary.innerHTML = `
     <strong>${escapeHtml(title)}</strong>
+    <p class="command-validation-hint">Die betroffenen Befehle sind unten gelb oder rot markiert. Diese Hinweise sind nur zur Kontrolle und führen keine Aktion aus.</p>
     <div class="command-validation-list">
       ${issues.slice(0, 8).map((issue) => `
-        <button type="button" class="command-validation-item ${escapeHtml(issue.level)}" data-command-key="${escapeHtml(issue.commandKey)}">
+        <div class="command-validation-item ${escapeHtml(issue.level)}">
           <span>${escapeHtml(getCommandDisplayName(issue.commandKey, issue.command))}</span>
           <small>${escapeHtml(issue.text)}</small>
-        </button>
+        </div>
       `).join('')}
     </div>
   `;
-  commandValidationSummary.querySelectorAll('.command-validation-item').forEach((button) => {
-    button.addEventListener('click', () => focusCommandCard(button.dataset.commandKey || ''));
-  });
-}
-
-function focusCommandCard(commandKey) {
-  if (!commandKey) return;
-  if (commandSearch) commandSearch.value = '';
-  if (commandCategoryFilter) commandCategoryFilter.value = '';
-  if (commandViewFilter) commandViewFilter.value = '';
-  if (commandOnlyInvalid) commandOnlyInvalid.checked = false;
-  renderCommandEditor(commandKey);
-  const card = [...roomEditor.querySelectorAll('.room-card')]
-    .find((item) => normalizeInputKey(item.querySelector('.command-key')?.value || item.dataset.commandOriginal || '') === normalizeInputKey(commandKey));
-  if (!card) return;
-  card.open = true;
-  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  card.classList.add('focus-flash');
-  window.setTimeout(() => card.classList.remove('focus-flash'), 1400);
 }
 
 function commandSummaryBadges(commandKey, command) {

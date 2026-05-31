@@ -1822,6 +1822,11 @@ input[type='range'] {
   gap: 8px;
 }
 
+.command-validation-hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .command-validation-item {
   display: grid;
   justify-items: start;

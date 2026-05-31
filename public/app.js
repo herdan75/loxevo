@@ -142,6 +142,8 @@ const LAST_BACKUP_EXPORT_KEY = 'loxevoLastBackupExportAt';
 const SETUP_WIZARD_SKIPPED_KEY = 'loxevoSetupWizardSkipped';
 const SHOW_ALL_TTS_DEVICE_TYPES_KEY = 'loxevoShowAllTtsDeviceTypes';
 const HELP_TOOLTIP_MARGIN = 10;
+const NEW_COMMAND_CATEGORY = 'Neue Befehle';
+const NEW_COMMAND_LABEL = 'Neuer noch nicht konfigurierter Befehl';
 let wizardStepIndex = 0;
 let configDirtyRenderTimer = null;
 let jsonSyncTimer = null;
@@ -2819,10 +2821,19 @@ function updateTtsVolumeLabels() {
   }
 }
 
-function renderCommandEditor() {
+function renderCommandEditor(openCommandKey = '') {
+  const openCommandKeys = new Set(
+    [...roomEditor.querySelectorAll('.room-card[open]')]
+      .map((card) => normalizeInputKey(card.querySelector('.command-key')?.value || card.dataset.commandOriginal || ''))
+      .filter(Boolean)
+  );
+  if (roomEditor.querySelector('.room-card')) {
+    config = collectConfigFromForms();
+  }
   roomEditor.innerHTML = '';
   updateCommandCategoryFilter();
   const filteredCommands = filterConfiguredCommands(Object.entries(getConfiguredCommands()));
+  roomEditor.dataset.renderedCommands = JSON.stringify(filteredCommands.map(([commandKey]) => commandKey));
   const commandGroups = groupCommandsByCategory(filteredCommands);
   if (!filteredCommands.length) {
     roomEditor.innerHTML = '<p class="empty">Keine Befehle passend zum Filter gefunden.</p>';
@@ -2830,7 +2841,9 @@ function renderCommandEditor() {
   Object.entries(commandGroups).forEach(([category, commands]) => {
     const group = createCategoryGroup(category, commands.length);
     commands.forEach(([commandKey, command]) => {
-      group.append(createCommandCard(commandKey, command));
+      const card = createCommandCard(commandKey, command);
+      card.open = commandKey === openCommandKey || openCommandKeys.has(commandKey);
+      group.append(card);
     });
     roomEditor.append(group);
   });
@@ -3077,12 +3090,15 @@ function commandSummaryMeta(command) {
 }
 
 function addRoom() {
+  if (roomEditor.querySelector('.room-card')) {
+    config = collectConfigFromForms();
+  }
   const nextName = uniqueCommandName('neuer_befehl');
   config.commands ||= {};
   config.commands[nextName] = {
-    label: 'Neuer Befehl',
-    voiceName: 'Neuer Befehl',
-    category: 'Allgemein',
+    label: NEW_COMMAND_LABEL,
+    voiceName: NEW_COMMAND_LABEL,
+    category: NEW_COMMAND_CATEGORY,
     room: '',
     function: '',
     action: '',
@@ -3094,7 +3110,10 @@ function addRoom() {
     },
     enabled: false
   };
-  renderCommandEditor();
+  if (commandCategoryFilter && commandCategoryFilter.value && commandCategoryFilter.value !== NEW_COMMAND_CATEGORY) {
+    commandCategoryFilter.value = '';
+  }
+  renderCommandEditor(nextName);
   renderCommands();
   renderIntegrations();
   syncJsonFromForms();
@@ -3456,7 +3475,16 @@ function collectConfigFromForms() {
 }
 
 function collectCommands() {
-  const commands = {};
+  const commands = { ...(config?.commands && typeof config.commands === 'object' ? config.commands : {}) };
+  let renderedCommandKeys = [];
+  try {
+    renderedCommandKeys = JSON.parse(roomEditor.dataset.renderedCommands || '[]');
+  } catch {
+    renderedCommandKeys = [];
+  }
+  renderedCommandKeys.forEach((commandKey) => {
+    delete commands[commandKey];
+  });
   roomEditor.querySelectorAll('.room-card').forEach((card) => {
     const commandKey = normalizeInputKey(card.querySelector('.command-key').value);
     if (!commandKey) return;

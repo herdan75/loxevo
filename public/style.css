@@ -774,28 +774,28 @@ h2 {
   margin-top: 6px;
   padding: 6px 10px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 999px;
   background: #ffffff;
   color: var(--muted);
   font-weight: 700;
 }
 
 .setup-summary.ok {
-  border-color: #b8dcc6;
-  background: #eaf8ef;
-  color: #0b6b3a;
+  border-color: var(--chip-ok-border);
+  background: var(--chip-ok-bg);
+  color: var(--chip-ok-text);
 }
 
 .setup-summary.warning {
-  border-color: #e5c67a;
-  background: #fff4d8;
-  color: #795500;
+  border-color: var(--chip-warning-border);
+  background: var(--chip-warning-bg);
+  color: var(--chip-warning-text);
 }
 
 .setup-summary.error {
-  border-color: #e1a29b;
-  background: #fff0ee;
-  color: var(--danger);
+  border-color: var(--chip-error-border);
+  background: var(--chip-error-bg);
+  color: var(--chip-error-text);
 }
 
 .setup-checks {
@@ -805,7 +805,7 @@ h2 {
 
 .setup-check {
   display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 12px;
   align-items: start;
   padding: 10px 12px;
@@ -815,30 +815,26 @@ h2 {
 }
 
 .setup-marker {
-  display: inline-flex;
-  align-items: center;
+  min-width: 86px;
   justify-content: center;
-  min-height: 28px;
-  border-radius: 6px;
-  background: #f3f5f7;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .setup-check.ok .setup-marker {
-  background: #ecf8f1;
-  color: #247143;
+  border-color: var(--chip-ok-border);
+  background: var(--chip-ok-bg);
+  color: var(--chip-ok-text);
 }
 
 .setup-check.open .setup-marker {
-  background: #fff0ee;
-  color: var(--danger);
+  border-color: var(--chip-error-border);
+  background: var(--chip-error-bg);
+  color: var(--chip-error-text);
 }
 
 .setup-check.optional.open .setup-marker {
-  background: #edf1f3;
-  color: #4f5f69;
+  border-color: #eadca9;
+  background: #f7f3e8;
+  color: #6b5411;
 }
 
 .setup-check.optional.open {
@@ -1915,9 +1911,14 @@ input[type='range'] {
 }
 
 .endpoint-block .config-section-body > p {
-  margin-bottom: 12px;
+  margin: 0 14px 12px;
   color: var(--muted);
   font-size: 14px;
+  line-height: 1.45;
+}
+
+.endpoint-block .config-section-body > .endpoint-section-note {
+  margin: 0 14px 12px;
 }
 
 .endpoint-list {

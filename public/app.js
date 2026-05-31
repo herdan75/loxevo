@@ -2268,7 +2268,7 @@ function renderSetupStatus(errorText) {
     row.className = `setup-check ${check.ok ? 'ok' : 'open'} ${check.optional ? 'optional' : ''}`.trim();
 
     const marker = document.createElement('span');
-    marker.className = 'setup-marker';
+    marker.className = `setup-marker command-badge ${setupCheckBadgeTone(check)}`;
     marker.textContent = check.ok ? 'OK' : check.optional ? 'Optional' : 'Offen';
 
     const content = document.createElement('div');
@@ -2281,6 +2281,12 @@ function renderSetupStatus(errorText) {
     row.append(marker, content);
     setupChecks.append(row);
   });
+}
+
+function setupCheckBadgeTone(check = {}) {
+  if (check.ok) return 'ok';
+  if (check.optional) return 'internal';
+  return 'error';
 }
 
 async function refreshDashboard(button) {
@@ -2656,7 +2662,7 @@ function renderWizard() {
   wizardBody.innerHTML = `
     <p>${escapeHtml(step.text)}</p>
     ${step.detail ? `<div class="wizard-detail">${escapeHtml(step.detail)}</div>` : ''}
-    ${step.status ? `<div class="service-status ${step.statusClass || 'disabled'}">${escapeHtml(step.status)}</div>` : ''}
+    ${step.status ? `<div><span class="command-badge ${statusClassToBadgeTone(step.statusClass)}">${escapeHtml(step.status)}</span></div>` : ''}
   `;
   wizardActionBar.innerHTML = '';
   step.actions.forEach((action) => {
@@ -2859,6 +2865,14 @@ function renderCommandEditor(openCommandKey = '') {
     roomEditor.append(group);
   });
   updateConfigSectionCounts();
+}
+
+function statusClassToBadgeTone(statusClass = '') {
+  if (statusClass === 'ready' || statusClass === 'ok') return 'ok';
+  if (statusClass === 'warning') return 'warning';
+  if (statusClass === 'error') return 'error';
+  if (statusClass === 'disabled') return 'disabled';
+  return 'info';
 }
 
 function updateCommandCategoryFilter() {
@@ -3330,7 +3344,7 @@ function createTtsEndpointGroup(baseUrl, open = false) {
   status.className = statusView.className;
   status.textContent = statusView.text;
   const hint = document.createElement('p');
-  hint.className = 'section-note';
+  hint.className = 'section-note endpoint-section-note';
   hint.textContent = 'Diese Einträge sind Muster und Testaufrufe. Sie werden nicht als feste Meldungen gespeichert; Loxone sendet den eigentlichen Text oder die Lautstärke im HTTP-Body.';
   group.append(status, hint, ...cards);
   return group;

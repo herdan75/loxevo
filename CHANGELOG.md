@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.16 - 2026-05-31
+
+- UUID-Validierung akzeptiert jetzt Loxone UUIDs im Format `8-4-4-16`, im Standardformat `8-4-4-4-12` sowie als 32 Hex-Zeichen ohne Bindestriche.
+- Bestehende fehlerhafte Befehle blockieren den Start der Web-UI nicht mehr; sie werden in der UI markiert und beim Speichern abgefangen.
+
 ## 1.0.15 - 2026-05-31
 
 - Loxone UUIDs werden jetzt in der Web-UI live und serverseitig beim Speichern validiert.

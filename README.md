@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: Source available](https://img.shields.io/badge/License-source--available-orange.svg)](LICENSE)
 
-> **Status: Version 1.0.15 / getestete lauffähige Version**
+> **Status: Version 1.0.16 / getestete lauffähige Version**
 >
 > LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte, Alexa-Gerätesuche, Alexa-TTS, Rückmeldungen, Backup und Web-UI wurden soweit möglich getestet. Trotzdem können in einzelnen Loxone-/Alexa-Umgebungen noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
@@ -190,7 +190,7 @@ Unterstützte Loxone-Befehlstypen:
 - `pulse`: `/jdev/sps/io/<uuid>/pulse` für Taster
 - `raw`: frei definierter Pfad, optional mit `{uuid}`, `{value}` oder `{command}`
 
-Für `changeTo`, `direct` und `pulse` prüft LoxEvo die Loxone UUID formal. Gültig ist das Loxone-Format mit 36 Zeichen inklusive Bindestrichen, zum Beispiel `2030c0ad-02a5-5919-ffffba27bfcae6ca`. In der Web-UI wird ein ungültiges UUID-Feld direkt markiert; beim Speichern wird die Konfiguration ebenfalls geprüft.
+Für `changeTo`, `direct` und `pulse` prüft LoxEvo die Loxone UUID formal. Gültig sind Loxone UUIDs im üblichen Loxone-Format `8-4-4-16`, zum Beispiel `2030c0ad-02a5-5919-ffffba27bfcae6ca`, im Standardformat `8-4-4-4-12` sowie als 32 Hex-Zeichen ohne Bindestriche. In der Web-UI wird ein ungültiges UUID-Feld direkt markiert; beim Speichern wird die Konfiguration ebenfalls geprüft. Bestehende fehlerhafte Befehle blockieren den Start der Web-UI nicht, müssen aber vor dem Speichern korrigiert werden.
 
 Letzte Aktionen:
 

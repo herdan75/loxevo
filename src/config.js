@@ -10,7 +10,7 @@ export async function loadConfig() {
   const raw = await readConfigOrCreateDefault(path);
   const config = JSON.parse(raw);
 
-  validateConfig(config);
+  validateConfig(config, { strictCommandValidation: false });
   normalizeConfig(config);
 
   return config;
@@ -24,7 +24,15 @@ export async function saveConfig(config) {
   return config;
 }
 
-function validateConfig(config) {
+function validateConfig(config, options = {}) {
+  const strictCommandValidation = options.strictCommandValidation !== false;
+  const reportCommandIssue = (message) => {
+    if (strictCommandValidation) {
+      throw new Error(message);
+    }
+    console.warn(message);
+  };
+
   config.server ||= {};
   if (!config.loxone?.baseUrl) {
     throw new Error('loxone.baseUrl fehlt in der Konfiguration.');
@@ -43,61 +51,59 @@ function validateConfig(config) {
       }
       const target = readCommandTarget(command);
       if (!isCommandType(target.type)) {
-        throw new Error(`Unbekannter Loxone-Befehlstyp "${target.type}" für Befehl "${commandName}".`);
+        reportCommandIssue(`Unbekannter Loxone-Befehlstyp "${target.type}" für Befehl "${commandName}".`);
+        continue;
       }
 
       const alexaMode = String(command.alexaMode || 'switch').trim().toLowerCase();
       if (!['switch', 'action'].includes(alexaMode)) {
-        throw new Error(`Unbekannter Alexa-Modus "${command.alexaMode}" für Befehl "${commandName}".`);
+        reportCommandIssue(`Unbekannter Alexa-Modus "${command.alexaMode}" für Befehl "${commandName}".`);
       }
       const offCommand = normalizeConfigCommandKey(command.offCommand);
       if (offCommand) {
         if (offCommand === commandName) {
-          throw new Error(`Aus-Befehl "${offCommand}" für Befehl "${commandName}" darf nicht auf sich selbst zeigen.`);
+          reportCommandIssue(`Aus-Befehl "${offCommand}" für Befehl "${commandName}" darf nicht auf sich selbst zeigen.`);
         }
         const targetCommand = config.commands[offCommand];
         if (!targetCommand) {
-          throw new Error(`Aus-Befehl "${offCommand}" für Befehl "${commandName}" wurde nicht gefunden.`);
-        }
-        if (targetCommand.enabled === false) {
-          throw new Error(`Aus-Befehl "${offCommand}" für Befehl "${commandName}" ist deaktiviert.`);
+          reportCommandIssue(`Aus-Befehl "${offCommand}" für Befehl "${commandName}" wurde nicht gefunden.`);
+        } else if (targetCommand.enabled === false) {
+          reportCommandIssue(`Aus-Befehl "${offCommand}" für Befehl "${commandName}" ist deaktiviert.`);
         }
       }
 
       if (command.confirmation?.enabled) {
         const confirmationText = String(command.confirmation.text || '').trim();
         if (!confirmationText) {
-          throw new Error(`Rueckmeldungstext fuer Befehl "${commandName}" fehlt.`);
+          reportCommandIssue(`Rückmeldungstext für Befehl "${commandName}" fehlt.`);
         }
         if (confirmationText.length > 300) {
-          throw new Error(`Rueckmeldungstext fuer Befehl "${commandName}" ist zu lang.`);
+          reportCommandIssue(`Rückmeldungstext für Befehl "${commandName}" ist zu lang.`);
         }
       }
 
       if (target.type === 'raw') {
         if (!target.path) {
-          throw new Error(`Loxone Pfad für Befehl "${commandName}" fehlt.`);
+          reportCommandIssue(`Loxone Pfad für Befehl "${commandName}" fehlt.`);
         }
         if (target.path.includes('{uuid}') && !target.uuid) {
-          throw new Error(`Loxone UUID für Befehl "${commandName}" fehlt.`);
-        }
-        if (target.path.includes('{uuid}') && target.uuid && !isValidLoxoneUuid(target.uuid)) {
-          throw new Error(`Loxone UUID für Befehl "${commandName}" ist ungültig.`);
+          reportCommandIssue(`Loxone UUID für Befehl "${commandName}" fehlt.`);
+        } else if (target.path.includes('{uuid}') && target.uuid && !isValidLoxoneUuid(target.uuid)) {
+          reportCommandIssue(`Loxone UUID für Befehl "${commandName}" ist ungültig.`);
         }
         if ((target.path.includes('{value}') || target.path.includes('{command}')) && !target.value) {
-          throw new Error(`Loxone Wert für Befehl "${commandName}" fehlt.`);
+          reportCommandIssue(`Loxone Wert für Befehl "${commandName}" fehlt.`);
         }
         continue;
       }
 
       if (!target.uuid) {
-        throw new Error(`Loxone UUID für Befehl "${commandName}" fehlt.`);
-      }
-      if (!isValidLoxoneUuid(target.uuid)) {
-        throw new Error(`Loxone UUID für Befehl "${commandName}" ist ungültig.`);
+        reportCommandIssue(`Loxone UUID für Befehl "${commandName}" fehlt.`);
+      } else if (!isValidLoxoneUuid(target.uuid)) {
+        reportCommandIssue(`Loxone UUID für Befehl "${commandName}" ist ungültig.`);
       }
       if (target.type !== 'pulse' && !target.value) {
-        throw new Error(`Loxone Wert/Befehl für Befehl "${commandName}" fehlt.`);
+        reportCommandIssue(`Loxone Wert/Befehl für Befehl "${commandName}" fehlt.`);
       }
     }
   }

@@ -145,7 +145,7 @@ const SHOW_ALL_TTS_DEVICE_TYPES_KEY = 'loxevoShowAllTtsDeviceTypes';
 const HELP_TOOLTIP_MARGIN = 10;
 const NEW_COMMAND_CATEGORY = 'Neue Befehle';
 const NEW_COMMAND_LABEL = 'Neuer noch nicht konfigurierter Befehl';
-const LOXONE_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const LOXONE_UUID_PATTERN = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-(?:[0-9a-f]{16}|[0-9a-f]{4}-[0-9a-f]{12}))$/i;
 let wizardStepIndex = 0;
 let configDirtyRenderTimer = null;
 let jsonSyncTimer = null;
@@ -3229,13 +3229,13 @@ function commandValidationIssues(commandKey, command = {}, commandMap = getConfi
     if (!String(target.uuid || '').trim()) {
       addRequiredIssue('UUID fehlt', 'Pulse-Befehle benötigen eine Loxone UUID.');
     } else if (!isValidLoxoneUuid(target.uuid)) {
-      addRequiredIssue('UUID ungültig', 'Loxone UUID muss 36 Zeichen inklusive Bindestriche haben.');
+      addRequiredIssue('UUID ungültig', 'Loxone UUID muss als 8-4-4-16, als 8-4-4-4-12 oder als 32 Hex-Zeichen ohne Bindestriche eingetragen sein.');
     }
   } else {
     if (!String(target.uuid || '').trim()) {
       addRequiredIssue('UUID fehlt', `${target.type}-Befehle benötigen eine Loxone UUID.`);
     } else if (!isValidLoxoneUuid(target.uuid)) {
-      addRequiredIssue('UUID ungültig', 'Loxone UUID muss 36 Zeichen inklusive Bindestriche haben.');
+      addRequiredIssue('UUID ungültig', 'Loxone UUID muss als 8-4-4-16, als 8-4-4-4-12 oder als 32 Hex-Zeichen ohne Bindestriche eingetragen sein.');
     }
     if (!String(target.value || '').trim()) {
       addRequiredIssue('Wert fehlt', `${target.type}-Befehle benötigen einen Wert/Befehl.`);
@@ -3930,9 +3930,10 @@ function normalizeCommandType(value) {
 
 function normalizeLoxoneUuidInput(value) {
   const raw = String(value || '').trim();
-  const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  const segment = raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
+  const match = segment.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-(?:[0-9a-f]{16}|[0-9a-f]{4}-[0-9a-f]{12})|[0-9a-f]{32}/i);
   if (match) return match[0].toLowerCase();
-  return raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
+  return segment.toLowerCase();
 }
 
 function isValidLoxoneUuid(value) {

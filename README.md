@@ -266,11 +266,13 @@ Optional kann pro Befehl eine TTS-Rueckmeldung aktiviert werden. Dann spricht Lo
 
 ## Praxisbeispiele
 
-Die folgenden Beispiele zeigen typische LoxEvo-Konfigurationen aus der Web-UI. Sie sind als Nachbauhilfe gedacht: Die UUIDs, Werte und Namen muessen zur eigenen Loxone-Installation passen. Die Bildmuster koennen bei Bedarf als Screenshots in `docs/images/` abgelegt und direkt bei den jeweiligen Beispielen eingebunden werden.
+Die folgenden Beispiele zeigen typische LoxEvo-Konfigurationen aus der Web-UI. Sie sind als Nachbauhilfe gedacht: Die UUIDs, Werte und Namen muessen zur eigenen Loxone-Installation passen.
 
 ### Lichtszene als eigenes Alexa-Geraet
 
 Typisch fuer einzelne Lichtszenen wie `Licht Essbereich Ambient` oder `Licht Essbereich Hell`. Alexa sieht jede Szene als eigenes virtuelles Geraet. Beim Einschalten wird die Szene aktiviert, beim Ausschalten wird direkt der hinterlegte Aus-Wert gesendet.
+
+![Praxisbeispiel Lichtszene Ambient](docs/Images/praxis-licht-ambient.png)
 
 ```text
 Befehl-Schluessel: essbereich_licht_ambient
@@ -292,9 +294,13 @@ Rueckmeldung:      optional
 
 Fuer eine helle Szene bleibt die Struktur gleich, nur `Aktion/Szene` und `Wert/Befehl` wechseln, zum Beispiel `hell` und `777`. Der Vorteil dieser Variante ist, dass jede Szene direkt per Sprache, App oder Routine erreichbar ist. Der Nachteil: Pro Szene erscheint ein eigenes Alexa-Geraet.
 
+![Praxisbeispiel Lichtszene Hell](docs/Images/praxis-licht-hell.png)
+
 ### Licht mit einfachem Raum-Aus
 
 Wenn der kurze Satz `Alexa, Licht Kueche aus` funktionieren soll, ist meist ein sichtbares Basis-Geraet pro Raum am einfachsten. Dieses Geraet schaltet bei `ein` eine Standardszene, zum Beispiel Ambient, und bei `aus` den zentralen Aus-Wert des Lichtbausteins.
+
+![Praxisbeispiel Licht mit Raum-Aus](docs/Images/praxis-licht-raum-aus.png)
 
 ```text
 Befehl-Schluessel: kueche_licht
@@ -326,6 +332,8 @@ Fuer diesen einfachen Fall ist kein separater Hilfsbefehl `kueche_licht_aus` noe
 
 Fuer Luefter oder einfache digitale Loxone-Befehle reicht ein einziges Alexa-Geraet. `Wert/Befehl` schaltet ein, `Aus-Wert/Pfad` schaltet aus.
 
+![Praxisbeispiel Lueftung](docs/Images/praxis-lueftung.png)
+
 ```text
 Befehl-Schluessel: lueftung_bad
 Anzeigename:       Lueftung Bad
@@ -355,6 +363,8 @@ Ein separater Befehl `lueftung_bad_aus` wird in dieser Variante nicht mehr benoe
 ### Rollladen mit Auf und Zu
 
 Rolllaeden passen gut als Schalter, auch wenn Alexa sie technisch als lokales On/Off-Geraet sieht. `ein` kann fuer `FullUp` verwendet werden, `aus` fuer `FullDown`.
+
+![Praxisbeispiel Rollladen](docs/Images/praxis-rollladen.png)
 
 ```text
 Befehl-Schluessel: rollladen_essbereich
@@ -389,6 +399,8 @@ Routine "Rollladen Essbereich zu"  -> Rollladen Essbereich ausschalten
 ### Einmalaktion oder Ausfuehrungsbefehl
 
 Fuer Befehle, die keinen echten Ein/Aus-Zustand haben, wird `Alexa-Modus: Aktion` verwendet. Das ist passend fuer Pulse, Szenen, Reinigungsbereiche, einzelne Ausloeser oder andere Befehle, bei denen nur das Einschalten relevant ist.
+
+![Praxisbeispiel Einmalaktion](docs/Images/praxis-aktion.png)
 
 ```text
 Befehl-Schluessel: roboter_bad

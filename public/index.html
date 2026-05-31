@@ -342,6 +342,18 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
                 <option value="">Alle Rubriken</option>
               </select>
             </label>
+            <label>
+              Ansicht
+              <select id="commandViewFilter">
+                <option value="">Alle Befehle</option>
+                <option value="alexa">Nur Alexa-Geräte</option>
+                <option value="internal">Nur interne Befehle</option>
+                <option value="switch">Nur Schalter</option>
+                <option value="action">Nur Aktionen</option>
+                <option value="confirmation">Nur mit Rückmeldung</option>
+                <option value="issues">Nur Hinweise/Fehler</option>
+              </select>
+            </label>
             <label class="checkbox-row inline">
               <input id="commandOnlyInvalid" type="checkbox">
               <span>Nur unvollständige Befehle</span>
@@ -351,6 +363,7 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
               <span class="field-note">Neue Einträge erscheinen unter „Neue Befehle”.</span>
             </div>
           </div>
+          <div id="commandValidationSummary" class="command-validation-summary" hidden></div>
           <div id="roomEditor" class="room-editor"></div>
           </div>
         </details>

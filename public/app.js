@@ -85,7 +85,9 @@ const dirtyDiscardBtn = document.querySelector('#dirtyDiscardBtn');
 const configCommandsCount = document.querySelector('#configCommandsCount');
 const commandSearch = document.querySelector('#commandSearch');
 const commandCategoryFilter = document.querySelector('#commandCategoryFilter');
+const commandViewFilter = document.querySelector('#commandViewFilter');
 const commandOnlyInvalid = document.querySelector('#commandOnlyInvalid');
+const commandValidationSummary = document.querySelector('#commandValidationSummary');
 const configTtsDevicesCount = document.querySelector('#configTtsDevicesCount');
 const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
 const ttsHelpBtn = document.querySelector('#ttsHelpBtn');
@@ -236,7 +238,7 @@ document.querySelector('#configView')?.addEventListener('change', (event) => {
   if (event.target?.closest?.('.command-tools')) return;
   markConfigDirty();
 });
-[commandSearch, commandCategoryFilter, commandOnlyInvalid].forEach((control) => {
+[commandSearch, commandCategoryFilter, commandViewFilter, commandOnlyInvalid].forEach((control) => {
   control?.addEventListener('input', () => renderCommandEditor());
   control?.addEventListener('change', () => renderCommandEditor());
 });
@@ -419,6 +421,14 @@ function validateConfigBeforeSave(nextConfig) {
   const duplicateLabels = duplicateValues(commandKeys.map((key) => normalizeText(nextConfig.commands?.[key]?.voiceName || nextConfig.commands?.[key]?.label || key)));
   if (duplicateLabels.length) {
     errors.push(`Doppelte Sprach-/Befehlsnamen prüfen: ${duplicateLabels.slice(0, 3).join(', ')}.`);
+  }
+  const commandErrors = Object.entries(nextConfig.commands || {})
+    .flatMap(([commandKey, command]) => commandValidationIssues(commandKey, command, nextConfig.commands || {})
+      .filter((issue) => issue.level === 'error')
+      .map((issue) => ({ commandKey, command, ...issue })));
+  if (commandErrors.length) {
+    const first = commandErrors[0];
+    errors.push(`Befehl "${getCommandDisplayName(first.commandKey, first.command)}": ${first.text}`);
   }
   if (nextConfig.alexaBridge?.enabled && !Number.isFinite(Number(nextConfig.alexaBridge?.advertisePort))) {
     errors.push('Bitte einen gültigen Alexa/Hue-Port eintragen.');
@@ -2834,6 +2844,7 @@ function renderCommandEditor(openCommandKey = '') {
   updateCommandCategoryFilter();
   const filteredCommands = filterConfiguredCommands(Object.entries(getConfiguredCommands()));
   roomEditor.dataset.renderedCommands = JSON.stringify(filteredCommands.map(([commandKey]) => commandKey));
+  renderCommandValidationSummary();
   const commandGroups = groupCommandsByCategory(filteredCommands);
   if (!filteredCommands.length) {
     roomEditor.innerHTML = '<p class="empty">Keine Befehle passend zum Filter gefunden.</p>';
@@ -2870,10 +2881,12 @@ function updateCommandCategoryFilter() {
 function filterConfiguredCommands(entries) {
   const query = normalizeText(commandSearch?.value || '');
   const category = commandCategoryFilter?.value || '';
+  const viewFilter = commandViewFilter?.value || '';
   const onlyInvalid = Boolean(commandOnlyInvalid?.checked);
   return entries.filter(([commandKey, command]) => {
     if (category && (command.category || command.function || 'Allgemein') !== category) return false;
-    if (onlyInvalid && !isCommandIncomplete(command)) return false;
+    if (viewFilter && !matchesCommandViewFilter(commandKey, command, viewFilter)) return false;
+    if (onlyInvalid && !isCommandIncomplete(commandKey, command)) return false;
     if (!query) return true;
     const target = getCommandTarget(command);
     return [
@@ -2898,12 +2911,18 @@ function filterConfiguredCommands(entries) {
   });
 }
 
-function isCommandIncomplete(command) {
-  const target = getCommandTarget(command);
-  if (!command.label && !command.voiceName) return true;
-  if (target.type === 'raw') return !target.path;
-  if (target.type === 'pulse') return !target.uuid;
-  return !target.uuid || !target.value;
+function isCommandIncomplete(commandKey, command) {
+  return commandValidationIssues(commandKey, command).length > 0;
+}
+
+function matchesCommandViewFilter(commandKey, command, filter) {
+  if (filter === 'alexa') return command.enabled !== false && command.alexaExpose !== false;
+  if (filter === 'internal') return command.alexaExpose === false || command.enabled === false;
+  if (filter === 'switch') return command.alexaMode !== 'action';
+  if (filter === 'action') return command.alexaMode === 'action';
+  if (filter === 'confirmation') return command.confirmation?.enabled === true;
+  if (filter === 'issues') return commandValidationIssues(commandKey, command).length > 0;
+  return true;
 }
 
 function createCommandCard(commandKey, command) {
@@ -2918,13 +2937,22 @@ function createCommandCard(commandKey, command) {
   const titleWrap = document.createElement('div');
   titleWrap.className = 'command-summary-main';
 
+  const titleLine = document.createElement('div');
+  titleLine.className = 'command-summary-titleline';
+
   const title = document.createElement('strong');
   title.textContent = getCommandDisplayName(commandKey, command);
 
-  const meta = document.createElement('span');
-  meta.className = 'command-summary-meta';
-  meta.textContent = commandSummaryMeta(command);
-  titleWrap.append(title, meta);
+  const key = document.createElement('span');
+  key.className = 'command-summary-key';
+  key.textContent = commandKey;
+
+  titleLine.append(title, key);
+
+  const badges = document.createElement('div');
+  badges.className = 'command-summary-badges';
+  commandSummaryBadges(commandKey, command).forEach((badge) => badges.append(createCommandBadge(badge.label, badge.tone)));
+  titleWrap.append(titleLine, badges);
 
   const deleteButton = document.createElement('button');
   deleteButton.type = 'button';
@@ -3034,9 +3062,9 @@ function createCommandCard(commandKey, command) {
   const offTargetLabel = document.createElement('label');
   offTargetLabel.className = 'option-label';
   offTargetLabel.innerHTML = `
-    <span class="option-label-head">Aus-Wert/Pfad (optional)<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Aus-Wert oder Aus-Pfad erklaeren">i</button></span>
+    <span class="option-label-head">Aus-Wert/Pfad (optional)<button type="button" class="info-button info-button-small inline-help-button" aria-expanded="false" aria-label="Aus-Wert oder Aus-Pfad erklären">i</button></span>
     <input class="command-off-target" type="text" placeholder="z. B. 778">
-    <span class="compact-help inline-help-text" hidden>Einfacher Ausschaltwert direkt am selben Alexa-Schalter. Fuer changeTo/direct wird dieser Wert mit derselben UUID gesendet, zum Beispiel Ein=1 und Aus=778. Bei raw ist hier ein kompletter Aus-Pfad moeglich. Wenn dieses Feld gefuellt ist, braucht es fuer diesen Schalter keinen separaten internen Aus-Befehl.</span>
+    <span class="compact-help inline-help-text" hidden>Einfacher Ausschaltwert direkt am selben Alexa-Schalter. Für changeTo/direct wird dieser Wert mit derselben UUID gesendet, zum Beispiel Ein=1 und Aus=778. Bei raw ist hier ein kompletter Aus-Pfad möglich. Wenn dieses Feld gefüllt ist, braucht es für diesen Schalter keinen separaten internen Aus-Befehl.</span>
   `;
   const alexaExposeLabel = alexa.querySelector('.command-alexa-expose')?.closest('.option-label');
   alexa.insertBefore(offTargetLabel, alexaExposeLabel || alexa.firstChild);
@@ -3070,23 +3098,135 @@ function initInlineHelpButtons(scope) {
   });
 }
 
-function commandSummaryMeta(command) {
+function renderCommandValidationSummary() {
+  if (!commandValidationSummary) return;
+  const issues = Object.entries(getConfiguredCommands())
+    .flatMap(([commandKey, command]) => commandValidationIssues(commandKey, command).map((issue) => ({ commandKey, command, ...issue })));
+  const errors = issues.filter((issue) => issue.level === 'error');
+  const warnings = issues.filter((issue) => issue.level === 'warning');
+  if (!errors.length && !warnings.length) {
+    commandValidationSummary.hidden = true;
+    commandValidationSummary.innerHTML = '';
+    return;
+  }
+  commandValidationSummary.hidden = false;
+  const title = errors.length
+    ? `${errors.length} unvollständige oder fehlerhafte Befehl(e)`
+    : `${warnings.length} Hinweis(e) zur Befehls-Konfiguration`;
+  commandValidationSummary.innerHTML = `
+    <strong>${escapeHtml(title)}</strong>
+    <div class="command-validation-list">
+      ${issues.slice(0, 8).map((issue) => `
+        <button type="button" class="command-validation-item ${escapeHtml(issue.level)}" data-command-key="${escapeHtml(issue.commandKey)}">
+          <span>${escapeHtml(getCommandDisplayName(issue.commandKey, issue.command))}</span>
+          <small>${escapeHtml(issue.text)}</small>
+        </button>
+      `).join('')}
+    </div>
+  `;
+  commandValidationSummary.querySelectorAll('.command-validation-item').forEach((button) => {
+    button.addEventListener('click', () => focusCommandCard(button.dataset.commandKey || ''));
+  });
+}
+
+function focusCommandCard(commandKey) {
+  if (!commandKey) return;
+  if (commandSearch) commandSearch.value = '';
+  if (commandCategoryFilter) commandCategoryFilter.value = '';
+  if (commandViewFilter) commandViewFilter.value = '';
+  if (commandOnlyInvalid) commandOnlyInvalid.checked = false;
+  renderCommandEditor(commandKey);
+  const card = [...roomEditor.querySelectorAll('.room-card')]
+    .find((item) => normalizeInputKey(item.querySelector('.command-key')?.value || item.dataset.commandOriginal || '') === normalizeInputKey(commandKey));
+  if (!card) return;
+  card.open = true;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('focus-flash');
+  window.setTimeout(() => card.classList.remove('focus-flash'), 1400);
+}
+
+function commandSummaryBadges(commandKey, command) {
   const target = getCommandTarget(command);
   const alexaMode = command.alexaMode === 'action' ? 'Aktion' : 'Schalter';
-  const pieces = [
-    alexaMode,
-    command.alexaExpose === false ? 'intern' : 'Alexa',
-    command.offCommand ? `Aus: ${command.offCommand}` : '',
-    target.offValue ? `Aus-Wert: ${target.offValue}` : '',
-    target.offPath ? `Aus-Pfad: ${target.offPath}` : '',
-    command.confirmation?.enabled ? `Rueckmeldung: ${command.confirmation.text || 'OK'}` : '',
-    target.type,
-    command.room && displayPart(command.room),
-    command.action && displayPart(command.action),
-    target.type === 'raw' ? target.path : target.value,
-    command.enabled === false ? 'inaktiv' : 'aktiv'
+  const issues = commandValidationIssues(commandKey, command);
+  return [
+    { label: displayPart(command.category || command.function || 'Allgemein'), tone: 'neutral' },
+    command.room ? { label: displayPart(command.room), tone: 'neutral' } : null,
+    { label: target.type, tone: 'technical' },
+    { label: alexaMode, tone: command.alexaMode === 'action' ? 'action' : 'switch' },
+    command.enabled === false
+      ? { label: 'inaktiv', tone: 'disabled' }
+      : { label: 'aktiv', tone: 'ok' },
+    command.enabled !== false && command.alexaExpose !== false
+      ? { label: 'Alexa', tone: 'alexa' }
+      : { label: 'Intern', tone: 'internal' },
+    command.offCommand ? { label: 'Aus-Befehl', tone: 'off' } : null,
+    target.offValue || target.offPath ? { label: 'Aus-Wert', tone: 'off' } : null,
+    command.confirmation?.enabled ? { label: 'Rückmeldung', tone: 'info' } : null,
+    ...issues.map((issue) => ({ label: issue.label, tone: issue.level }))
   ].filter(Boolean);
-  return pieces.join(' · ');
+}
+
+function createCommandBadge(label, tone = 'neutral') {
+  const badge = document.createElement('span');
+  badge.className = `command-badge ${tone}`;
+  badge.textContent = label;
+  return badge;
+}
+
+function commandValidationIssues(commandKey, command = {}, commandMap = getConfiguredCommands()) {
+  const issues = [];
+  const target = getCommandTarget(command);
+  const label = getCommandDisplayName(commandKey, command);
+  const requiredLevel = command.enabled === false ? 'warning' : 'error';
+  const addRequiredIssue = (labelText, text) => {
+    issues.push({ level: requiredLevel, label: labelText, text });
+  };
+  if (!String(label || '').trim()) {
+    addRequiredIssue('Name fehlt', 'Anzeigename oder Sprachname fehlt.');
+  }
+  if (!isKnownCommandType(target.type)) {
+    addRequiredIssue('Typ prüfen', `Befehlstyp "${target.type || 'leer'}" ist unbekannt.`);
+  } else if (target.type === 'raw') {
+    if (!String(target.path || '').trim()) {
+      addRequiredIssue('Pfad fehlt', 'Raw-Befehle benötigen einen Spezialpfad.');
+    }
+  } else if (target.type === 'pulse') {
+    if (!String(target.uuid || '').trim()) {
+      addRequiredIssue('UUID fehlt', 'Pulse-Befehle benötigen eine Loxone UUID.');
+    }
+  } else {
+    if (!String(target.uuid || '').trim()) {
+      addRequiredIssue('UUID fehlt', `${target.type}-Befehle benötigen eine Loxone UUID.`);
+    }
+    if (!String(target.value || '').trim()) {
+      addRequiredIssue('Wert fehlt', `${target.type}-Befehle benötigen einen Wert/Befehl.`);
+    }
+  }
+
+  const offCommand = normalizeInputKey(command.offCommand || '');
+  if (offCommand) {
+    const offTarget = commandMap[offCommand];
+    if (!offTarget) {
+      addRequiredIssue('Aus-Befehl fehlt', `Aus-Befehl "${offCommand}" wurde nicht gefunden.`);
+    } else if (offTarget.enabled === false) {
+      addRequiredIssue('Aus-Befehl inaktiv', `Aus-Befehl "${offCommand}" ist deaktiviert.`);
+    } else if (offCommand === normalizeInputKey(commandKey)) {
+      addRequiredIssue('Aus-Befehl Kreis', 'Aus-Befehl darf nicht auf sich selbst zeigen.');
+    }
+  }
+
+  if (command.confirmation?.enabled === true && !String(command.confirmation.text || '').trim()) {
+    addRequiredIssue('Text fehlt', 'Rückmeldung ist aktiv, aber der Rückmeldungstext fehlt.');
+  }
+  if (command.alexaExpose !== false && command.enabled === false) {
+    issues.push({ level: 'warning', label: 'Nicht sichtbar', text: 'Alexa-Gerät ist markiert, aber der Befehl ist inaktiv und wird nicht angeboten.' });
+  }
+  return issues;
+}
+
+function isKnownCommandType(type) {
+  return ['changeTo', 'direct', 'pulse', 'raw'].includes(normalizeCommandType(type));
 }
 
 function addRoom() {

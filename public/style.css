@@ -1533,7 +1533,7 @@ input[type='range'] {
   top: 8px;
   z-index: 5;
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px) auto minmax(180px, max-content);
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 220px) minmax(160px, 220px) auto minmax(180px, max-content);
   align-items: end;
   gap: 12px;
   margin-bottom: 12px;
@@ -1658,6 +1658,18 @@ input[type='range'] {
   background: #ffffff;
 }
 
+.room-card:has(.command-badge.error) {
+  border-color: #f0b4aa;
+}
+
+.room-card:has(.command-badge.warning) {
+  border-color: #e5c67d;
+}
+
+.room-card.focus-flash {
+  box-shadow: 0 0 0 3px rgba(37, 111, 116, 0.18);
+}
+
 .room-card-head {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1675,17 +1687,145 @@ input[type='range'] {
 
 .command-summary-main {
   display: grid;
-  gap: 3px;
+  gap: 7px;
   min-width: 0;
 }
 
-.command-summary-meta {
+.command-summary-titleline {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.command-summary-titleline strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-summary-key {
   color: var(--muted);
   font-size: 12px;
   font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.command-summary-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.command-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid #d8e1e4;
+  border-radius: 999px;
+  background: #f7fafb;
+  color: #304f55;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.command-badge.technical {
+  background: #eef2f4;
+  color: #34454a;
+}
+
+.command-badge.switch {
+  background: #edf7f4;
+  border-color: #cfe7df;
+  color: #176153;
+}
+
+.command-badge.action {
+  background: #f1f0ff;
+  border-color: #d8d4ff;
+  color: #4b3ca8;
+}
+
+.command-badge.alexa,
+.command-badge.ok {
+  background: #e8f6ef;
+  border-color: #c5e8d7;
+  color: #0d6b3d;
+}
+
+.command-badge.internal {
+  background: #f7f3e8;
+  border-color: #eadca9;
+  color: #6b5411;
+}
+
+.command-badge.off,
+.command-badge.info {
+  background: #e9f4f8;
+  border-color: #c8e4ee;
+  color: #126075;
+}
+
+.command-badge.disabled,
+.command-badge.warning {
+  background: #fff6df;
+  border-color: #efd389;
+  color: #72520b;
+}
+
+.command-badge.error {
+  background: #fff0ee;
+  border-color: #f0b4aa;
+  color: #9d2d20;
+}
+
+.command-validation-summary {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid #efd389;
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.command-validation-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.command-validation-item {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  max-width: 360px;
+  padding: 8px 10px;
+  border: 1px solid #d8e1e4;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--text);
+  text-align: left;
+}
+
+.command-validation-item small {
+  color: var(--muted);
+}
+
+.command-validation-item.error {
+  border-color: #f0b4aa;
+  background: #fff8f7;
+}
+
+.command-validation-item.warning {
+  border-color: #efd389;
+  background: #fffdf7;
 }
 
 .room-card[open] {

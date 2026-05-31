@@ -1844,19 +1844,37 @@ input[type='range'] {
 }
 
 .room-card[open] {
-  padding-bottom: 12px;
+  padding-bottom: 8px;
 }
 
 .room-card[open] .room-card-head {
-  margin-bottom: 12px;
+  min-height: 42px;
+  margin-bottom: 6px;
   border-bottom: 1px solid var(--line);
+}
+
+.room-card[open] label {
+  gap: 4px;
+  font-size: 12px;
+}
+
+.room-card[open] input,
+.room-card[open] select {
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.room-card[open] .form-row {
+  gap: 8px 10px;
+  margin-top: 8px;
 }
 
 .command-detail-section {
   display: grid;
-  gap: 10px;
-  margin: 12px 12px 0;
-  padding-top: 12px;
+  gap: 8px;
+  margin: 8px 12px 0;
+  padding-top: 8px;
   border-top: 1px solid #eef2f4;
 }
 
@@ -1867,7 +1885,7 @@ input[type='range'] {
 .command-detail-section h3 {
   margin: 0;
   color: var(--accent-strong);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;

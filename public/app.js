@@ -237,6 +237,12 @@ document.querySelector('#configView')?.addEventListener('change', (event) => {
   if (event.target?.closest?.('.command-tools')) return;
   markConfigDirty();
 });
+roomEditor?.addEventListener('input', (event) => {
+  updateCommandCardValidation(event.target?.closest?.('.room-card'));
+});
+roomEditor?.addEventListener('change', (event) => {
+  updateCommandCardValidation(event.target?.closest?.('.room-card'));
+});
 [commandSearch, commandCategoryFilter, commandViewFilter, commandOnlyInvalid].forEach((control) => {
   control?.addEventListener('input', () => renderCommandEditor());
   control?.addEventListener('change', () => renderCommandEditor());
@@ -2856,8 +2862,6 @@ function renderCommandEditor(openCommandKey = '') {
   Object.entries(commandGroups).forEach(([category, commands]) => {
     const groupShouldOpen = commands.some(([commandKey]) => commandKey === openCommandKey || openCommandKeys.has(commandKey));
     const group = createCategoryGroup(category, commands.length, groupShouldOpen);
-    const notice = createCommandValidationNotice(commands);
-    if (notice) group.append(notice);
     commands.forEach(([commandKey, command]) => {
       const card = createCommandCard(commandKey, command);
       card.open = commandKey === openCommandKey || openCommandKeys.has(commandKey);
@@ -2956,6 +2960,7 @@ function createCommandCard(commandKey, command) {
   titleLine.className = 'command-summary-titleline';
 
   const title = document.createElement('strong');
+  title.className = 'command-summary-title';
   title.textContent = getCommandDisplayName(commandKey, command);
 
   const key = document.createElement('span');
@@ -3109,6 +3114,7 @@ function createCommandCard(commandKey, command) {
   );
   initInlineHelpButtons(card);
   updatePathFieldState(card);
+  updateCommandCardValidation(card);
   return card;
 }
 
@@ -3130,54 +3136,45 @@ function initInlineHelpButtons(scope) {
 }
 
 
-function createCommandValidationNotice(commands) {
-  const issueRows = commands
-    .map(([commandKey, command]) => ({
-      commandKey,
-      command,
-      issues: commandValidationIssues(commandKey, command)
-    }))
-    .filter((row) => row.issues.length);
+function updateCommandCardValidation(card) {
+  if (!card) return;
+  const commandKey = normalizeInputKey(card.querySelector('.command-key')?.value || card.dataset.commandOriginal || '');
+  const command = collectCommandFromCard(card, commandKey);
+  const issues = commandValidationIssues(commandKey, command);
+  const title = card.querySelector('.command-summary-title');
+  const key = card.querySelector('.command-summary-key');
+  const badges = card.querySelector('.command-summary-badges');
 
-  if (!issueRows.length) return null;
-
-  const hasErrors = issueRows.some((row) => row.issues.some((issue) => issue.level === 'error'));
-  const note = document.createElement('div');
-  note.className = `command-validation-note ${hasErrors ? 'error' : 'warning'}`;
-
-  const title = document.createElement('strong');
-  title.className = 'command-validation-note-title';
-  title.textContent = hasErrors ? 'Bitte prüfen' : 'Hinweise';
-  note.append(title);
-
-  const list = document.createElement('div');
-  list.className = 'command-validation-note-list';
-
-  issueRows.slice(0, 5).forEach(({ commandKey, command, issues }) => {
-    const row = document.createElement('div');
-    row.className = 'command-validation-note-row';
-
-    const name = document.createElement('span');
-    name.className = 'command-validation-note-name';
-    name.textContent = getCommandDisplayName(commandKey, command);
-    row.append(name);
-
-    issues.slice(0, 4).forEach((issue) => {
-      row.append(createCommandBadge(issue.label, issue.level));
-    });
-
-    list.append(row);
-  });
-
-  if (issueRows.length > 5) {
-    const more = document.createElement('span');
-    more.className = 'command-validation-note-more';
-    more.textContent = `+${issueRows.length - 5} weitere`;
-    list.append(more);
+  if (title) title.textContent = getCommandDisplayName(commandKey, command);
+  if (key) key.textContent = commandKey || 'neuer_befehl';
+  if (badges) {
+    badges.innerHTML = '';
+    commandSummaryBadges(commandKey, command).forEach((badge) => badges.append(createCommandBadge(badge.label, badge.tone)));
   }
 
-  note.append(list);
-  return note;
+  card.querySelectorAll('.command-validation-field-error, .command-validation-field-warning')
+    .forEach((field) => field.classList.remove('command-validation-field-error', 'command-validation-field-warning'));
+  issues.forEach((issue) => {
+    commandIssueFields(card, issue.label)
+      .forEach((field) => field.classList.add(`command-validation-field-${issue.level}`));
+  });
+}
+
+function commandIssueFields(card, label) {
+  const selectorMap = {
+    'Name fehlt': ['.command-label', '.command-voice'],
+    'Typ prüfen': ['.command-type'],
+    'UUID fehlt': ['.command-uuid'],
+    'Wert fehlt': ['.command-value'],
+    'Pfad fehlt': ['.command-path'],
+    'Aus-Befehl fehlt': ['.command-off-command'],
+    'Aus-Befehl inaktiv': ['.command-off-command'],
+    'Aus-Befehl Kreis': ['.command-off-command'],
+    'Text fehlt': ['.command-confirmation-text']
+  };
+  return (selectorMap[label] || [])
+    .map((selector) => card.querySelector(selector))
+    .filter(Boolean);
 }
 
 function commandSummaryBadges(commandKey, command) {
@@ -3663,37 +3660,41 @@ function collectCommands() {
   roomEditor.querySelectorAll('.room-card').forEach((card) => {
     const commandKey = normalizeInputKey(card.querySelector('.command-key').value);
     if (!commandKey) return;
-    const loxoneType = card.querySelector('.command-type').value;
-    const alexaMode = card.querySelector('.command-alexa-mode')?.value || 'switch';
-    const offCommand = normalizeInputKey(card.querySelector('.command-off-command')?.value || '');
-    const offTarget = card.querySelector('.command-off-target')?.value.trim() || '';
-    const alexaExpose = card.querySelector('.command-alexa-expose')?.checked !== false;
-    const confirmationEnabled = card.querySelector('.command-confirmation-enabled')?.checked === true;
-    const confirmationText = card.querySelector('.command-confirmation-text')?.value.trim() || 'OK';
-
-    commands[commandKey] = {
-      label: card.querySelector('.command-label').value.trim() || commandKey,
-      voiceName: card.querySelector('.command-voice').value.trim() || commandKey,
-      category: card.querySelector('.command-category').value.trim() || 'Allgemein',
-      room: normalizeInputKey(card.querySelector('.command-room').value),
-      function: normalizeInputKey(card.querySelector('.command-function').value),
-      action: normalizeInputKey(card.querySelector('.command-action').value),
-      ...(alexaMode === 'action' ? { alexaMode: 'action' } : {}),
-      ...(offCommand ? { offCommand } : {}),
-      ...(alexaExpose ? {} : { alexaExpose: false }),
-      ...(confirmationEnabled ? { confirmation: { enabled: true, text: confirmationText } } : {}),
-      loxone: {
-        type: loxoneType,
-        uuid: normalizeLoxoneUuidInput(card.querySelector('.command-uuid').value),
-        value: card.querySelector('.command-value').value.trim(),
-        path: loxoneType === 'raw' ? card.querySelector('.command-path').value.trim() : '',
-        ...(offTarget && loxoneType === 'raw' ? { offPath: offTarget } : {}),
-        ...(offTarget && loxoneType !== 'raw' ? { offValue: offTarget } : {})
-      },
-      enabled: card.querySelector('.command-enabled').checked
-    };
+    commands[commandKey] = collectCommandFromCard(card, commandKey);
   });
   return commands;
+}
+
+function collectCommandFromCard(card, commandKey) {
+  const loxoneType = card.querySelector('.command-type')?.value || 'changeTo';
+  const alexaMode = card.querySelector('.command-alexa-mode')?.value || 'switch';
+  const offCommand = normalizeInputKey(card.querySelector('.command-off-command')?.value || '');
+  const offTarget = card.querySelector('.command-off-target')?.value.trim() || '';
+  const alexaExpose = card.querySelector('.command-alexa-expose')?.checked !== false;
+  const confirmationEnabled = card.querySelector('.command-confirmation-enabled')?.checked === true;
+  const confirmationText = card.querySelector('.command-confirmation-text')?.value.trim() || 'OK';
+
+  return {
+    label: card.querySelector('.command-label')?.value.trim() || commandKey,
+    voiceName: card.querySelector('.command-voice')?.value.trim() || commandKey,
+    category: card.querySelector('.command-category')?.value.trim() || 'Allgemein',
+    room: normalizeInputKey(card.querySelector('.command-room')?.value || ''),
+    function: normalizeInputKey(card.querySelector('.command-function')?.value || ''),
+    action: normalizeInputKey(card.querySelector('.command-action')?.value || ''),
+    ...(alexaMode === 'action' ? { alexaMode: 'action' } : {}),
+    ...(offCommand ? { offCommand } : {}),
+    ...(alexaExpose ? {} : { alexaExpose: false }),
+    ...(confirmationEnabled ? { confirmation: { enabled: true, text: confirmationText } } : {}),
+    loxone: {
+      type: loxoneType,
+      uuid: normalizeLoxoneUuidInput(card.querySelector('.command-uuid')?.value || ''),
+      value: card.querySelector('.command-value')?.value.trim() || '',
+      path: loxoneType === 'raw' ? card.querySelector('.command-path')?.value.trim() || '' : '',
+      ...(offTarget && loxoneType === 'raw' ? { offPath: offTarget } : {}),
+      ...(offTarget && loxoneType !== 'raw' ? { offValue: offTarget } : {})
+    },
+    enabled: card.querySelector('.command-enabled')?.checked === true
+  };
 }
 
 function confirmConfigSave(nextConfig) {

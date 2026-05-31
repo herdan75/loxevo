@@ -87,7 +87,6 @@ const commandSearch = document.querySelector('#commandSearch');
 const commandCategoryFilter = document.querySelector('#commandCategoryFilter');
 const commandViewFilter = document.querySelector('#commandViewFilter');
 const commandOnlyInvalid = document.querySelector('#commandOnlyInvalid');
-const commandValidationSummary = document.querySelector('#commandValidationSummary');
 const configTtsDevicesCount = document.querySelector('#configTtsDevicesCount');
 const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
 const ttsHelpBtn = document.querySelector('#ttsHelpBtn');
@@ -2850,7 +2849,6 @@ function renderCommandEditor(openCommandKey = '') {
   updateCommandCategoryFilter();
   const filteredCommands = filterConfiguredCommands(Object.entries(getConfiguredCommands()));
   roomEditor.dataset.renderedCommands = JSON.stringify(filteredCommands.map(([commandKey]) => commandKey));
-  renderCommandValidationSummary();
   const commandGroups = groupCommandsByCategory(filteredCommands);
   if (!filteredCommands.length) {
     roomEditor.innerHTML = '<p class="empty">Keine Befehle passend zum Filter gefunden.</p>';
@@ -3130,11 +3128,6 @@ function initInlineHelpButtons(scope) {
   });
 }
 
-function renderCommandValidationSummary() {
-  if (!commandValidationSummary) return;
-  commandValidationSummary.hidden = true;
-  commandValidationSummary.innerHTML = '';
-}
 
 function createCommandValidationNotice(commands) {
   const issueRows = commands
@@ -3153,7 +3146,7 @@ function createCommandValidationNotice(commands) {
 
   const title = document.createElement('strong');
   title.className = 'command-validation-note-title';
-  title.textContent = hasErrors ? 'Bitte prüfen' : 'Hinweise';
+  title.textContent = hasErrors ? 'Bitte prÃ¼fen' : 'Hinweise';
   note.append(title);
 
   const list = document.createElement('div');
@@ -3185,6 +3178,7 @@ function createCommandValidationNotice(commands) {
   note.append(list);
   return note;
 }
+
 function commandSummaryBadges(commandKey, command) {
   const target = getCommandTarget(command);
   const alexaMode = command.alexaMode === 'action' ? 'Aktion' : 'Schalter';

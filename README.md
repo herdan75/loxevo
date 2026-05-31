@@ -262,20 +262,20 @@ Pro Befehl kann ausserdem gesteuert werden, ob er als eigenes Alexa-Gerät angeb
 
 Wenn ein Aus-Befehl nicht als Alexa-Gerät angeboten wird, braucht Alexa trotzdem ein sichtbares Ziel für die Sprache. Für Sätze wie `Alexa, Licht Küche aus` empfiehlt sich entweder ein sichtbares Basis-Gerät `Licht Küche` mit passendem Aus-Befehl oder eine Alexa-Gruppe `Küche`, in der die sichtbaren Küchen-Geräte liegen.
 
-Optional kann pro Befehl eine TTS-Rueckmeldung aktiviert werden. Dann spricht LoxEvo nach einem erfolgreichen Alexa-Befehl den hinterlegten Text, zum Beispiel `OK`, ueber die Standard-TTS-Geraete. Der eigentliche Loxone-Befehl und die Alexa-Antwort werden dadurch nicht blockiert; die Rueckmeldung laeuft im Hintergrund und kommt so schnell, wie Alexa TTS gerade reagiert. Das ist kein natives Alexa-Acknowledge der Hue-Emulation, sondern eine LoxEvo-Rueckmeldung ueber die konfigurierte TTS-Funktion.
+Optional kann pro Befehl eine TTS-Rückmeldung aktiviert werden. Dann spricht LoxEvo nach einem erfolgreichen Alexa-Befehl den hinterlegten Text, zum Beispiel `OK`, über die Standard-TTS-Geräte. Der eigentliche Loxone-Befehl und die Alexa-Antwort werden dadurch nicht blockiert; die Rückmeldung läuft im Hintergrund und kommt so schnell, wie Alexa TTS gerade reagiert. Das ist kein natives Alexa-Acknowledge der Hue-Emulation, sondern eine LoxEvo-Rückmeldung über die konfigurierte TTS-Funktion.
 
 ## Praxisbeispiele
 
-Die folgenden Beispiele zeigen typische LoxEvo-Konfigurationen aus der Web-UI. Sie sind als Nachbauhilfe gedacht: Die UUIDs, Werte und Namen muessen zur eigenen Loxone-Installation passen.
+Die folgenden Beispiele zeigen typische LoxEvo-Konfigurationen aus der Web-UI. Sie sind als Nachbauhilfe gedacht: Die UUIDs, Werte und Namen müssen zur eigenen Loxone-Installation passen.
 
-### Lichtszene als eigenes Alexa-Geraet
+### Lichtszene als eigenes Alexa-Gerät
 
-Typisch fuer einzelne Lichtszenen wie `Licht Essbereich Ambient` oder `Licht Essbereich Hell`. Alexa sieht jede Szene als eigenes virtuelles Geraet. Beim Einschalten wird die Szene aktiviert, beim Ausschalten wird direkt der hinterlegte Aus-Wert gesendet.
+Typisch für einzelne Lichtszenen wie `Licht Essbereich Ambient` oder `Licht Essbereich Hell`. Alexa sieht jede Szene als eigenes virtuelles Gerät. Beim Einschalten wird die Szene aktiviert, beim Ausschalten wird direkt der hinterlegte Aus-Wert gesendet.
 
 ![Praxisbeispiel Lichtszene Ambient](docs/Images/praxis-licht-ambient.png)
 
 ```text
-Befehl-Schluessel: essbereich_licht_ambient
+Befehl-Schlüssel: essbereich_licht_ambient
 Anzeigename:       Licht Essbereich Ambient
 Sprachname:        Licht Essbereich Ambient an
 Rubrik:            Licht
@@ -288,24 +288,24 @@ Wert/Befehl:       2
 Aus-Wert/Pfad:     778
 Alexa-Modus:       Schalter: Ein/Aus
 Befehl verwenden:  aktiv
-Als Alexa-Geraet:  aktiv
-Rueckmeldung:      optional
+Als Alexa-Gerät:   aktiv
+Rückmeldung:       optional
 ```
 
-Fuer eine helle Szene bleibt die Struktur gleich, nur `Aktion/Szene` und `Wert/Befehl` wechseln, zum Beispiel `hell` und `777`. Der Vorteil dieser Variante ist, dass jede Szene direkt per Sprache, App oder Routine erreichbar ist. Der Nachteil: Pro Szene erscheint ein eigenes Alexa-Geraet.
+Für eine helle Szene bleibt die Struktur gleich, nur `Aktion/Szene` und `Wert/Befehl` wechseln, zum Beispiel `hell` und `777`. Der Vorteil dieser Variante ist, dass jede Szene direkt per Sprache, App oder Routine erreichbar ist. Der Nachteil: Pro Szene erscheint ein eigenes Alexa-Gerät.
 
 ![Praxisbeispiel Lichtszene Hell](docs/Images/praxis-licht-hell.png)
 
 ### Licht mit einfachem Raum-Aus
 
-Wenn der kurze Satz `Alexa, Licht Kueche aus` funktionieren soll, ist meist ein sichtbares Basis-Geraet pro Raum am einfachsten. Dieses Geraet schaltet bei `ein` eine Standardszene, zum Beispiel Ambient, und bei `aus` den zentralen Aus-Wert des Lichtbausteins.
+Wenn der kurze Satz `Alexa, Licht Küche aus` funktionieren soll, ist meist ein sichtbares Basis-Gerät pro Raum am einfachsten. Dieses Gerät schaltet bei `ein` eine Standardszene, zum Beispiel Ambient, und bei `aus` den zentralen Aus-Wert des Lichtbausteins.
 
 ![Praxisbeispiel Licht mit Raum-Aus](docs/Images/praxis-licht-raum-aus.png)
 
 ```text
-Befehl-Schluessel: kueche_licht
-Anzeigename:       Licht Kueche
-Sprachname:        Licht Kueche
+Befehl-Schlüssel:  kueche_licht
+Anzeigename:       Licht Küche
+Sprachname:        Licht Küche
 Rubrik:            Licht
 Raum:              kueche
 Funktion:          licht
@@ -316,58 +316,58 @@ Wert/Befehl:       1
 Aus-Wert/Pfad:     778
 Alexa-Modus:       Schalter: Ein/Aus
 Befehl verwenden:  aktiv
-Als Alexa-Geraet:  aktiv
+Als Alexa-Gerät:   aktiv
 ```
 
 Damit gilt:
 
 ```text
-Alexa, Licht Kueche ein  -> sendet Wert 1
-Alexa, Licht Kueche aus  -> sendet Aus-Wert 778
+Alexa, Licht Küche ein  -> sendet Wert 1
+Alexa, Licht Küche aus  -> sendet Aus-Wert 778
 ```
 
-Fuer diesen einfachen Fall ist kein separater Hilfsbefehl `kueche_licht_aus` noetig. Ein separater interner Aus-Befehl ist nur noch sinnvoll, wenn mehrere sichtbare Befehle denselben komplexeren Aus-Ablauf nutzen sollen.
+Für diesen einfachen Fall ist kein separater Hilfsbefehl `kueche_licht_aus` nötig. Ein separater interner Aus-Befehl ist nur noch sinnvoll, wenn mehrere sichtbare Befehle denselben komplexeren Aus-Ablauf nutzen sollen.
 
-### Lueftung als Ein/Aus-Schalter
+### Lüftung als Ein/Aus-Schalter
 
-Fuer Luefter oder einfache digitale Loxone-Befehle reicht ein einziges Alexa-Geraet. `Wert/Befehl` schaltet ein, `Aus-Wert/Pfad` schaltet aus.
+Für Lüfter oder einfache digitale Loxone-Befehle reicht ein einziges Alexa-Gerät. `Wert/Befehl` schaltet ein, `Aus-Wert/Pfad` schaltet aus.
 
-![Praxisbeispiel Lueftung](docs/Images/praxis-lueftung.png)
+![Praxisbeispiel Lüftung](docs/Images/praxis-lueftung.png)
 
 ```text
-Befehl-Schluessel: lueftung_bad
-Anzeigename:       Lueftung Bad
-Sprachname:        Lueftung Bad
-Rubrik:            Lueftung
+Befehl-Schlüssel:  lueftung_bad
+Anzeigename:       Lüftung Bad
+Sprachname:        Lüftung Bad
+Rubrik:            Lüftung
 Raum:              bad
 Funktion:          lueftung
 Aktion/Szene:      ein
 Befehlstyp:        direct
-Loxone UUID:       <uuid-des-luefters>
+Loxone UUID:       <uuid-des-lüfters>
 Wert/Befehl:       on
 Aus-Wert/Pfad:     off
 Alexa-Modus:       Schalter: Ein/Aus
 Befehl verwenden:  aktiv
-Als Alexa-Geraet:  aktiv
+Als Alexa-Gerät:   aktiv
 ```
 
 Damit gilt:
 
 ```text
-Alexa, Lueftung Bad ein  -> sendet on
-Alexa, Lueftung Bad aus  -> sendet off
+Alexa, Lüftung Bad ein  -> sendet on
+Alexa, Lüftung Bad aus  -> sendet off
 ```
 
-Ein separater Befehl `lueftung_bad_aus` wird in dieser Variante nicht mehr benoetigt.
+Ein separater Befehl `lueftung_bad_aus` wird in dieser Variante nicht mehr benötigt.
 
 ### Rollladen mit Auf und Zu
 
-Rolllaeden passen gut als Schalter, auch wenn Alexa sie technisch als lokales On/Off-Geraet sieht. `ein` kann fuer `FullUp` verwendet werden, `aus` fuer `FullDown`.
+Rollläden passen gut als Schalter, auch wenn Alexa sie technisch als lokales On/Off-Gerät sieht. `ein` kann für `FullUp` verwendet werden, `aus` für `FullDown`.
 
 ![Praxisbeispiel Rollladen](docs/Images/praxis-rollladen.png)
 
 ```text
-Befehl-Schluessel: rollladen_essbereich
+Befehl-Schlüssel:  rollladen_essbereich
 Anzeigename:       Rollladen Essbereich
 Sprachname:        Rollladen Essbereich
 Rubrik:            Rollladen
@@ -379,7 +379,7 @@ Spezialpfad:       /jdev/sps/io/<uuid>/FullUp
 Aus-Wert/Pfad:     /jdev/sps/io/<uuid>/FullDown
 Alexa-Modus:       Schalter: Ein/Aus
 Befehl verwenden:  aktiv
-Als Alexa-Geraet:  aktiv
+Als Alexa-Gerät:   aktiv
 ```
 
 Damit gilt:
@@ -389,21 +389,21 @@ Alexa, Rollladen Essbereich ein  -> FullUp
 Alexa, Rollladen Essbereich aus  -> FullDown
 ```
 
-Fuer natuerlichere Sprache koennen Alexa-Routinen genutzt werden:
+Für natürlichere Sprache können Alexa-Routinen genutzt werden:
 
 ```text
 Routine "Rollladen Essbereich auf" -> Rollladen Essbereich einschalten
 Routine "Rollladen Essbereich zu"  -> Rollladen Essbereich ausschalten
 ```
 
-### Einmalaktion oder Ausfuehrungsbefehl
+### Einmalaktion oder Ausführungsbefehl
 
-Fuer Befehle, die keinen echten Ein/Aus-Zustand haben, wird `Alexa-Modus: Aktion` verwendet. Das ist passend fuer Pulse, Szenen, Reinigungsbereiche, einzelne Ausloeser oder andere Befehle, bei denen nur das Einschalten relevant ist.
+Für Befehle, die keinen echten Ein/Aus-Zustand haben, wird `Alexa-Modus: Aktion` verwendet. Das ist passend für Pulse, Szenen, Reinigungsbereiche, einzelne Auslöser oder andere Befehle, bei denen nur das Einschalten relevant ist.
 
 ![Praxisbeispiel Einmalaktion](docs/Images/praxis-aktion.png)
 
 ```text
-Befehl-Schluessel: roboter_bad
+Befehl-Schlüssel:  roboter_bad
 Anzeigename:       Reinigung Bad
 Sprachname:        Reinigung Bad
 Rubrik:            Reinigung
@@ -413,9 +413,9 @@ Aktion/Szene:      bad
 Befehlstyp:        direct
 Loxone UUID:       <uuid-des-befehls>
 Wert/Befehl:       10
-Alexa-Modus:       Aktion: nur Einschalten ausfuehren
+Alexa-Modus:       Aktion: nur Einschalten ausführen
 Befehl verwenden:  aktiv
-Als Alexa-Geraet:  aktiv
+Als Alexa-Gerät:   aktiv
 ```
 
 Damit gilt:
@@ -425,11 +425,11 @@ Alexa, Reinigung Bad ein -> sendet Wert 10
 Alexa, Reinigung Bad aus -> wird bewusst ignoriert
 ```
 
-Eine Aktion wird von Alexa wegen der lokalen Hue-Emulation trotzdem als On/Off-Geraet angezeigt. LoxEvo setzt den internen Zustand danach wieder zurueck, damit die Aktion spaeter erneut ausgeloest werden kann.
+Eine Aktion wird von Alexa wegen der lokalen Hue-Emulation trotzdem als On/Off-Gerät angezeigt. LoxEvo setzt den internen Zustand danach wieder zurück, damit die Aktion später erneut ausgelöst werden kann.
 
 ### TTS aus Loxone
 
-TTS-Meldungen werden in Loxone ueber einen virtuellen Ausgang an LoxEvo gesendet. Wichtig ist der LoxEvo-Port `8080`, nicht der alte Node-RED-Port `1880`.
+TTS-Meldungen werden in Loxone über einen virtuellen Ausgang an LoxEvo gesendet. Wichtig ist der LoxEvo-Port `8080`, nicht der alte Node-RED-Port `1880`.
 
 ```text
 Virtueller Ausgang:
@@ -437,19 +437,19 @@ Adresse: http://<loxberry-ip>:8080/
 Verbindung nach Senden schliessen: aktiv
 ```
 
-Fuer eine normale Meldung:
+Für eine normale Meldung:
 
 ```text
 Befehl bei EIN:     /kochen
 HTTP-Methode bei EIN: POST
-HTTP-Body bei EIN: Ist die Schlafzimmer- und Buerotuer geschlossen? Viel Spass beim Kochen!
+HTTP-Body bei EIN: Ist die Schlafzimmer- und Bürotür geschlossen? Viel Spass beim Kochen!
 Befehl bei AUS:     leer lassen
 ```
 
 Der Pfad nach dem Slash ist nur der Name des Aufrufs und hilft im LoxEvo-Protokoll. Gesprochen wird der Text aus dem HTTP-Body. Reservierte Kurzpfade sind:
 
 ```text
-/alarm       -> Alarm-Geraete und Alarm-Lautstaerke
+/alarm       -> Alarm-Geräte und Alarm-Lautstärke
 /lautstaerke -> Body ist eine Zahl von 0 bis 100
 ```
 

@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.14 - 2026-05-31
+
+- Konfigurationsansicht weiter verdichtet: offene Befehlskarten nutzen geringere Abstände und bleiben dadurch auf kleinen Bildschirmen besser bedienbar.
+- Neue Befehle erscheinen direkt unterhalb der Befehlsleiste, werden nach dem Anlegen automatisch geöffnet und nach dem Speichern wieder in die passende Rubrik einsortiert.
+- Praxisbeispiele für Licht, Lüftung, Rollladen und einzelne Ausführungsbefehle mit Bildmustern in der README gebündelt.
+
 ## 1.0.10 - 2026-05-30
 
 - Alexa-Bridge-Debug-Schalter in das Register `Protokoll` verschoben und mit einem Info-Button erklärt, damit die Diagnose direkt dort steuerbar ist, wo die Einträge erscheinen.

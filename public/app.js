@@ -3084,10 +3084,26 @@ function createCommandCard(commandKey, command) {
   `;
   raw.querySelector('.command-path').value = target.path;
 
-  card.append(head, fields, details, loxone, alexa, raw);
+  card.append(
+    head,
+    createCommandSection('Basisdaten', fields),
+    createCommandSection('Zuordnung', details),
+    createCommandSection('Loxone', loxone),
+    createCommandSection('Alexa und Rückmeldung', alexa),
+    createCommandSection('Spezial', raw)
+  );
   initInlineHelpButtons(card);
   updatePathFieldState(card);
   return card;
+}
+
+function createCommandSection(title, content) {
+  const section = document.createElement('section');
+  section.className = 'command-detail-section';
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  section.append(heading, content);
+  return section;
 }
 
 function initInlineHelpButtons(scope) {
@@ -3439,7 +3455,7 @@ function createEndpointCard({ title, method, url, body, note, testLabel, testAct
   label.textContent = title;
 
   const methodBadge = document.createElement('span');
-  methodBadge.className = 'method-badge';
+  methodBadge.className = 'method-badge command-badge info';
   methodBadge.textContent = method;
 
   header.append(label, methodBadge);

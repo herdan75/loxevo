@@ -9,6 +9,18 @@
   --accent-strong: #174f53;
   --danger: #a13a32;
   --shadow: 0 12px 30px rgba(30, 41, 59, 0.08);
+  --chip-bg: #f7fafb;
+  --chip-border: #d8e1e4;
+  --chip-text: #304f55;
+  --chip-ok-bg: #e8f6ef;
+  --chip-ok-border: #c5e8d7;
+  --chip-ok-text: #0d6b3d;
+  --chip-warning-bg: #fff6df;
+  --chip-warning-border: #efd389;
+  --chip-warning-text: #72520b;
+  --chip-error-bg: #fff0ee;
+  --chip-error-border: #f0b4aa;
+  --chip-error-text: #9d2d20;
 }
 
 * {
@@ -181,28 +193,32 @@ h2 {
 }
 
 .status-pill {
-  display: inline-grid;
-  place-items: center;
-  width: 112px;
-  min-height: 30px;
-  padding: 7px 10px;
-  border-radius: 6px;
-  background: #eef3f5;
-  color: var(--accent-strong);
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 104px;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid var(--chip-border);
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: 12px;
   font-weight: 700;
   text-align: center;
   white-space: nowrap;
 }
 
 .status-pill.ok {
-  background: #e7f7ee;
-  color: #0b6b3a;
+  border-color: var(--chip-ok-border);
+  background: var(--chip-ok-bg);
+  color: var(--chip-ok-text);
 }
 
 .status-pill.warning {
-  background: #fff1cd;
-  color: #805300;
+  border-color: var(--chip-warning-border);
+  background: var(--chip-warning-bg);
+  color: var(--chip-warning-text);
 }
 
 .status-pill.optional {
@@ -211,8 +227,9 @@ h2 {
 }
 
 .status-pill.error {
-  background: #fde5e2;
-  color: var(--danger);
+  border-color: var(--chip-error-border);
+  background: var(--chip-error-bg);
+  color: var(--chip-error-text);
 }
 
 .status-pill.info {
@@ -904,18 +921,20 @@ h2 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 26px;
-  padding: 0 8px;
-  border-radius: 6px;
-  background: #eef2f6;
-  color: var(--muted);
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--chip-border);
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
   font-size: 12px;
   font-weight: 700;
 }
 
 .preflight-check.ok .preflight-marker {
-  background: #ecf8f1;
-  color: #247143;
+  border-color: var(--chip-ok-border);
+  background: var(--chip-ok-bg);
+  color: var(--chip-ok-text);
 }
 
 .preflight-check.error {
@@ -924,8 +943,9 @@ h2 {
 }
 
 .preflight-check.error .preflight-marker {
-  background: #fff0ee;
-  color: var(--danger);
+  border-color: var(--chip-error-border);
+  background: var(--chip-error-bg);
+  color: var(--chip-error-text);
 }
 
 .preflight-check.warning {
@@ -939,8 +959,9 @@ h2 {
 }
 
 .preflight-check.warning .preflight-marker {
-  background: #fff4db;
-  color: #835500;
+  border-color: var(--chip-warning-border);
+  background: var(--chip-warning-bg);
+  color: var(--chip-warning-text);
 }
 
 .preflight-check.optional .preflight-marker {
@@ -1726,10 +1747,10 @@ input[type='range'] {
   align-items: center;
   min-height: 22px;
   padding: 0 8px;
-  border: 1px solid #d8e1e4;
+  border: 1px solid var(--chip-border);
   border-radius: 999px;
-  background: #f7fafb;
-  color: #304f55;
+  background: var(--chip-bg);
+  color: var(--chip-text);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -1754,9 +1775,9 @@ input[type='range'] {
 
 .command-badge.alexa,
 .command-badge.ok {
-  background: #e8f6ef;
-  border-color: #c5e8d7;
-  color: #0d6b3d;
+  background: var(--chip-ok-bg);
+  border-color: var(--chip-ok-border);
+  color: var(--chip-ok-text);
 }
 
 .command-badge.internal {
@@ -1774,15 +1795,15 @@ input[type='range'] {
 
 .command-badge.disabled,
 .command-badge.warning {
-  background: #fff6df;
-  border-color: #efd389;
-  color: #72520b;
+  background: var(--chip-warning-bg);
+  border-color: var(--chip-warning-border);
+  color: var(--chip-warning-text);
 }
 
 .command-badge.error {
-  background: #fff0ee;
-  border-color: #f0b4aa;
-  color: #9d2d20;
+  background: var(--chip-error-bg);
+  border-color: var(--chip-error-border);
+  color: var(--chip-error-text);
 }
 
 .command-validation-summary {
@@ -1839,6 +1860,27 @@ input[type='range'] {
 .room-card[open] .room-card-head {
   margin-bottom: 12px;
   border-bottom: 1px solid var(--line);
+}
+
+.command-detail-section {
+  display: grid;
+  gap: 10px;
+  margin: 12px 12px 0;
+  padding-top: 12px;
+  border-top: 1px solid #eef2f4;
+}
+
+.command-detail-section:first-of-type {
+  border-top: 0;
+}
+
+.command-detail-section h3 {
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .room-card > .form-row {
@@ -1902,6 +1944,17 @@ input[type='range'] {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.endpoint-card-head {
+  min-width: 0;
+}
+
+.endpoint-card-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .endpoint-actions {

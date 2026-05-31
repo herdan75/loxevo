@@ -2857,6 +2857,8 @@ function renderCommandEditor(openCommandKey = '') {
   }
   Object.entries(commandGroups).forEach(([category, commands]) => {
     const group = createCategoryGroup(category, commands.length);
+    const notice = createCommandValidationNotice(commands);
+    if (notice) group.append(notice);
     commands.forEach(([commandKey, command]) => {
       const card = createCommandCard(commandKey, command);
       card.open = commandKey === openCommandKey || openCommandKeys.has(commandKey);
@@ -3130,33 +3132,59 @@ function initInlineHelpButtons(scope) {
 
 function renderCommandValidationSummary() {
   if (!commandValidationSummary) return;
-  const issues = Object.entries(getConfiguredCommands())
-    .flatMap(([commandKey, command]) => commandValidationIssues(commandKey, command).map((issue) => ({ commandKey, command, ...issue })));
-  const errors = issues.filter((issue) => issue.level === 'error');
-  const warnings = issues.filter((issue) => issue.level === 'warning');
-  if (!errors.length && !warnings.length) {
-    commandValidationSummary.hidden = true;
-    commandValidationSummary.innerHTML = '';
-    return;
-  }
-  commandValidationSummary.hidden = false;
-  const title = errors.length
-    ? `${errors.length} unvollständige oder fehlerhafte Befehl(e)`
-    : `${warnings.length} Hinweis(e) zur Befehls-Konfiguration`;
-  commandValidationSummary.innerHTML = `
-    <strong>${escapeHtml(title)}</strong>
-    <p class="command-validation-hint">Die betroffenen Befehle sind unten gelb oder rot markiert. Diese Hinweise sind nur zur Kontrolle und führen keine Aktion aus.</p>
-    <div class="command-validation-list">
-      ${issues.slice(0, 8).map((issue) => `
-        <div class="command-validation-item ${escapeHtml(issue.level)}">
-          <span>${escapeHtml(getCommandDisplayName(issue.commandKey, issue.command))}</span>
-          <small>${escapeHtml(issue.text)}</small>
-        </div>
-      `).join('')}
-    </div>
-  `;
+  commandValidationSummary.hidden = true;
+  commandValidationSummary.innerHTML = '';
 }
 
+function createCommandValidationNotice(commands) {
+  const issueRows = commands
+    .map(([commandKey, command]) => ({
+      commandKey,
+      command,
+      issues: commandValidationIssues(commandKey, command)
+    }))
+    .filter((row) => row.issues.length);
+
+  if (!issueRows.length) return null;
+
+  const hasErrors = issueRows.some((row) => row.issues.some((issue) => issue.level === 'error'));
+  const note = document.createElement('div');
+  note.className = `command-validation-note ${hasErrors ? 'error' : 'warning'}`;
+
+  const title = document.createElement('strong');
+  title.className = 'command-validation-note-title';
+  title.textContent = hasErrors ? 'Bitte pr�fen' : 'Hinweise';
+  note.append(title);
+
+  const list = document.createElement('div');
+  list.className = 'command-validation-note-list';
+
+  issueRows.slice(0, 5).forEach(({ commandKey, command, issues }) => {
+    const row = document.createElement('div');
+    row.className = 'command-validation-note-row';
+
+    const name = document.createElement('span');
+    name.className = 'command-validation-note-name';
+    name.textContent = getCommandDisplayName(commandKey, command);
+    row.append(name);
+
+    issues.slice(0, 4).forEach((issue) => {
+      row.append(createCommandBadge(issue.label, issue.level));
+    });
+
+    list.append(row);
+  });
+
+  if (issueRows.length > 5) {
+    const more = document.createElement('span');
+    more.className = 'command-validation-note-more';
+    more.textContent = `+${issueRows.length - 5} weitere`;
+    list.append(more);
+  }
+
+  note.append(list);
+  return note;
+}
 function commandSummaryBadges(commandKey, command) {
   const target = getCommandTarget(command);
   const alexaMode = command.alexaMode === 'action' ? 'Aktion' : 'Schalter';

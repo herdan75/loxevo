@@ -264,75 +264,182 @@ Wenn ein Aus-Befehl nicht als Alexa-Gerät angeboten wird, braucht Alexa trotzde
 
 Optional kann pro Befehl eine TTS-Rueckmeldung aktiviert werden. Dann spricht LoxEvo nach einem erfolgreichen Alexa-Befehl den hinterlegten Text, zum Beispiel `OK`, ueber die Standard-TTS-Geraete. Der eigentliche Loxone-Befehl und die Alexa-Antwort werden dadurch nicht blockiert; die Rueckmeldung laeuft im Hintergrund und kommt so schnell, wie Alexa TTS gerade reagiert. Das ist kein natives Alexa-Acknowledge der Hue-Emulation, sondern eine LoxEvo-Rueckmeldung ueber die konfigurierte TTS-Funktion.
 
-### Licht aus bei Szenen
+## Praxisbeispiele
 
-Empfohlen fuer einfache Lichtbausteine: Ein sichtbares Raumgeraet kann direkt einen eigenen Aus-Wert haben. Beispiel: `Licht Kueche` sendet bei `ein` den Wert `1` fuer Ambient und bei `aus` den `Aus-Wert/Pfad` `778`. Dafuer ist kein separater Hilfsbefehl `kueche_licht_aus` noetig.
+Die folgenden Beispiele zeigen typische LoxEvo-Konfigurationen aus der Web-UI. Sie sind als Nachbauhilfe gedacht: Die UUIDs, Werte und Namen muessen zur eigenen Loxone-Installation passen. Die Bildmuster koennen bei Bedarf als Screenshots in `docs/images/` abgelegt und direkt bei den jeweiligen Beispielen eingebunden werden.
 
-```text
-Befehl: kueche_licht
-Sprachname: Licht Kueche
-Wert/Befehl: 1
-Aus-Wert/Pfad: 778
-Alexa-Modus: Schalter
-Als Alexa-Geraet anbieten: ja
-```
+### Lichtszene als eigenes Alexa-Geraet
 
-Für Licht-Szenen gibt es mehrere sinnvolle Varianten. Welche besser passt, hängt davon ab, ob Alexa den Aus-Befehl als eigenes Gerät sehen soll oder ob LoxEvo ihn nur intern nutzen soll.
-
-Variante 1: Separates Alexa-Gerät für `Aus`.
-
-Beispiel:
+Typisch fuer einzelne Lichtszenen wie `Licht Essbereich Ambient` oder `Licht Essbereich Hell`. Alexa sieht jede Szene als eigenes virtuelles Geraet. Beim Einschalten wird die Szene aktiviert, beim Ausschalten wird direkt der hinterlegte Aus-Wert gesendet.
 
 ```text
-Licht Küche Ambient
-Licht Küche Hell
-Licht Küche Nacht
-Licht Küche Aus
+Befehl-Schluessel: essbereich_licht_ambient
+Anzeigename:       Licht Essbereich Ambient
+Sprachname:        Licht Essbereich Ambient an
+Rubrik:            Licht
+Raum:              essbereich
+Funktion:          licht
+Aktion/Szene:      ambient
+Befehlstyp:        changeTo
+Loxone UUID:       <uuid-des-lichtbausteins>
+Wert/Befehl:       2
+Aus-Wert/Pfad:     778
+Alexa-Modus:       Schalter: Ein/Aus
+Befehl verwenden:  aktiv
+Als Alexa-Geraet:  aktiv
+Rueckmeldung:      optional
 ```
 
-Vorteil: Der Aus-Befehl ist in der Alexa-App sichtbar und kann direkt in Routinen verwendet werden. Nachteil: In der Alexa-App erscheint ein zusätzliches Gerät, das eigentlich nur ein interner Loxone-Befehl ist. Das kann bei vielen Räumen unübersichtlich werden.
+Fuer eine helle Szene bleibt die Struktur gleich, nur `Aktion/Szene` und `Wert/Befehl` wechseln, zum Beispiel `hell` und `777`. Der Vorteil dieser Variante ist, dass jede Szene direkt per Sprache, App oder Routine erreichbar ist. Der Nachteil: Pro Szene erscheint ein eigenes Alexa-Geraet.
 
-Variante 2: Interner Aus-Befehl in LoxEvo, aber nicht als Alexa-Gerät anbieten.
+### Licht mit einfachem Raum-Aus
 
-Beispiel:
+Wenn der kurze Satz `Alexa, Licht Kueche aus` funktionieren soll, ist meist ein sichtbares Basis-Geraet pro Raum am einfachsten. Dieses Geraet schaltet bei `ein` eine Standardszene, zum Beispiel Ambient, und bei `aus` den zentralen Aus-Wert des Lichtbausteins.
 
 ```text
-kueche_licht_aus
-Aktiv: ja
-Als Alexa-Gerät anbieten: nein
+Befehl-Schluessel: kueche_licht
+Anzeigename:       Licht Kueche
+Sprachname:        Licht Kueche
+Rubrik:            Licht
+Raum:              kueche
+Funktion:          licht
+Aktion/Szene:      ambient
+Befehlstyp:        changeTo
+Loxone UUID:       <uuid-des-lichtbausteins>
+Wert/Befehl:       1
+Aus-Wert/Pfad:     778
+Alexa-Modus:       Schalter: Ein/Aus
+Befehl verwenden:  aktiv
+Als Alexa-Geraet:  aktiv
 ```
 
-Die sichtbaren Szenen bleiben `switch`-Befehle und verweisen über `Aus-Befehl (optional)` auf `kueche_licht_aus`:
+Damit gilt:
 
 ```text
-kueche_licht_ambient -> Aus-Befehl: kueche_licht_aus
-kueche_licht_hell    -> Aus-Befehl: kueche_licht_aus
-kueche_licht_nacht   -> Aus-Befehl: kueche_licht_aus
+Alexa, Licht Kueche ein  -> sendet Wert 1
+Alexa, Licht Kueche aus  -> sendet Aus-Wert 778
 ```
 
-Vorteil: Alexa sieht nur die wirklich bedienbaren Szenen, der Aus-Befehl bleibt zentral und wartbar in LoxEvo. Nachteil: Der versteckte Aus-Befehl kann in Alexa nicht direkt als Routine-Ziel ausgewählt werden. Routinen müssen stattdessen ein sichtbares Szenen-Gerät ausschalten; LoxEvo führt dann intern den hinterlegten Aus-Befehl aus.
+Fuer diesen einfachen Fall ist kein separater Hilfsbefehl `kueche_licht_aus` noetig. Ein separater interner Aus-Befehl ist nur noch sinnvoll, wenn mehrere sichtbare Befehle denselben komplexeren Aus-Ablauf nutzen sollen.
 
-Variante 3: Alexa-Gruppe oder Routine für den kurzen Sprachbefehl.
+### Lueftung als Ein/Aus-Schalter
 
-Wenn der Sprachbefehl `Alexa, Licht Küche aus` ohne separates Gerät funktionieren soll, braucht Alexa ein sichtbares Ziel. Dafür gibt es zwei praktische Wege:
+Fuer Luefter oder einfache digitale Loxone-Befehle reicht ein einziges Alexa-Geraet. `Wert/Befehl` schaltet ein, `Aus-Wert/Pfad` schaltet aus.
 
 ```text
-Alexa-Gruppe "Küche" mit den sichtbaren Geräten:
-- Licht Küche Ambient
-- Licht Küche Hell
-- Licht Küche Nacht
+Befehl-Schluessel: lueftung_bad
+Anzeigename:       Lueftung Bad
+Sprachname:        Lueftung Bad
+Rubrik:            Lueftung
+Raum:              bad
+Funktion:          lueftung
+Aktion/Szene:      ein
+Befehlstyp:        direct
+Loxone UUID:       <uuid-des-luefters>
+Wert/Befehl:       on
+Aus-Wert/Pfad:     off
+Alexa-Modus:       Schalter: Ein/Aus
+Befehl verwenden:  aktiv
+Als Alexa-Geraet:  aktiv
 ```
 
-oder eine Alexa-Routine:
+Damit gilt:
 
 ```text
-Wenn gesagt wird: "Licht Küche aus"
-Dann: Licht Küche Ambient ausschalten
-Dann: Licht Küche Hell ausschalten
-Dann: Licht Küche Nacht ausschalten
+Alexa, Lueftung Bad ein  -> sendet on
+Alexa, Lueftung Bad aus  -> sendet off
 ```
 
-In beiden Fällen sendet Alexa `aus` an sichtbare Geräte. LoxEvo übersetzt dieses `aus` intern auf den zentralen Aus-Befehl. Das ist meistens die aufgeräumteste Lösung, solange man akzeptiert, dass Alexa den versteckten Aus-Befehl selbst nicht als eigenes Gerät kennt.
+Ein separater Befehl `lueftung_bad_aus` wird in dieser Variante nicht mehr benoetigt.
+
+### Rollladen mit Auf und Zu
+
+Rolllaeden passen gut als Schalter, auch wenn Alexa sie technisch als lokales On/Off-Geraet sieht. `ein` kann fuer `FullUp` verwendet werden, `aus` fuer `FullDown`.
+
+```text
+Befehl-Schluessel: rollladen_essbereich
+Anzeigename:       Rollladen Essbereich
+Sprachname:        Rollladen Essbereich
+Rubrik:            Rollladen
+Raum:              essbereich
+Funktion:          rollladen
+Aktion/Szene:      auf
+Befehlstyp:        raw
+Spezialpfad:       /jdev/sps/io/<uuid>/FullUp
+Aus-Wert/Pfad:     /jdev/sps/io/<uuid>/FullDown
+Alexa-Modus:       Schalter: Ein/Aus
+Befehl verwenden:  aktiv
+Als Alexa-Geraet:  aktiv
+```
+
+Damit gilt:
+
+```text
+Alexa, Rollladen Essbereich ein  -> FullUp
+Alexa, Rollladen Essbereich aus  -> FullDown
+```
+
+Fuer natuerlichere Sprache koennen Alexa-Routinen genutzt werden:
+
+```text
+Routine "Rollladen Essbereich auf" -> Rollladen Essbereich einschalten
+Routine "Rollladen Essbereich zu"  -> Rollladen Essbereich ausschalten
+```
+
+### Einmalaktion oder Ausfuehrungsbefehl
+
+Fuer Befehle, die keinen echten Ein/Aus-Zustand haben, wird `Alexa-Modus: Aktion` verwendet. Das ist passend fuer Pulse, Szenen, Reinigungsbereiche, einzelne Ausloeser oder andere Befehle, bei denen nur das Einschalten relevant ist.
+
+```text
+Befehl-Schluessel: roboter_bad
+Anzeigename:       Reinigung Bad
+Sprachname:        Reinigung Bad
+Rubrik:            Reinigung
+Raum:              bad
+Funktion:          reinigung
+Aktion/Szene:      bad
+Befehlstyp:        direct
+Loxone UUID:       <uuid-des-befehls>
+Wert/Befehl:       10
+Alexa-Modus:       Aktion: nur Einschalten ausfuehren
+Befehl verwenden:  aktiv
+Als Alexa-Geraet:  aktiv
+```
+
+Damit gilt:
+
+```text
+Alexa, Reinigung Bad ein -> sendet Wert 10
+Alexa, Reinigung Bad aus -> wird bewusst ignoriert
+```
+
+Eine Aktion wird von Alexa wegen der lokalen Hue-Emulation trotzdem als On/Off-Geraet angezeigt. LoxEvo setzt den internen Zustand danach wieder zurueck, damit die Aktion spaeter erneut ausgeloest werden kann.
+
+### TTS aus Loxone
+
+TTS-Meldungen werden in Loxone ueber einen virtuellen Ausgang an LoxEvo gesendet. Wichtig ist der LoxEvo-Port `8080`, nicht der alte Node-RED-Port `1880`.
+
+```text
+Virtueller Ausgang:
+Adresse: http://<loxberry-ip>:8080/
+Verbindung nach Senden schliessen: aktiv
+```
+
+Fuer eine normale Meldung:
+
+```text
+Befehl bei EIN:     /kochen
+HTTP-Methode bei EIN: POST
+HTTP-Body bei EIN: Ist die Schlafzimmer- und Buerotuer geschlossen? Viel Spass beim Kochen!
+Befehl bei AUS:     leer lassen
+```
+
+Der Pfad nach dem Slash ist nur der Name des Aufrufs und hilft im LoxEvo-Protokoll. Gesprochen wird der Text aus dem HTTP-Body. Reservierte Kurzpfade sind:
+
+```text
+/alarm       -> Alarm-Geraete und Alarm-Lautstaerke
+/lautstaerke -> Body ist eine Zahl von 0 bis 100
+```
 
 Wenn während der Entwicklung Geräte mehrfach gefunden wurden, alte LoxEvo-Testgeräte in der Alexa-App löschen und danach erneut suchen. Die aktuellen Geräte-IDs sind pro Befehl stabil, damit spätere Konfigurationsänderungen weniger Durcheinander erzeugen.
 

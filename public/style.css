@@ -1938,6 +1938,15 @@ input[type='range'] {
   gap: 8px;
 }
 
+.endpoint-card.alexa-device-card .endpoint-card-head {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.endpoint-card.alexa-device-card .command-summary-badges {
+  margin-left: 4px;
+}
+
 .endpoint-card-head,
 .endpoint-actions {
   display: flex;

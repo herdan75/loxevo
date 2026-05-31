@@ -145,6 +145,7 @@ const SHOW_ALL_TTS_DEVICE_TYPES_KEY = 'loxevoShowAllTtsDeviceTypes';
 const HELP_TOOLTIP_MARGIN = 10;
 const NEW_COMMAND_CATEGORY = 'Neue Befehle';
 const NEW_COMMAND_LABEL = 'Neuer noch nicht konfigurierter Befehl';
+const LOXONE_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let wizardStepIndex = 0;
 let configDirtyRenderTimer = null;
 let jsonSyncTimer = null;
@@ -3165,6 +3166,7 @@ function commandIssueFields(card, label) {
     'Name fehlt': ['.command-label', '.command-voice'],
     'Typ prüfen': ['.command-type'],
     'UUID fehlt': ['.command-uuid'],
+    'UUID ungültig': ['.command-uuid'],
     'Wert fehlt': ['.command-value'],
     'Pfad fehlt': ['.command-path'],
     'Aus-Befehl fehlt': ['.command-off-command'],
@@ -3226,10 +3228,14 @@ function commandValidationIssues(commandKey, command = {}, commandMap = getConfi
   } else if (target.type === 'pulse') {
     if (!String(target.uuid || '').trim()) {
       addRequiredIssue('UUID fehlt', 'Pulse-Befehle benötigen eine Loxone UUID.');
+    } else if (!isValidLoxoneUuid(target.uuid)) {
+      addRequiredIssue('UUID ungültig', 'Loxone UUID muss 36 Zeichen inklusive Bindestriche haben.');
     }
   } else {
     if (!String(target.uuid || '').trim()) {
       addRequiredIssue('UUID fehlt', `${target.type}-Befehle benötigen eine Loxone UUID.`);
+    } else if (!isValidLoxoneUuid(target.uuid)) {
+      addRequiredIssue('UUID ungültig', 'Loxone UUID muss 36 Zeichen inklusive Bindestriche haben.');
     }
     if (!String(target.value || '').trim()) {
       addRequiredIssue('Wert fehlt', `${target.type}-Befehle benötigen einen Wert/Befehl.`);
@@ -3927,6 +3933,10 @@ function normalizeLoxoneUuidInput(value) {
   const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   if (match) return match[0].toLowerCase();
   return raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
+}
+
+function isValidLoxoneUuid(value) {
+  return LOXONE_UUID_PATTERN.test(String(value || '').trim());
 }
 
 function normalizeBridgeIdInput(value) {

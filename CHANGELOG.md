@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.15 - 2026-05-31
+
+- Loxone UUIDs werden jetzt in der Web-UI live und serverseitig beim Speichern validiert.
+- Ungültige UUIDs werden direkt am Feld markiert und als `UUID ungültig` in den Befehls-Badges angezeigt.
+- README um das erwartete Loxone-UUID-Format ergänzt.
+
 ## 1.0.14 - 2026-05-31
 
 - Konfigurationsansicht weiter verdichtet: offene Befehlskarten nutzen geringere Abstände und bleiben dadurch auf kleinen Bildschirmen besser bedienbar.

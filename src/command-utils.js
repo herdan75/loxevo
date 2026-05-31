@@ -1,4 +1,5 @@
 export const COMMAND_TYPES = ['changeTo', 'direct', 'pulse', 'raw'];
+export const LOXONE_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function isCommandType(value) {
   return COMMAND_TYPES.includes(value);
@@ -52,4 +53,8 @@ export function normalizeLoxoneUuid(value) {
   const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   if (match) return match[0].toLowerCase();
   return raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
+}
+
+export function isValidLoxoneUuid(value) {
+  return LOXONE_UUID_PATTERN.test(String(value || '').trim());
 }

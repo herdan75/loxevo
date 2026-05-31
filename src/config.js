@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { isCommandType, readCommandTarget } from './command-utils.js';
+import { isCommandType, isValidLoxoneUuid, readCommandTarget } from './command-utils.js';
 
 const DEFAULT_CONFIG_PATH = './config.json';
 const EXAMPLE_CONFIG_PATH = './config.example.json';
@@ -81,6 +81,9 @@ function validateConfig(config) {
         if (target.path.includes('{uuid}') && !target.uuid) {
           throw new Error(`Loxone UUID für Befehl "${commandName}" fehlt.`);
         }
+        if (target.path.includes('{uuid}') && target.uuid && !isValidLoxoneUuid(target.uuid)) {
+          throw new Error(`Loxone UUID für Befehl "${commandName}" ist ungültig.`);
+        }
         if ((target.path.includes('{value}') || target.path.includes('{command}')) && !target.value) {
           throw new Error(`Loxone Wert für Befehl "${commandName}" fehlt.`);
         }
@@ -89,6 +92,9 @@ function validateConfig(config) {
 
       if (!target.uuid) {
         throw new Error(`Loxone UUID für Befehl "${commandName}" fehlt.`);
+      }
+      if (!isValidLoxoneUuid(target.uuid)) {
+        throw new Error(`Loxone UUID für Befehl "${commandName}" ist ungültig.`);
       }
       if (target.type !== 'pulse' && !target.value) {
         throw new Error(`Loxone Wert/Befehl für Befehl "${commandName}" fehlt.`);
@@ -103,6 +109,9 @@ function validateConfig(config) {
     for (const [roomName, room] of Object.entries(config.rooms)) {
       if (!room.uuid) {
         throw new Error(`UUID für Raum "${roomName}" fehlt.`);
+      }
+      if (!isValidLoxoneUuid(room.uuid)) {
+        throw new Error(`UUID für Raum "${roomName}" ist ungültig.`);
       }
       if (!room.scenes || typeof room.scenes !== 'object') {
         throw new Error(`Szenen für Raum "${roomName}" fehlen.`);

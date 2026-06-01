@@ -2923,7 +2923,16 @@ function statusClassToBadgeTone(statusClass = '') {
 function updateCommandCategoryFilter() {
   if (!commandCategoryFilter) return;
   const selected = commandCategoryFilter.value;
-  const categories = [...new Set(Object.values(getConfiguredCommands()).map((command) => command.category || command.function || 'Allgemein'))]
+  const selectedCategoryKey = normalizeCategoryName(selected);
+  const categoryMap = new Map();
+  Object.values(getConfiguredCommands()).forEach((command) => {
+    const category = commandBaseCategory(command);
+    const categoryKey = normalizeCategoryName(category);
+    if (!categoryMap.has(categoryKey)) {
+      categoryMap.set(categoryKey, displayPart(category) || 'Allgemein');
+    }
+  });
+  const categories = [...categoryMap.values()]
     .sort((a, b) => displayPart(a).localeCompare(displayPart(b), 'de-CH'));
   commandCategoryFilter.innerHTML = '<option value="">Alle Rubriken</option>';
   categories.forEach((category) => {
@@ -2932,8 +2941,9 @@ function updateCommandCategoryFilter() {
     option.textContent = displayPart(category) || 'Allgemein';
     commandCategoryFilter.append(option);
   });
-  if (categories.includes(selected)) {
-    commandCategoryFilter.value = selected;
+  const restoredCategory = categories.find((category) => normalizeCategoryName(category) === selectedCategoryKey);
+  if (restoredCategory) {
+    commandCategoryFilter.value = restoredCategory;
   }
 }
 
@@ -2942,8 +2952,9 @@ function filterConfiguredCommands(entries) {
   const category = commandCategoryFilter?.value || '';
   const viewFilter = commandViewFilter?.value || '';
   const onlyInvalid = Boolean(commandOnlyInvalid?.checked);
+  const categoryKey = normalizeCategoryName(category);
   return entries.filter(([commandKey, command]) => {
-    if (category && (command.category || command.function || 'Allgemein') !== category) return false;
+    if (category && normalizeCategoryName(commandBaseCategory(command)) !== categoryKey) return false;
     if (viewFilter && !matchesCommandViewFilter(commandKey, command, viewFilter)) return false;
     if (onlyInvalid && !isCommandIncomplete(commandKey, command)) return false;
     if (!query) return true;
@@ -3225,7 +3236,7 @@ function commandSummaryBadges(commandKey, command) {
   const alexaMode = command.alexaMode === 'action' ? 'Aktion' : 'Schalter';
   const issues = commandValidationIssues(commandKey, command);
   return [
-    { label: displayPart(command.category || command.function || 'Allgemein'), tone: 'neutral' },
+    { label: displayPart(commandBaseCategory(command)), tone: 'neutral' },
     command.room ? { label: displayPart(command.room), tone: 'neutral' } : null,
     { label: target.type, tone: 'technical' },
     { label: alexaMode, tone: command.alexaMode === 'action' ? 'action' : 'switch' },
@@ -3727,7 +3738,7 @@ function collectCommandFromCard(card, commandKey) {
   return {
     label: card.querySelector('.command-label')?.value.trim() || commandKey,
     voiceName: card.querySelector('.command-voice')?.value.trim() || commandKey,
-    category: card.querySelector('.command-category')?.value.trim() || 'Allgemein',
+    category: normalizeCommandCategoryInput(card.querySelector('.command-category')?.value || ''),
     room: normalizeInputKey(card.querySelector('.command-room')?.value || ''),
     function: normalizeInputKey(card.querySelector('.command-function')?.value || ''),
     action: normalizeInputKey(card.querySelector('.command-action')?.value || ''),
@@ -4016,10 +4027,14 @@ function updatePathFieldState(card) {
 
 function groupCommandsByCategory(entries, options = {}) {
   const sortedEntries = [...entries].sort((left, right) => compareConfiguredCommands(left, right, options));
+  const groupKeys = new Map();
   return sortedEntries.reduce((groups, [commandKey, command]) => {
     const category = commandGroupCategory(commandKey, command, options);
-    groups[category] ||= [];
-    groups[category].push([commandKey, command]);
+    const normalizedCategory = normalizeCategoryName(category);
+    const groupKey = groupKeys.get(normalizedCategory) || displayPart(category) || 'Allgemein';
+    groupKeys.set(normalizedCategory, groupKey);
+    groups[groupKey] ||= [];
+    groups[groupKey].push([commandKey, command]);
     return groups;
   }, {});
 }
@@ -4047,7 +4062,20 @@ function compareConfiguredCommands([leftKey, leftCommand], [rightKey, rightComma
 
 function commandGroupCategory(commandKey, command, options = {}) {
   if (options.newCommandsFirst && isDraftCommand(commandKey)) return NEW_COMMAND_CATEGORY;
-  return command.category || command.function || 'Allgemein';
+  return commandBaseCategory(command);
+}
+
+function commandBaseCategory(command = {}) {
+  return String(command.category || command.function || 'Allgemein').trim() || 'Allgemein';
+}
+
+function normalizeCategoryName(value) {
+  return normalizeText(displayPart(value || 'Allgemein'));
+}
+
+function normalizeCommandCategoryInput(value) {
+  const raw = String(value || '').trim();
+  return displayPart(raw || 'Allgemein') || 'Allgemein';
 }
 
 function compareCommandCategory(leftCategory, rightCategory, options = {}) {

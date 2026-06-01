@@ -554,7 +554,7 @@ function sanitizeConfigForDiagnostics(sourceConfig) {
     commands: {
       count: Object.keys(sourceConfig.commands || {}).length,
       activeCount: Object.values(sourceConfig.commands || {}).filter((command) => command?.enabled !== false).length,
-      categories: Array.from(new Set(Object.values(sourceConfig.commands || {}).map((command) => command?.category).filter(Boolean)))
+      categories: uniqueCaseInsensitive(Object.values(sourceConfig.commands || {}).map((command) => command?.category).filter(Boolean))
     },
     alexaBridge: {
       enabled: Boolean(sourceConfig.alexaBridge?.enabled),
@@ -603,6 +603,20 @@ function redactUrlHost(value) {
   } catch {
     return '<configured>';
   }
+}
+
+function uniqueCaseInsensitive(values = []) {
+  const result = [];
+  const seen = new Set();
+  values.forEach((value) => {
+    const text = String(value || '').trim();
+    if (!text) return;
+    const key = text.toLocaleLowerCase('de-CH');
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(text);
+  });
+  return result;
 }
 
 function redactUrl(value) {

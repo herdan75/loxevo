@@ -76,6 +76,9 @@ export class TtsService {
         this.lastError = null;
         const sequenceMode = this.hasNativeSequenceSupport() ? 'native Sequenzen' : 'sendSequenceCommand-Fallback';
         console.log(`TTS ist mit alexa-remote2 verbunden (${sequenceMode}).`);
+        this.persistCookie().catch((persistError) => {
+          console.warn(`Alexa-Cookie konnte nicht gespeichert werden: ${persistError.message}`);
+        });
         finishFirstCallback();
       });
     });
@@ -126,16 +129,21 @@ export class TtsService {
 
     const cookieData = isPlainObject(this.remote?.cookieData) ? this.remote.cookieData : {};
     const sourceData = isPlainObject(this.auth?.originalData) ? this.auth.originalData : {};
-    const localCookie = cookieData.localCookie || cookie;
+    const localCookie = firstNonEmptyString(
+      cookieData.localCookie,
+      cookie,
+      sourceData.localCookie,
+      sourceData.cookie,
+      sourceData.loginCookie
+    );
 
-    if (!localCookie || typeof localCookie !== 'string') return;
-    if (!isFreshRegistrationData(cookieData)) return;
+    if (!localCookie) return;
 
     const nextData = {
       ...sourceData,
       ...cookieData,
       localCookie,
-      csrf: cookieData.csrf || csrf || sourceData.csrf,
+      csrf: firstNonEmptyString(cookieData.csrf, csrf, sourceData.csrf),
       dataVersion: cookieData.dataVersion || sourceData.dataVersion || 2,
       tokenDate: cookieData.tokenDate || Date.now()
     };
@@ -752,6 +760,10 @@ function firstText(...values) {
   return '';
 }
 
+function firstNonEmptyString(...values) {
+  return values.find((value) => typeof value === 'string' && value.trim().length > 0);
+}
+
 export function parseAlexaCookieFile(content) {
   const raw = String(content || '').trim();
   if (!raw) {
@@ -822,15 +834,6 @@ function defaultAcceptLanguage(amazonPage) {
 
 function isProxyLoginPrompt(error) {
   return /please open https?:\/\//i.test(error?.message || String(error || ''));
-}
-
-function isFreshRegistrationData(value) {
-  return Boolean(
-    isPlainObject(value) &&
-    typeof value.localCookie === 'string' &&
-    typeof value.refreshToken === 'string' &&
-    typeof value.deviceSerial === 'string'
-  );
 }
 
 function isSameJsonData(left, right) {

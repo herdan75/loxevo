@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, saveConfig } from './config.js';
-import { AlexaBridgeService } from './alexa-bridge.js';
+import { AlexaBridgeService, isSsdpPortInUseError } from './alexa-bridge.js';
 import { isCommandType, readCommandTarget } from './command-utils.js';
 import { DiscoveryControl } from './discovery-control.js';
 import { LoxoneClient } from './loxone.js';
@@ -27,6 +27,7 @@ let bridgeHttpServer = null;
 let bridgeHttpStatus = { enabled: false, ready: false, error: null, port: null };
 const events = [];
 const dedupedEventTimes = new Map();
+const oncePerProcessEventKeys = new Set();
 const startedAt = new Date();
 const MAX_REQUEST_BODY_SIZE = 1024 * 1024 * 2;
 const OPTIONAL_DISCOVERY_EVENT_DEDUPE_MS = 30 * 60 * 1000;
@@ -1712,6 +1713,7 @@ function ttsDetail(status) {
 }
 
 function isDiscoveryPortIssue(errorText = '') {
+  if (isSsdpPortInUseError(errorText)) return true;
   const lower = String(errorText || '').toLowerCase();
   return lower.includes('1900') && (
     lower.includes('eaddrinuse') ||
@@ -2094,6 +2096,9 @@ function shouldSuppressEvent(event) {
   if (!isRepeatedDiscoveryHint) return false;
 
   const key = `${type}:${status}:discovery-port`;
+  if (oncePerProcessEventKeys.has(key)) return true;
+  oncePerProcessEventKeys.add(key);
+
   const now = Date.now();
   const lastAt = dedupedEventTimes.get(key) || 0;
   if (now - lastAt < OPTIONAL_DISCOVERY_EVENT_DEDUPE_MS) return true;

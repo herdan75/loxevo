@@ -58,7 +58,7 @@ export class AlexaBridgeService {
         status: 'error',
         text: error.message
       });
-      this.scheduleRetry();
+      this.scheduleRetry(error);
     }
   }
 
@@ -109,7 +109,8 @@ export class AlexaBridgeService {
     this.retryTimer = null;
   }
 
-  scheduleRetry() {
+  scheduleRetry(error = this.lastError) {
+    if (isSsdpPortInUseError(error)) return;
     if (this.retryTimer || !this.isEnabled()) return;
     this.retryTimer = setTimeout(async () => {
       this.retryTimer = null;
@@ -792,15 +793,27 @@ function isUsableLanAddress(value) {
   return Boolean(ip && ip !== '127.0.0.1' && ip !== '0.0.0.0' && !ip.startsWith('169.254.'));
 }
 
+export function isSsdpPortInUseError(value) {
+  const text = String(value?.message || value || '').toLowerCase();
+  return (
+    value?.code === 'EADDRINUSE' ||
+    text.includes('eaddrinuse') ||
+    text.includes('udp-port 1900') ||
+    text.includes('bind udp 1900 failed') ||
+    (text.includes('address in use') && text.includes('1900'))
+  );
+}
+
 function friendlySsdpError(error) {
-  const message = String(error?.message || '');
-  const lower = message.toLowerCase();
-  if (error?.code === 'EADDRINUSE' || message.includes('EADDRINUSE') || lower.includes('bind udp 1900 failed')) {
-    return new Error(
+  if (isSsdpPortInUseError(error)) {
+    const friendly = new Error(
       `SSDP/UDP-Port 1900 konnte nicht geöffnet werden. ` +
       `Der Port ist vermutlich durch LoxBerry-ssdpd oder einen anderen SSDP-Dienst belegt. ` +
       `Vorhandene Alexa-Geräte funktionieren weiter; für neue Geräte muss die Gerätesuche kurz aktiviert werden.`
     );
+    friendly.code = error?.code || 'EADDRINUSE';
+    friendly.cause = error;
+    return friendly;
   }
   return error;
 }

@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.17 - 2026-06-13
+
+- SSDP/UDP-Port-1900-Hinweis wird bei belegtem Port nur noch einmal pro Prozesslauf protokolliert; der erwartbare LoxBerry-Fall löst keinen 30-Sekunden-Retry mehr aus.
+- Alexa-Cookie-Persistenz speichert Cookie-Updates robuster, übernimmt vorhandene JSON-Felder weiter und verlangt nicht mehr alle Registrierungsfelder gleichzeitig.
+
 ## 1.0.16 - 2026-05-31
 
 - UUID-Validierung akzeptiert jetzt Loxone UUIDs im Format `8-4-4-16`, im Standardformat `8-4-4-4-12` sowie als 32 Hex-Zeichen ohne Bindestriche.

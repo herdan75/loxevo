@@ -1,6 +1,6 @@
 {
   "name": "loxevo",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "Eigene LoxBerry-Zentrale für Alexa, Echo-TTS und Loxone.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",

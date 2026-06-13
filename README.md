@@ -78,7 +78,7 @@ In `data/config.json` ist `loxone.dryRun` standardmässig `true`. Dann erzeugt L
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
 TTS braucht das Paket `alexa-remote2` und eine gültige Alexa-Cookie-Datei. Das Paket wird bewusst nicht fest im Docker-Build installiert, damit LoxEvo auch dann startet, wenn npm-Versionen wechseln. Installiere oder aktualisiere es in der Web-UI unter `Wartung`; im Docker/LoxBerry-Betrieb landet es im gemounteten `/config`-Bereich.
-Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCookie` verwendet werden. Bei JSON-Dateien nutzt LoxEvo `localCookie`, `csrf` und gespeicherte Registrierungsdaten wie `macDms` und `refreshToken`, falls diese vorhanden sind.
+Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCookie` verwendet werden. Bei JSON-Dateien nutzt LoxEvo `localCookie`, `csrf` und gespeicherte Registrierungsdaten wie `macDms` und `refreshToken`, falls diese vorhanden sind. Wenn `alexa-remote2` neue Cookie-Daten liefert, aktualisiert LoxEvo die Cookie-Datei im Hintergrund und behält vorhandene Registrierungsdaten bei.
 Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen lokalen Login-Proxy. LoxEvo setzt dafür automatisch die LAN-IP des LoxBerry; bei Bedarf kann `tts.proxyOwnIp` und `tts.proxyPort` in der Web-UI angepasst werden.
 Für den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
@@ -226,7 +226,7 @@ Für die Fehlersuche kann im Register `Protokoll` das `Alexa-Bridge Debug-Protok
 
 Für die Gerätesuche muss LoxEvo im gleichen LAN wie die Echo-Geräte erreichbar sein. Im Docker/LoxBerry-Betrieb ist `network_mode: host` deshalb der empfohlene Modus, weil SSDP/UDP 1900 sonst oft nicht sauber bis in den Container gelangt.
 Für neuere Echo-Geräte sollte die Alexa-Bridge über Port 80 erreichbar sein. Die Web-UI kann weiter auf Port 8080 laufen; LoxEvo startet bei abweichendem `alexaBridge.advertisePort` einen zusätzlichen Alexa/Hue-HTTP-Listener.
-SSDP/UDP 1900 wird nur für die Suche neuer Alexa-Geräte gebraucht. Bereits gefundene Geräte können danach normalerweise weiter über den Alexa/Hue-HTTP-Port bedient werden. Wenn LoxBerry-`ssdpd` oder ein anderer SSDP-Dienst den Port 1900 belegt, zeigt LoxEvo eine Info: vorhandene Geräte funktionieren weiter, neue Geräte werden aber wahrscheinlich nicht gefunden, bis die Gerätesuche kurz aktiviert wird.
+SSDP/UDP 1900 wird nur für die Suche neuer Alexa-Geräte gebraucht. Bereits gefundene Geräte können danach normalerweise weiter über den Alexa/Hue-HTTP-Port bedient werden. Wenn LoxBerry-`ssdpd` oder ein anderer SSDP-Dienst den Port 1900 belegt, zeigt LoxEvo pro Prozesslauf einmal eine Info: vorhandene Geräte funktionieren weiter, neue Geräte werden aber wahrscheinlich nicht gefunden, bis die Gerätesuche kurz aktiviert wird.
 
 Optional kann auf dem LoxBerry-Host ein enger Discovery-Helper installiert werden. Er pausiert für die Gerätesuche nur die Dienste `ssdpd` und `lbssdpd` und startet sie danach wieder. Der Helper führt keine freien Shell-Befehle aus und ist nur lokal auf `127.0.0.1` erreichbar.
 Dieser Schritt wird nicht automatisch durch den Docker-Container ausgeführt, weil dafür bewusst Host-/Root-Rechte nötig sind. Er ist nur erforderlich, wenn UDP 1900 belegt ist und neue Alexa-Geräte gesucht werden sollen.

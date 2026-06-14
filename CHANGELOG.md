@@ -4,6 +4,8 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.18 - 2026-06-14
+
 - Alexa-TTS nutzt für normale Sprachausgaben jetzt automatisch `defaultDevices`, danach `allDevices` und zuletzt `alarmDevices`; damit fallen normale Meldungen nicht aus, wenn nur Fallback-Geräte gepflegt sind.
 - Alexa-CookieData wird vollständiger an `alexa-remote2` übergeben und bei echten Cookie-Updates gespeichert; alte Cookie-Dateien werden nicht mehr nur durch ein neues Datum scheinbar aktualisiert.
 - Bei erkannten Alexa-Auth-Fehlern versucht TTS einmal eine Reinitialisierung mit gespeicherten CookieData und wiederholt den Befehl; Diagnose und Protokoll zeigen nur nicht-sensitive Auth-Metadaten.

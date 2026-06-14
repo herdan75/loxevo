@@ -11,7 +11,7 @@ import { AlexaBridgeService, isSsdpPortInUseError } from './alexa-bridge.js';
 import { isCommandType, readCommandTarget } from './command-utils.js';
 import { DiscoveryControl } from './discovery-control.js';
 import { LoxoneClient } from './loxone.js';
-import { TtsService } from './tts.js';
+import { TtsService, parseAlexaCookieFile } from './tts.js';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const publicDir = join(rootDir, 'public');
@@ -20,7 +20,7 @@ let dependencyUpdate = null;
 
 let config = await loadConfig();
 let loxone = new LoxoneClient(config);
-let tts = new TtsService(config);
+let tts = createTtsService();
 let alexaBridge = createAlexaBridge();
 let discoveryControl = new DiscoveryControl(config);
 let bridgeHttpServer = null;
@@ -243,7 +243,7 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
     const nextConfig = parseJson(await readRequestBody());
     config = await saveConfig(nextConfig);
     loxone = new LoxoneClient(config);
-    tts = new TtsService(config);
+    tts = createTtsService();
     discoveryControl = new DiscoveryControl(config);
     await initTts();
     await restartAlexaBridge();
@@ -466,7 +466,7 @@ async function restoreBackup(res, backupPayload) {
   const cookieRestored = await restoreCookieFromBackup(backupPayload, cookieTargetPath);
 
   loxone = new LoxoneClient(config);
-  tts = new TtsService(config);
+  tts = createTtsService();
   discoveryControl = new DiscoveryControl(config);
   await initTts();
   await restartAlexaBridge();
@@ -511,11 +511,13 @@ function summarizeTtsStatus(status) {
     ready: Boolean(status?.ready),
     error: status?.error ? redactDiagnosticText(String(status.error)) : null,
     defaultDevicesCount: configuredCount(status?.defaultDevices),
+    defaultSpeakDevicesCount: configuredCount(status?.defaultSpeakDevices),
     allDevicesCount: configuredCount(status?.allDevices),
     alarmDevicesCount: configuredCount(status?.alarmDevices),
     defaultVolume: status?.defaultVolume,
     alarmVolume: status?.alarmVolume,
-    nativeSequences: Boolean(status?.nativeSequences)
+    nativeSequences: Boolean(status?.nativeSequences),
+    auth: sanitizeDiagnosticValue(status?.auth || {})
   };
 }
 
@@ -796,7 +798,7 @@ async function handleTts(req, res, pathParts, body) {
     return sendJson(res, { ok: true, command: 'alarm', devices: targetDevices });
   }
 
-  const targetDevices = payload.devices || firstNonEmpty(config.tts?.defaultDevices);
+  const targetDevices = payload.devices || defaultTtsSpeakDevices();
   await tts.speak(payload.text, targetDevices);
   addEvent({ type: 'tts-speak', status: 'sent', text: payload.text, devices: targetDevices });
   return sendJson(res, { ok: true, command: 'speak', devices: targetDevices });
@@ -827,7 +829,7 @@ async function handleLoxoneTtsShortPath(res, url, commandName, body) {
 async function executeLoxoneTtsShortPath(cmd, payload) {
   if (cmd === 'lautstaerke' || cmd === 'volume') {
     const volume = payload.volume ?? payload.text;
-    const targetDevices = payload.devices || firstNonEmpty(config.tts?.allDevices, config.tts?.defaultDevices);
+    const targetDevices = payload.devices || firstNonEmpty(config.tts?.allDevices, config.tts?.defaultDevices, config.tts?.alarmDevices);
     await tts.setVolume(volume, targetDevices);
     addEvent({ type: 'tts-volume', status: 'sent', key: cmd, volume, devices: targetDevices, compat: 'loxone-short-path' });
     return;
@@ -845,7 +847,7 @@ async function executeLoxoneTtsShortPath(cmd, payload) {
     return;
   }
 
-  const targetDevices = payload.devices || firstNonEmpty(config.tts?.defaultDevices);
+  const targetDevices = payload.devices || defaultTtsSpeakDevices();
   await tts.speak(payload.text, targetDevices);
   addEvent({ type: 'tts-speak', status: 'sent', key: cmd, text: payload.text, devices: targetDevices, compat: 'loxone-short-path' });
 }
@@ -1019,9 +1021,7 @@ async function getPreflightStatus() {
           ? `Installiert: ${alexaRemoteVersion}.`
           : 'Nicht lokal gefunden. Wenn TTS genutzt wird, im Register Wartung installieren.'),
         preflightCheck(config.tts?.enabled ? cookieLevel(cookieInfo, ttsStatus) : 'optional', 'Cookie-Datei', describeCookieInfo(cookieInfo, config.tts?.enabled)),
-        preflightCheck(config.tts?.enabled ? (configuredCount(ttsStatus.defaultDevices) > 0 ? 'ok' : 'warning') : 'optional', 'Standard-Geräte', configuredCount(ttsStatus.defaultDevices) > 0
-          ? `${configuredCount(ttsStatus.defaultDevices)} Standard-Gerät(e) konfiguriert.`
-          : 'Für normale TTS-Ausgaben ist kein Standard-Gerät ausgewählt.'),
+        preflightCheck(config.tts?.enabled ? (configuredCount(ttsStatus.defaultSpeakDevices) > 0 ? 'ok' : 'warning') : 'optional', 'Sprech-Geräte', ttsSpeakDevicesDetail(ttsStatus)),
         preflightCheck(config.tts?.enabled ? (configuredCount(ttsStatus.alarmDevices) > 0 ? 'ok' : 'info') : 'optional', 'Alarm-Geräte', configuredCount(ttsStatus.alarmDevices) > 0
           ? `${configuredCount(ttsStatus.alarmDevices)} Alarm-Gerät(e) konfiguriert.`
           : 'Keine eigenen Alarm-Geräte konfiguriert; LoxEvo nutzt dann die vorhandene Geräteauswahl als Fallback.'),
@@ -1117,11 +1117,32 @@ async function getCookieFileInfo(cookieFile) {
   try {
     await access(path, constants.R_OK);
     const fileStat = await stat(path);
+    const content = await readFile(path, 'utf8');
+    let auth = null;
+    let parseError = null;
+    try {
+      auth = parseAlexaCookieFile(content);
+    } catch (error) {
+      parseError = error.message;
+    }
+    const authData = auth?.originalData || {};
+    const tokenAgeMs = tokenAgeMsFromDate(authData.tokenDate);
     return {
       path,
       exists: true,
       size: fileStat.size,
-      modifiedAt: fileStat.mtime.toISOString()
+      modifiedAt: fileStat.mtime.toISOString(),
+      json: Boolean(auth?.isJson),
+      parseError,
+      hasLocalCookie: Boolean(firstConfiguredValue(authData.localCookie, auth?.cookie)),
+      hasLoginCookie: Boolean(firstConfiguredValue(authData.loginCookie)),
+      hasRefreshToken: Boolean(firstConfiguredValue(authData.refreshToken)),
+      hasDeviceSerial: Boolean(firstConfiguredValue(authData.deviceSerial, authData.deviceId)),
+      hasCsrf: Boolean(firstConfiguredValue(authData.csrf, auth?.csrf)),
+      hasMacDms: Boolean(authData.macDms && typeof authData.macDms === 'object'),
+      amazonPage: authData.amazonPage || auth?.amazonPage || null,
+      tokenDate: authData.tokenDate || null,
+      tokenAgeHours: Number.isFinite(tokenAgeMs) ? Math.round(tokenAgeMs / 36_000) / 100 : null
     };
   } catch (error) {
     return {
@@ -1308,7 +1329,17 @@ function describeCookieInfo(info, enabled) {
     return `TTS ist deaktiviert. Konfigurierter Pfad: ${info.path}.`;
   }
   if (info.exists) {
-    return `Lesbar: ${info.path}. Grösse: ${formatBytes(info.size)}, geändert: ${formatDateTimeForDetail(info.modifiedAt)}.`;
+    const details = [];
+    details.push(info.json ? 'JSON' : 'Roh-Cookie');
+    if (info.hasLocalCookie) details.push('localCookie');
+    if (info.hasLoginCookie) details.push('loginCookie');
+    if (info.hasRefreshToken) details.push('refreshToken');
+    if (info.hasDeviceSerial) details.push('deviceSerial');
+    if (info.hasCsrf) details.push('csrf');
+    if (info.hasMacDms) details.push('macDms');
+    if (info.tokenAgeHours !== null && info.tokenAgeHours !== undefined) details.push(`Token-Alter ca. ${info.tokenAgeHours} h`);
+    const parseDetail = info.parseError ? ` Parse-Hinweis: ${info.parseError}` : '';
+    return `Lesbar: ${info.path}. Grösse: ${formatBytes(info.size)}, geändert: ${formatDateTimeForDetail(info.modifiedAt)}. Felder: ${details.join(', ') || 'keine erkannten Auth-Felder'}.${parseDetail}`;
   }
   return `Nicht lesbar: ${info.path}. ${info.error || ''}`.trim();
 }
@@ -1418,6 +1449,23 @@ function ttsPreflightDetail(status) {
       : 'TTS ist bereit.';
   }
   return status.error || 'TTS ist aktiviert, aber noch nicht bereit.';
+}
+
+function ttsSpeakDevicesDetail(status) {
+  const defaultCount = configuredCount(status?.defaultDevices);
+  const speakCount = configuredCount(status?.defaultSpeakDevices);
+  const allCount = configuredCount(status?.allDevices);
+  const alarmCount = configuredCount(status?.alarmDevices);
+  if (defaultCount > 0) {
+    return `${defaultCount} Standard-Gerät(e) für normale TTS-Ausgaben konfiguriert.`;
+  }
+  if (speakCount > 0) {
+    const fallbackParts = [];
+    if (allCount > 0) fallbackParts.push(`${allCount} Alle-Gerät(e)`);
+    if (alarmCount > 0) fallbackParts.push(`${alarmCount} Alarm-Gerät(e)`);
+    return `Kein Standard-Gerät ausgewählt; normale TTS nutzt als Fallback ${fallbackParts.join(' und ')}.`;
+  }
+  return 'Für normale TTS-Ausgaben ist kein Alexa-Gerät ausgewählt.';
 }
 
 function bridgeHttpLevel(status) {
@@ -1744,6 +1792,17 @@ function isConfiguredValue(value) {
   return raw && !raw.includes('replace-with');
 }
 
+function firstConfiguredValue(...values) {
+  return values.find((value) => isConfiguredValue(value));
+}
+
+function tokenAgeMsFromDate(value) {
+  if (!value) return NaN;
+  const date = typeof value === 'number' ? new Date(value) : new Date(String(value));
+  const time = date.getTime();
+  return Number.isFinite(time) ? Date.now() - time : NaN;
+}
+
 async function handleAlexa2LoxCompat(req, res, url) {
   if (req.method !== 'GET' && req.method !== 'POST') {
     return sendText(res, 'method not allowed', 405);
@@ -1782,6 +1841,10 @@ function createAlexaBridge() {
   });
 }
 
+function createTtsService() {
+  return new TtsService(config, { addEvent });
+}
+
 async function executeAlexaBridgeCommand(commandKey, options = {}) {
   const result = await executeConfiguredCommand(commandKey, 'alexa-command', options);
   triggerAlexaCommandConfirmation(result.key || commandKey);
@@ -1808,14 +1871,14 @@ function triggerAlexaCommandConfirmation(commandKey) {
     return;
   }
 
-  const targetDevices = firstNonEmpty(config.tts?.defaultDevices);
+  const targetDevices = defaultTtsSpeakDevices();
   if (!targetDevices.length) {
     addEvent({
       type: 'alexa-confirmation',
       status: 'ignored',
       key: normalizeKey(commandKey),
       text,
-      error: 'Keine Standard-TTS-Geraete konfiguriert.'
+      error: 'Keine TTS-Geraete konfiguriert.'
     });
     return;
   }
@@ -2032,7 +2095,7 @@ function normalizeTtsText(value) {
 
 function resolveTtsDevices(deviceParam) {
   const raw = String(deviceParam || '').trim();
-  if (!raw) return firstNonEmpty(config.tts?.defaultDevices);
+  if (!raw) return defaultTtsSpeakDevices();
   if (raw.toUpperCase() === 'ALL') {
     return firstNonEmpty(config.tts?.allDevices, config.tts?.alarmDevices, config.tts?.defaultDevices);
   }
@@ -2075,6 +2138,10 @@ function firstText(...values) {
 
 function firstNonEmpty(...lists) {
   return lists.find((list) => Array.isArray(list) && list.length > 0) || [];
+}
+
+function defaultTtsSpeakDevices() {
+  return firstNonEmpty(config.tts?.defaultDevices, config.tts?.allDevices, config.tts?.alarmDevices);
 }
 
 function addEvent(event) {

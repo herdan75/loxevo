@@ -4,6 +4,10 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+- Alexa-TTS nutzt für normale Sprachausgaben jetzt automatisch `defaultDevices`, danach `allDevices` und zuletzt `alarmDevices`; damit fallen normale Meldungen nicht aus, wenn nur Fallback-Geräte gepflegt sind.
+- Alexa-CookieData wird vollständiger an `alexa-remote2` übergeben und bei echten Cookie-Updates gespeichert; alte Cookie-Dateien werden nicht mehr nur durch ein neues Datum scheinbar aktualisiert.
+- Bei erkannten Alexa-Auth-Fehlern versucht TTS einmal eine Reinitialisierung mit gespeicherten CookieData und wiederholt den Befehl; Diagnose und Protokoll zeigen nur nicht-sensitive Auth-Metadaten.
+
 ## 1.0.17 - 2026-06-13
 
 - SSDP/UDP-Port-1900-Hinweis wird bei belegtem Port nur noch einmal pro Prozesslauf protokolliert; der erwartbare LoxBerry-Fall löst keinen 30-Sekunden-Retry mehr aus.

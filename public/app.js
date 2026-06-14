@@ -1079,8 +1079,9 @@ function renderTtsStatus() {
 function ttsStatusView() {
   const status = ttsStatus || { enabled: false, ready: false };
   if (status.enabled && status.ready) {
+    const speakCount = deviceCount(status.defaultSpeakDevices);
     return {
-      text: `TTS ist bereit. Standard: ${deviceCount(status.defaultDevices)}, Alarm: ${deviceCount(status.alarmDevices)}.`,
+      text: `TTS ist bereit. Sprechen: ${speakCount}, Standard: ${deviceCount(status.defaultDevices)}, Alarm: ${deviceCount(status.alarmDevices)}.`,
       className: 'service-status ready'
     };
   }
@@ -1781,7 +1782,7 @@ function buildClientPreflightStatus() {
       checks: [
         preflightRow(config.tts?.enabled ? (tts.ready ? 'ok' : 'error') : 'optional', 'Alexa-Verbindung', tts.enabled ? (tts.ready ? 'Alexa TTS ist bereit.' : humanizeTtsStatusError(tts.error)) : 'TTS ist deaktiviert.'),
         preflightRow(config.tts?.enabled ? 'info' : 'optional', 'Cookie-Datei', config.tts?.cookieFile ? `Konfigurierter Pfad: ${config.tts.cookieFile}.` : 'Keine Cookie-Datei konfiguriert.'),
-        preflightRow(config.tts?.enabled ? (deviceListCount(tts.defaultDevices) ? 'ok' : 'warning') : 'optional', 'Standard-Geräte', deviceListCount(tts.defaultDevices) ? `${deviceListCount(tts.defaultDevices)} Standard-Gerät(e) konfiguriert.` : 'Kein Standard-Gerät ausgewählt.'),
+        preflightRow(config.tts?.enabled ? (deviceListCount(tts.defaultSpeakDevices) ? 'ok' : 'warning') : 'optional', 'Sprech-Geräte', ttsSpeakDevicesClientDetail(tts)),
         preflightRow(config.tts?.enabled ? 'info' : 'optional', 'Lautstärke', `Standard ${tts.defaultVolume ?? config.tts?.defaultVolume ?? 40}%, Alarm ${tts.alarmVolume ?? config.tts?.alarmVolume ?? 100}%.`),
         preflightRow(config.tts?.enabled ? (tts.nativeSequences ? 'ok' : 'info') : 'optional', 'TTS-Sequenzen', tts.nativeSequences ? 'Native Alexa-Sequenzen sind aktiv.' : 'Native Sequenzen konnten lokal nicht bestätigt werden.')
       ]
@@ -1837,9 +1838,25 @@ function deviceListCount(values) {
   return Array.isArray(values) ? values.filter((value) => value && !String(value).includes('replace-with')).length : 0;
 }
 
+function ttsSpeakDevicesClientDetail(status) {
+  const defaultCount = deviceListCount(status?.defaultDevices);
+  const speakCount = deviceListCount(status?.defaultSpeakDevices);
+  const allCount = deviceListCount(status?.allDevices);
+  const alarmCount = deviceListCount(status?.alarmDevices);
+  if (defaultCount) return `${defaultCount} Standard-Gerät(e) konfiguriert.`;
+  if (speakCount) {
+    const fallback = [];
+    if (allCount) fallback.push(`${allCount} Alle-Gerät(e)`);
+    if (alarmCount) fallback.push(`${alarmCount} Alarm-Gerät(e)`);
+    return `Kein Standard-Gerät ausgewählt; normale TTS nutzt ${fallback.join(' und ')} als Fallback.`;
+  }
+  return 'Kein Alexa-Gerät für normale TTS-Ausgaben ausgewählt.';
+}
+
 function ttsDeviceSummary(status) {
   if (!status?.ready) return humanizeTtsStatusError(status?.error || '');
   const parts = [
+    `Sprechen: ${deviceListCount(status.defaultSpeakDevices)}`,
     `Standard: ${deviceListCount(status.defaultDevices)}`,
     `Alarm: ${deviceListCount(status.alarmDevices)}`
   ];

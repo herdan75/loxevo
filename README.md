@@ -78,8 +78,9 @@ In `data/config.json` ist `loxone.dryRun` standardmässig `true`. Dann erzeugt L
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
 TTS braucht das Paket `alexa-remote2` und eine gültige Alexa-Cookie-Datei. Das Paket wird bewusst nicht fest im Docker-Build installiert, damit LoxEvo auch dann startet, wenn npm-Versionen wechseln. Installiere oder aktualisiere es in der Web-UI unter `Wartung`; im Docker/LoxBerry-Betrieb landet es im gemounteten `/config`-Bereich.
-Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCookie` verwendet werden. Bei JSON-Dateien nutzt LoxEvo `localCookie`, `csrf` und gespeicherte Registrierungsdaten wie `macDms` und `refreshToken`, falls diese vorhanden sind. Wenn `alexa-remote2` neue Cookie-Daten liefert, aktualisiert LoxEvo die Cookie-Datei im Hintergrund und behält vorhandene Registrierungsdaten bei.
+Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCookie` verwendet werden. Bei JSON-Dateien übergibt LoxEvo die gespeicherte CookieData-Struktur vollständig an `alexa-remote2`, nutzt Felder wie `csrf`, `macDms`, `refreshToken` und `deviceSerial`, falls vorhanden, und speichert echte Cookie-Updates wieder in die Datei. Bei einem Alexa-Auth-Fehler versucht LoxEvo einmal eine Reinitialisierung mit den gespeicherten CookieData und wiederholt den TTS-Befehl.
 Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen lokalen Login-Proxy. LoxEvo setzt dafür automatisch die LAN-IP des LoxBerry; bei Bedarf kann `tts.proxyOwnIp` und `tts.proxyPort` in der Web-UI angepasst werden.
+Normale TTS-Ausgaben verwenden zuerst `defaultDevices`, danach `allDevices` und zuletzt `alarmDevices`. Dadurch funktionieren normale Meldungen auch dann weiter, wenn keine Standardgeräte gepflegt sind, aber andere Alexa-Gerätelisten vorhanden sind.
 Für den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
 Die Web-UI startet mit einer kompakten `Statuskontrolle`. Dort sieht man auf einen Blick, ob Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche, Backup, Admin-Schutz und Systemprüfung in einem sinnvollen Zustand sind.

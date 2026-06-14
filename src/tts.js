@@ -10,13 +10,20 @@ const NATIVE_FIRE_AND_FORGET_MS = 100;
 const MEDIA_VOLUME_TIMEOUT_MS = 1200;
 
 export class TtsService {
-  constructor(config) {
+  constructor(config, handlers = {}) {
     this.rootConfig = config || {};
     this.config = this.rootConfig.tts || {};
+    this.handlers = handlers || {};
+    this.AlexaRemote = null;
     this.remote = null;
     this.ready = false;
     this.lastError = null;
     this.auth = null;
+    this.lastCookiePersistAt = null;
+    this.lastAuthRefreshAt = null;
+    this.lastAuthError = null;
+    this.loginProxyActive = false;
+    this.authRefreshPromise = null;
   }
 
   async init() {
@@ -28,6 +35,7 @@ export class TtsService {
     let AlexaRemote;
     try {
       AlexaRemote = loadAlexaRemote2();
+      this.AlexaRemote = AlexaRemote;
     } catch (error) {
       this.markUnavailable(
         'alexa-remote2 ist nicht installiert. Bitte in der Web-UI unter Wartung installieren.',
@@ -39,6 +47,7 @@ export class TtsService {
     let auth;
     try {
       auth = parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
+      this.emitAuthEvent('cookie-read', 'Alexa-Cookie-Datei wurde gelesen.');
     } catch (error) {
       this.markUnavailable(`Alexa-Cookie konnte nicht gelesen werden: ${this.config.cookieFile}`, error);
       return;
@@ -51,46 +60,50 @@ export class TtsService {
   }
 
   async initAlexaRemote() {
-    await new Promise((resolve) => {
+    return await new Promise((resolve) => {
       let firstCallbackHandled = false;
-      const finishFirstCallback = () => {
+      const finishFirstCallback = (success = false) => {
         if (firstCallbackHandled) return;
         firstCallbackHandled = true;
-        resolve();
+        resolve(success);
       };
 
       this.remote.init(this.buildInitOptions(this.auth), (error) => {
         if (error) {
           if (isProxyLoginPrompt(error)) {
             this.markWaitingForLogin(error);
-            finishFirstCallback();
+            finishFirstCallback(false);
             return;
           }
 
           this.markUnavailable('Alexa-Verbindung konnte nicht initialisiert werden.', error);
-          finishFirstCallback();
+          finishFirstCallback(false);
           return;
         }
 
         this.ready = true;
         this.lastError = null;
+        this.loginProxyActive = false;
         const sequenceMode = this.hasNativeSequenceSupport() ? 'native Sequenzen' : 'sendSequenceCommand-Fallback';
         console.log(`TTS ist mit alexa-remote2 verbunden (${sequenceMode}).`);
+        this.emitAuthEvent('ready', 'Alexa TTS ist bereit.');
         this.persistCookie().catch((persistError) => {
           console.warn(`Alexa-Cookie konnte nicht gespeichert werden: ${persistError.message}`);
         });
-        finishFirstCallback();
+        finishFirstCallback(true);
       });
     });
   }
 
   buildInitOptions(auth) {
+    const storedCookieData = auth?.cookieData || auth?.remoteCookie;
     const options = {
-      cookie: auth.remoteCookie || auth.cookie,
-      csrf: auth.csrf,
-      amazonPage: this.config.amazonPage || auth.amazonPage || 'amazon.de',
+      cookie: storedCookieData || auth?.cookie,
+      csrf: auth?.csrf,
+      cookieJustCreated: !storedCookieData,
+      amazonPage: this.config.amazonPage || auth?.amazonPage || storedCookieData?.amazonPage || 'amazon.de',
       alexaServiceHost: this.config.alexaServiceHost || 'layla.amazon.de',
-      acceptLanguage: this.config.acceptLanguage || defaultAcceptLanguage(this.config.amazonPage || auth.amazonPage),
+      acceptLanguage: this.config.acceptLanguage || defaultAcceptLanguage(this.config.amazonPage || auth?.amazonPage || storedCookieData?.amazonPage),
       proxyOwnIp: this.getProxyOwnIp(),
       usePushConnection: true
     };
@@ -100,13 +113,13 @@ export class TtsService {
       options.proxyPort = proxyPort;
     }
 
-    if (auth.formerRegistrationData) {
+    if (auth?.formerRegistrationData) {
       options.formerRegistrationData = auth.formerRegistrationData;
     }
-    if (auth.macDms) {
+    if (auth?.macDms) {
       options.macDms = auth.macDms;
     }
-    if (auth.deviceAppName) {
+    if (auth?.deviceAppName) {
       options.deviceAppName = auth.deviceAppName;
     }
 
@@ -129,6 +142,14 @@ export class TtsService {
 
     const cookieData = isPlainObject(this.remote?.cookieData) ? this.remote.cookieData : {};
     const sourceData = isPlainObject(this.auth?.originalData) ? this.auth.originalData : {};
+    const hasRemoteCookieData = Object.keys(cookieData).length > 0;
+    const hasCookieEventData = Boolean(
+      firstNonEmptyString(cookie, csrf) ||
+      firstNonEmptyObject(macDms)
+    );
+
+    if (!hasRemoteCookieData && !hasCookieEventData) return;
+
     const localCookie = firstNonEmptyString(
       cookieData.localCookie,
       cookie,
@@ -139,14 +160,19 @@ export class TtsService {
 
     if (!localCookie) return;
 
+    const nextCsrf = firstNonEmptyString(cookieData.csrf, csrf, sourceData.csrf);
+    const nextTokenDate = cookieData.tokenDate || sourceData.tokenDate || (hasRemoteCookieData || hasCookieEventData ? Date.now() : undefined);
     const nextData = {
       ...sourceData,
       ...cookieData,
       localCookie,
-      csrf: firstNonEmptyString(cookieData.csrf, csrf, sourceData.csrf),
-      dataVersion: cookieData.dataVersion || sourceData.dataVersion || 2,
-      tokenDate: cookieData.tokenDate || Date.now()
+      csrf: nextCsrf,
+      dataVersion: cookieData.dataVersion || sourceData.dataVersion || 2
     };
+    if (nextTokenDate) {
+      nextData.tokenDate = nextTokenDate;
+    }
+
     const macDmsValue = firstNonEmptyObject(cookieData.macDms, macDms, sourceData.macDms);
     if (macDmsValue) {
       nextData.macDms = macDmsValue;
@@ -158,6 +184,8 @@ export class TtsService {
 
     await writeFile(this.config.cookieFile, `${JSON.stringify(nextData, null, 2)}\n`, 'utf8');
     this.auth = parseAlexaCookieFile(JSON.stringify(nextData));
+    this.lastCookiePersistAt = new Date().toISOString();
+    this.emitAuthEvent('cookie-updated', 'Alexa-Cookie wurde aktualisiert.');
     console.log(`Alexa-Cookie wurde aktualisiert: ${this.config.cookieFile}`);
   }
 
@@ -172,13 +200,16 @@ export class TtsService {
   markUnavailable(message, error) {
     this.ready = false;
     this.remote = null;
+    this.loginProxyActive = false;
     this.lastError = error?.message ? `${message} (${error.message})` : message;
     console.warn(`TTS nicht bereit: ${this.lastError}`);
   }
 
   markWaitingForLogin(error) {
     this.ready = false;
+    this.loginProxyActive = true;
     this.lastError = `Amazon-Login erforderlich. ${error.message}`;
+    this.emitAuthEvent('login-required', 'Amazon-Login ist erforderlich.');
     console.warn(`TTS wartet auf Amazon-Login: ${error.message}`);
   }
 
@@ -190,13 +221,41 @@ export class TtsService {
       defaultDevices: configuredDeviceList(this.config.defaultDevices),
       allDevices: configuredDeviceList(this.config.allDevices),
       alarmDevices: configuredDeviceList(this.config.alarmDevices),
+      defaultSpeakDevices: configuredDeviceList(this.getDefaultSpeakDevices()),
       defaultVolume: normalizeVolume(this.config.defaultVolume, 40),
       alarmVolume: normalizeVolume(this.config.alarmVolume, 100),
-      nativeSequences: this.hasNativeSequenceSupport()
+      nativeSequences: this.hasNativeSequenceSupport(),
+      auth: this.getAuthStatus()
     };
   }
 
-  async speak(text, devices = firstNonEmpty(this.config.defaultDevices)) {
+  getDefaultSpeakDevices() {
+    return firstNonEmpty(this.config.defaultDevices, this.config.allDevices, this.config.alarmDevices);
+  }
+
+  getAuthStatus() {
+    const sourceData = isPlainObject(this.auth?.originalData) ? this.auth.originalData : {};
+    const tokenAgeMs = tokenAgeMsFromDate(sourceData.tokenDate);
+    return {
+      cookieFile: this.config.cookieFile || '',
+      cookieJson: Boolean(this.auth?.isJson),
+      hasLocalCookie: Boolean(firstNonEmptyString(sourceData.localCookie, this.auth?.cookie)),
+      hasLoginCookie: Boolean(firstNonEmptyString(sourceData.loginCookie)),
+      hasRefreshToken: Boolean(firstNonEmptyString(sourceData.refreshToken)),
+      hasDeviceSerial: Boolean(firstNonEmptyString(sourceData.deviceSerial, sourceData.deviceId)),
+      hasCsrf: Boolean(firstNonEmptyString(sourceData.csrf, this.auth?.csrf)),
+      hasMacDms: Boolean(firstNonEmptyObject(sourceData.macDms, this.auth?.macDms)),
+      amazonPage: sourceData.amazonPage || this.auth?.amazonPage || this.config.amazonPage || '',
+      tokenDate: sourceData.tokenDate || null,
+      tokenAgeHours: Number.isFinite(tokenAgeMs) ? Math.round(tokenAgeMs / 36_000) / 100 : null,
+      lastCookiePersistAt: this.lastCookiePersistAt,
+      lastAuthRefreshAt: this.lastAuthRefreshAt,
+      lastAuthError: this.lastAuthError,
+      loginProxyActive: this.loginProxyActive
+    };
+  }
+
+  async speak(text, devices = this.getDefaultSpeakDevices()) {
     this.assertReady();
     const targets = this.normalizeDevices(devices);
     this.assertDevices(targets);
@@ -208,7 +267,7 @@ export class TtsService {
     await this.speakAtVolume(text, normalizeVolume(volume, 100), devices);
   }
 
-  async speakAtVolume(text, volume, devices = firstNonEmpty(this.config.defaultDevices)) {
+  async speakAtVolume(text, volume, devices = this.getDefaultSpeakDevices()) {
     this.assertReady();
     await this.sendSequence('speakAtVolume', text, devices, normalizeVolume(volume, 40));
   }
@@ -277,6 +336,10 @@ export class TtsService {
   }
 
   async sendSequenceToTargets(type, text, targets, volume) {
+    return await this.withAuthRetry(`tts-${type}`, async () => this.sendSequenceToTargetsOnce(type, text, targets, volume));
+  }
+
+  async sendSequenceToTargetsOnce(type, text, targets, volume) {
     if (!text || typeof text !== 'string') {
       throw new Error('TTS braucht einen Text im Request-Body.');
     }
@@ -287,10 +350,72 @@ export class TtsService {
   }
 
   async sendCommandToTargets(type, value, targets) {
+    return await this.withAuthRetry(`tts-${type}`, async () => this.sendCommandToTargetsOnce(type, value, targets));
+  }
+
+  async sendCommandToTargetsOnce(type, value, targets) {
     if (await this.tryNativeCommand(type, value, targets)) {
       return;
     }
     await this.runForTargets(targets, (device) => this.exec(device, type, value), type);
+  }
+
+  async withAuthRetry(reason, action) {
+    try {
+      return await action();
+    } catch (error) {
+      if (!isAuthError(error)) throw error;
+      this.lastAuthError = summarizeAuthError(error);
+      await this.refreshAuth(reason, error);
+      return await action();
+    }
+  }
+
+  async refreshAuth(reason = 'auth-error', error = null) {
+    if (this.authRefreshPromise) return await this.authRefreshPromise;
+    this.authRefreshPromise = this.refreshAuthInternal(reason, error).finally(() => {
+      this.authRefreshPromise = null;
+    });
+    return await this.authRefreshPromise;
+  }
+
+  async refreshAuthInternal(reason, error) {
+    this.lastAuthError = summarizeAuthError(error);
+    this.emitAuthEvent('refresh-started', `Alexa-Auth wird erneuert (${reason}).`);
+
+    if (!hasReusableAuthData(this.auth)) {
+      this.markWaitingForLogin(new Error('Keine wiederverwendbaren Cookie-Daten vorhanden.'));
+      this.emitAuthEvent('refresh-failed', 'Alexa-Auth konnte nicht automatisch erneuert werden.');
+      throw new Error(this.lastError || 'Amazon-Login erforderlich.');
+    }
+
+    let AlexaRemote = this.AlexaRemote;
+    if (!AlexaRemote) {
+      AlexaRemote = loadAlexaRemote2();
+      this.AlexaRemote = AlexaRemote;
+    }
+
+    this.ready = false;
+    this.remote = new AlexaRemote();
+    this.attachCookiePersistence(this.auth);
+    const initialized = await this.initAlexaRemote();
+    if (!initialized) {
+      this.emitAuthEvent('refresh-failed', 'Alexa-Auth konnte nicht automatisch erneuert werden.');
+      throw new Error(this.lastError || 'Amazon-Login erforderlich.');
+    }
+
+    this.lastAuthRefreshAt = new Date().toISOString();
+    this.emitAuthEvent('refresh-ok', 'Alexa-Auth wurde erneuert.');
+    await this.persistCookie();
+  }
+
+  emitAuthEvent(status, text) {
+    if (typeof this.handlers.addEvent !== 'function') return;
+    this.handlers.addEvent({
+      type: 'tts-auth',
+      status,
+      text
+    });
   }
 
   async runForTargets(targets, runner, type) {
@@ -771,7 +896,12 @@ export function parseAlexaCookieFile(content) {
   }
 
   if (!raw.startsWith('{')) {
-    return { cookie: raw, isJson: false, originalData: null };
+    return {
+      cookie: raw,
+      isJson: false,
+      originalData: null,
+      cookieData: null
+    };
   }
 
   const parsed = JSON.parse(raw);
@@ -780,14 +910,17 @@ export function parseAlexaCookieFile(content) {
     throw new Error('Cookie-Datei ist JSON, enthaelt aber keinen localCookie oder loginCookie.');
   }
 
+  const cookieData = {
+    ...parsed,
+    localCookie: parsed.localCookie || cookie
+  };
+
   return {
     cookie,
     isJson: true,
     originalData: parsed,
-    remoteCookie: {
-      ...parsed,
-      localCookie: parsed.localCookie || cookie
-    },
+    cookieData,
+    remoteCookie: cookieData,
     csrf: typeof parsed.csrf === 'string' ? parsed.csrf : undefined,
     amazonPage: typeof parsed.amazonPage === 'string' ? parsed.amazonPage : undefined,
     deviceAppName: typeof parsed.deviceAppName === 'string' ? parsed.deviceAppName : undefined,
@@ -834,6 +967,50 @@ function defaultAcceptLanguage(amazonPage) {
 
 function isProxyLoginPrompt(error) {
   return /please open https?:\/\//i.test(error?.message || String(error || ''));
+}
+
+function isAuthError(error) {
+  const rawCode = error?.statusCode ?? error?.status;
+  const code = Number(rawCode);
+  const message = String(error?.message || error || '').toLowerCase();
+  return (
+    code === 401 ||
+    code === 403 ||
+    /\b401\b/.test(message) ||
+    /\b403\b/.test(message) ||
+    message.includes('unauthorized') ||
+    message.includes('forbidden') ||
+    message.includes('authentication failed') ||
+    message.includes('not authenticated') ||
+    message.includes('login required') ||
+    isProxyLoginPrompt(error)
+  );
+}
+
+function summarizeAuthError(error) {
+  if (!error) return null;
+  const code = error?.statusCode || error?.status || error?.code || '';
+  const message = String(error?.message || error || '').replace(/https?:\/\/\S+/g, '[login-url]');
+  return [code, message].filter(Boolean).join(' ');
+}
+
+function hasReusableAuthData(auth) {
+  if (!auth) return false;
+  const data = isPlainObject(auth.originalData) ? auth.originalData : {};
+  return Boolean(firstNonEmptyString(
+    auth.cookie,
+    data.localCookie,
+    data.loginCookie,
+    data.cookie,
+    data.refreshToken
+  ));
+}
+
+function tokenAgeMsFromDate(value) {
+  if (!value) return NaN;
+  const date = typeof value === 'number' ? new Date(value) : new Date(String(value));
+  const time = date.getTime();
+  return Number.isFinite(time) ? Date.now() - time : NaN;
 }
 
 function isSameJsonData(left, right) {

@@ -155,7 +155,7 @@ export class TtsService {
   }
 
   async persistCookie(cookie, csrf, macDms) {
-    if (!this.config.cookieFile) return;
+    if (!this.config.cookieFile) return false;
 
     const cookieData = isPlainObject(this.remote?.cookieData) ? this.remote.cookieData : {};
     const sourceData = isPlainObject(this.auth?.originalData) ? this.auth.originalData : {};
@@ -165,7 +165,7 @@ export class TtsService {
       firstNonEmptyObject(macDms)
     );
 
-    if (!hasRemoteCookieData && !hasCookieEventData) return;
+    if (!hasRemoteCookieData && !hasCookieEventData) return false;
 
     const localCookie = firstNonEmptyString(
       cookieData.localCookie,
@@ -175,7 +175,7 @@ export class TtsService {
       sourceData.loginCookie
     );
 
-    if (!localCookie) return;
+    if (!localCookie) return false;
 
     const nextCsrf = firstNonEmptyString(cookieData.csrf, csrf, sourceData.csrf);
     const previousCookie = firstNonEmptyString(sourceData.localCookie, sourceData.cookie, sourceData.loginCookie);
@@ -199,13 +199,14 @@ export class TtsService {
       delete nextData.macDms;
     }
 
-    if (isSameJsonData(sourceData, nextData)) return;
+    if (isSameJsonData(sourceData, nextData)) return false;
 
     await writeFile(this.config.cookieFile, `${JSON.stringify(nextData, null, 2)}\n`, 'utf8');
     this.auth = parseAlexaCookieFile(JSON.stringify(nextData));
     this.lastCookiePersistAt = new Date().toISOString();
     this.emitAuthEvent('cookie-updated', 'Alexa-Cookie wurde aktualisiert.');
     console.log(`Alexa-Cookie wurde aktualisiert: ${this.config.cookieFile}`);
+    return true;
   }
 
   getProxyOwnIp() {
@@ -329,10 +330,12 @@ export class TtsService {
     this.loginProxyReconnectRunning = true;
     this.loginProxyReconnectAttempts += 1;
     try {
-      if (hasRemoteCookieData) {
-        await this.persistCookie();
+      const cookiePersisted = hasRemoteCookieData ? await this.persistCookie() : false;
+      if (!cookieFileChanged && !cookiePersisted) {
+        this.startLoginProxyReconnectTimer();
+        return;
       }
-      const result = await this.reconnect(hasRemoteCookieData ? 'login-proxy-cookie-data' : 'login-proxy-cookie-updated');
+      const result = await this.reconnect(cookiePersisted ? 'login-proxy-cookie-data' : 'login-proxy-cookie-updated');
       if (result.ok) return;
     } finally {
       this.loginProxyReconnectRunning = false;

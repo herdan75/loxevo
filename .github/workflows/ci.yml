@@ -30,6 +30,9 @@ jobs:
       - name: Run syntax checks
         run: npm run check
 
+      - name: Run tests
+        run: npm test
+
   docker:
     name: Docker build
     runs-on: ubuntu-latest

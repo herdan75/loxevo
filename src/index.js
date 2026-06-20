@@ -189,7 +189,7 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
 
   if (req.method === 'POST' && pathParts[1] === 'tts' && pathParts[2] === 'reconnect') {
     const result = await tts.reconnect('manual-api');
-    return sendJson(res, { ok: Boolean(result.ok), status: result.status, error: result.error }, result.ok ? 200 : 503);
+    return sendJson(res, { ok: Boolean(result.ok), status: result.status, error: result.error });
   }
 
   if (req.method === 'GET' && pathParts[1] === 'alexa-bridge' && pathParts[2] === 'status') {

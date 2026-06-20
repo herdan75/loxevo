@@ -142,7 +142,7 @@ async function readConfigOrCreateDefault(path) {
   }
 }
 
-function normalizeConfig(config) {
+export function normalizeConfig(config) {
   delete config.security;
   config.server ||= {};
   config.server.port = Number(process.env.PORT || config.server.port || config.bridge?.port || 8080);

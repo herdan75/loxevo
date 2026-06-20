@@ -109,6 +109,11 @@ export class TtsService {
 
   buildInitOptions(auth) {
     const storedCookieData = auth?.cookieData || auth?.remoteCookie;
+    // LoxEvo nutzt bewusst einen eigenen Auth-Refresh-Timer statt eine
+    // alexa-remote2-spezifische Refresh-Option zu erzwingen. So bleibt das
+    // Verhalten über verschiedene alexa-remote2-Versionen nachvollziehbar.
+    // Eine PushConnection ist für reine TTS-Ausgabe nicht nötig und bleibt
+    // deshalb standardmässig aus.
     const options = {
       cookie: storedCookieData || auth?.cookie,
       csrf: auth?.csrf,
@@ -314,7 +319,9 @@ export class TtsService {
       return;
     }
 
-    if (!(await this.cookieFileChangedAfterLoginStart())) {
+    const hasRemoteCookieData = isPlainObject(this.remote?.cookieData) && Object.keys(this.remote.cookieData).length > 0;
+    const cookieFileChanged = await this.cookieFileChangedAfterLoginStart();
+    if (!hasRemoteCookieData && !cookieFileChanged) {
       this.startLoginProxyReconnectTimer();
       return;
     }
@@ -322,7 +329,10 @@ export class TtsService {
     this.loginProxyReconnectRunning = true;
     this.loginProxyReconnectAttempts += 1;
     try {
-      const result = await this.reconnect('login-proxy-cookie-updated');
+      if (hasRemoteCookieData) {
+        await this.persistCookie();
+      }
+      const result = await this.reconnect(hasRemoteCookieData ? 'login-proxy-cookie-data' : 'login-proxy-cookie-updated');
       if (result.ok) return;
     } finally {
       this.loginProxyReconnectRunning = false;
@@ -402,6 +412,7 @@ export class TtsService {
 
       const auth = parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
       this.emitAuthEvent('cookie-read', 'Alexa-Cookie-Datei wurde neu gelesen.');
+      await this.disposeRemote();
       this.remote = new AlexaRemote();
       this.attachCookiePersistence(auth);
       const initialized = await this.initAlexaRemote();
@@ -421,6 +432,24 @@ export class TtsService {
       this.emitAuthEvent('refresh-failed', 'Alexa TTS konnte nicht neu verbunden werden.');
       return { ok: false, ready: false, status: this.getStatus(), error: this.lastError };
     }
+  }
+
+  async disposeRemote() {
+    const remote = this.remote;
+    if (!remote) return;
+    const cleanupMethods = ['stopProxyServer', 'stopProxy', 'close', 'disconnect', 'stop'];
+    for (const method of cleanupMethods) {
+      if (typeof remote[method] !== 'function') continue;
+      try {
+        await remote[method]();
+      } catch (error) {
+        console.warn(`AlexaRemote Cleanup (${method}) ist fehlgeschlagen: ${error.message}`);
+      }
+      return;
+    }
+    // alexa-remote2 bietet je nach Version keine dokumentierte Cleanup-Methode
+    // für den Login-Proxy an. In diesem Fall wird die alte Instanz ersetzt; der
+    // interne Proxy endet normalerweise durch alexa-remote2 selbst.
   }
 
   async speak(text, devices = this.getDefaultSpeakDevices()) {
@@ -565,6 +594,7 @@ export class TtsService {
     }
 
     this.ready = false;
+    await this.disposeRemote();
     this.remote = new AlexaRemote();
     this.attachCookiePersistence(this.auth);
     const initialized = await this.initAlexaRemote();

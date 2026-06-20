@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.20 - 2026-06-20
+
+- Alexa-TTS Auto-Reconnect prüft nach Amazon-Login zusätzlich vorhandene `remote.cookieData`, persistiert sie und versucht danach die Neuverbindung.
+- Der manuelle TTS-Reconnect liefert bei noch offenem Amazon-Login einen normalen Zwischenstatus statt eines technischen Serverfehlers; die Web-UI zeigt den Status entsprechend ruhiger an.
+- Kleine Tests für Alexa-Cookie-Parsing und TTS-Config-Normalisierung ergänzt.
+
 ## 1.0.19 - 2026-06-20
 
 - Alexa-TTS verbindet sich nach einem Amazon-Login über den Login-Proxy automatisch oder per Button `Alexa TTS neu verbinden` neu, ohne dass LoxEvo komplett neu gestartet werden muss.

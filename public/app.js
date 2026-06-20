@@ -1137,8 +1137,13 @@ async function reconnectTts(button) {
     ttsStatus = payload.status;
     renderTtsStatus();
     await loadEvents();
-    setButtonFeedback(button, 'success', 'Verbunden');
-    showToast(payload.ok ? 'Alexa TTS neu verbunden' : 'Alexa TTS ist noch nicht bereit', payload.ok ? 'ok' : 'warning');
+    if (payload.ok) {
+      setButtonFeedback(button, 'success', 'Verbunden');
+      showToast('Alexa TTS neu verbunden', 'ok');
+      return;
+    }
+    setButtonFeedback(button, 'success', 'Noch offen');
+    showToast('Alexa TTS ist noch nicht bereit. Amazon-Login abschliessen oder Cookie prüfen.', 'warning');
   } catch (error) {
     await loadTtsStatus();
     setButtonFeedback(button, 'error', 'Fehler');

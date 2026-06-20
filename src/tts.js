@@ -2,6 +2,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { enforcePrivateFileMode, PRIVATE_FILE_MODE } from './file-security.js';
 
 const appRequire = createRequire(import.meta.url);
 const COMMAND_TIMEOUT_MS = 5000;
@@ -242,7 +243,8 @@ export class TtsService {
 
     if (isSameJsonData(sourceData, nextData)) return false;
 
-    await writeFile(this.config.cookieFile, `${JSON.stringify(nextData, null, 2)}\n`, 'utf8');
+    await writeFile(this.config.cookieFile, `${JSON.stringify(nextData, null, 2)}\n`, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
+    await enforcePrivateFileMode(this.config.cookieFile, 'Alexa-Cookie-Datei');
     if (sourceRemote === this.remote || sourceAuth === this.auth) {
       this.auth = parseAlexaCookieFile(JSON.stringify(nextData));
     }

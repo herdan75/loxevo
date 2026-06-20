@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.22 - 2026-06-20
+
+- Sensible lokale Dateien werden beim Schreiben best-effort auf private Dateirechte gesetzt: Alexa-Cookie, LoxEvo-Konfiguration und Admin-Token nutzen `0600`, wenn das Dateisystem dies zulässt.
+- Die Systemprüfung zeigt bei der Alexa-Cookie-Datei jetzt die Dateirechte an und warnt, wenn sie für Gruppe oder andere Benutzer lesbar ist.
+- README um Hinweise zu `data/Node.txt`, `data/config.json`, Backup mit Cookie und empfohlenen Docker/LoxBerry-Rechten ergänzt.
+
 ## 1.0.21 - 2026-06-20
 
 - Alexa-TTS Reconnect und Auth-Refresh sind jetzt nicht-destruktiv: eine neue AlexaRemote-Verbindung wird zuerst als Candidate aufgebaut und ersetzt die bestehende Verbindung nur bei erfolgreicher Initialisierung.

@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: Source available](https://img.shields.io/badge/License-source--available-orange.svg)](LICENSE)
 
-> **Status: Version 1.0.21 / getestete lauffähige Version**
+> **Status: Version 1.0.22 / getestete lauffähige Version**
 >
 > LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte, Alexa-Gerätesuche, Alexa-TTS, Rückmeldungen, Backup und Web-UI wurden soweit möglich getestet. Trotzdem können in einzelnen Loxone-/Alexa-Umgebungen noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
@@ -100,6 +100,16 @@ Private Daten gehören in `data/`:
 Dieser Ordner ist absichtlich von Git ausgenommen, damit keine Loxone-Zugangsdaten, UUIDs oder Alexa-Geräte-IDs veröffentlicht werden.
 Alle privaten Werte werden nach der Installation über die Web-UI oder direkt in `data/config.json` gepflegt.
 Bei einer Neuinstallation reicht es normalerweise, den Ordner `data/` zu sichern und später wieder in den Projektordner zu legen.
+
+`data/Node.txt` enthält sensible Amazon-Sessiondaten für Alexa TTS. `data/config.json` enthält unter anderem Loxone-Zugangsdaten. LoxEvo setzt beim Schreiben dieser Dateien sowie beim Admin-Token best-effort private Dateirechte. Auf Docker-/LoxBerry-Systemen ist zusätzlich diese lokale Absicherung empfohlen:
+
+```bash
+chmod 700 data
+chmod 600 data/Node.txt
+chmod 600 data/config.json
+```
+
+Wenn der Container nicht als `root` läuft, muss der Besitzer der Dateien zum Container-Benutzer passen, sonst kann LoxEvo die Dateien nicht lesen oder aktualisieren. Die Systemprüfung zeigt für die Alexa-Cookie-Datei an, wenn sie für Gruppe oder andere Benutzer lesbar ist. `Node.txt` und Backups mit Cookie sollten nie ins GitHub-Repository geladen und nur bewusst exportiert werden.
 
 Wichtig für Live-Tests: Die Web-UI zeigt und speichert Loxone-Zugangsdaten. LoxEvo sollte deshalb nur im eigenen LAN oder per VPN erreichbar sein und nicht direkt ins Internet freigegeben werden.
 

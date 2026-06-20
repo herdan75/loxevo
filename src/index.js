@@ -12,6 +12,7 @@ import { isCommandType, readCommandTarget } from './command-utils.js';
 import { DiscoveryControl } from './discovery-control.js';
 import { LoxoneClient } from './loxone.js';
 import { TtsService, parseAlexaCookieFile } from './tts.js';
+import { enforcePrivateFileMode, inspectFilePermissions, PRIVATE_FILE_MODE } from './file-security.js';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const publicDir = join(rootDir, 'public');
@@ -401,7 +402,8 @@ async function loadAdminSecurity() {
 async function writeAdminSecurity(record) {
   const tokenPath = getAdminTokenPath();
   await mkdir(dirname(tokenPath), { recursive: true });
-  await writeFile(tokenPath, `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+  await writeFile(tokenPath, `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
+  await enforcePrivateFileMode(tokenPath, 'Admin-Token-Datei');
 }
 
 async function removeAdminToken() {
@@ -676,7 +678,8 @@ function looksLikeLoxEvoConfig(value) {
 async function writeCurrentConfigBackup() {
   const configPath = getConfigPath();
   const backupPath = join(dirname(configPath), `config.backup-${timestampForFile(new Date().toISOString())}.json`);
-  await writeFile(backupPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+  await writeFile(backupPath, `${JSON.stringify(config, null, 2)}\n`, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
+  await enforcePrivateFileMode(backupPath, 'Konfigurations-Backup');
   return backupPath;
 }
 
@@ -698,7 +701,8 @@ async function restoreCookieFromBackup(payload, targetPath) {
     return false;
   }
 
-  await writeFile(targetPath, payload.cookie.content, 'utf8');
+  await writeFile(targetPath, payload.cookie.content, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
+  await enforcePrivateFileMode(targetPath, 'Alexa-Cookie-Datei');
   return true;
 }
 
@@ -1121,6 +1125,7 @@ async function getCookieFileInfo(cookieFile) {
   try {
     await access(path, constants.R_OK);
     const fileStat = await stat(path);
+    const permissions = await inspectFilePermissions(path);
     const content = await readFile(path, 'utf8');
     let auth = null;
     let parseError = null;
@@ -1136,6 +1141,7 @@ async function getCookieFileInfo(cookieFile) {
       exists: true,
       size: fileStat.size,
       modifiedAt: fileStat.mtime.toISOString(),
+      permissions,
       json: Boolean(auth?.isJson),
       parseError,
       hasLocalCookie: Boolean(firstConfiguredValue(authData.localCookie, auth?.cookie)),
@@ -1357,6 +1363,7 @@ function describeCookieInfo(info, enabled) {
     if (info.hasCsrf) details.push('csrf');
     if (info.hasMacDms) details.push('macDms');
     if (info.tokenAgeHours !== null && info.tokenAgeHours !== undefined) details.push(`Token-Alter ca. ${info.tokenAgeHours} h`);
+    if (info.permissions?.modeOctal) details.push(`Rechte ${info.permissions.modeOctal}`);
     const parseDetail = info.parseError ? ` Parse-Hinweis: ${info.parseError}` : '';
     const warnings = cookieInfoWarnings(info);
     const warningDetail = warnings.length ? ` Hinweise: ${warnings.join(' ')}` : '';
@@ -1376,6 +1383,9 @@ function cookieLevel(info, status) {
 
 function cookieInfoWarnings(info) {
   const warnings = [];
+  if (info.permissions?.groupOrOtherReadable) {
+    warnings.push('Cookie-Datei ist für Gruppe oder andere Benutzer lesbar. Empfohlen: chmod 600 data/Node.txt.');
+  }
   if (!info.json) {
     warnings.push('Roh-Cookie erkannt; für stabilen Dauerbetrieb ist eine vollständige JSON-CookieData aus dem Amazon-Login-Proxy besser.');
   }

@@ -4,6 +4,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { normalizeConfig } from '../src/config.js';
+import { describeFileMode } from '../src/file-security.js';
 import { parseAlexaCookieFile, TtsService } from '../src/tts.js';
 
 describe('Alexa cookie parsing', () => {
@@ -59,6 +60,15 @@ describe('TTS config normalization', () => {
     assert.equal(config.tts.loginProxyAutoReconnect, true);
     assert.equal(config.tts.loginProxyReconnectIntervalSeconds, 5);
     assert.equal(config.tts.loginProxyReconnectTimeoutMinutes, 60);
+  });
+});
+
+describe('Sensitive file mode helpers', () => {
+  it('detects group or other readable modes', () => {
+    assert.equal(describeFileMode(0o600).groupOrOtherReadable, false);
+    assert.equal(describeFileMode(0o640).groupOrOtherReadable, true);
+    assert.equal(describeFileMode(0o604).groupOrOtherReadable, true);
+    assert.equal(describeFileMode(0o644).modeOctal, '644');
   });
 });
 

@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { isCommandType, isValidLoxoneUuid, readCommandTarget } from './command-utils.js';
+import { enforcePrivateFileMode, PRIVATE_FILE_MODE } from './file-security.js';
 
 const DEFAULT_CONFIG_PATH = './config.json';
 const EXAMPLE_CONFIG_PATH = './config.example.json';
@@ -20,7 +21,8 @@ export async function saveConfig(config) {
   const path = process.env.CONFIG_PATH || DEFAULT_CONFIG_PATH;
   validateConfig(config);
   normalizeConfig(config);
-  await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+  await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
+  await enforcePrivateFileMode(path, 'Konfigurationsdatei');
   return config;
 }
 
@@ -136,7 +138,8 @@ async function readConfigOrCreateDefault(path) {
 
     const example = await readFile(EXAMPLE_CONFIG_PATH, 'utf8');
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, example, 'utf8');
+    await writeFile(path, example, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
+    await enforcePrivateFileMode(path, 'Konfigurationsdatei');
     console.log(`Keine Konfiguration gefunden. Erstkonfiguration wurde angelegt: ${path}`);
     return example;
   }

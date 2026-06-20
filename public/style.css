@@ -718,6 +718,22 @@ h2 {
   background: #e9eef3;
 }
 
+.tts-devices-help {
+  margin-top: 0;
+}
+
+.tts-devices-help p {
+  margin: 0;
+}
+
+.tts-devices-help p + p {
+  margin-top: 6px;
+}
+
+.tts-devices-tip {
+  margin: 8px 0 0;
+}
+
 .help-box pre {
   margin: 8px 0 10px;
   padding: 10px 12px;

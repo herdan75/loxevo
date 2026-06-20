@@ -66,6 +66,8 @@ const ttsAlarmDevices = document.querySelector('#ttsAlarmDevices');
 const refreshTtsDevicesBtn = document.querySelector('#refreshTtsDevicesBtn');
 const showAllTtsDeviceTypes = document.querySelector('#showAllTtsDeviceTypes');
 const ttsDeviceList = document.querySelector('#ttsDeviceList');
+const ttsDevicesHelpBtn = document.querySelector('#ttsDevicesHelpBtn');
+const ttsDevicesHelpText = document.querySelector('#ttsDevicesHelpText');
 const roomEditor = document.querySelector('#roomEditor');
 const addRoomBtn = document.querySelector('#addRoomBtn');
 const reloadJsonBtn = document.querySelector('#reloadJsonBtn');
@@ -201,6 +203,7 @@ alexaBridgeDebugHelpBtn?.addEventListener('click', () => toggleHelpBox(alexaBrid
 saveAdminTokenBtn?.addEventListener('click', () => saveAdminToken(saveAdminTokenBtn));
 disableAdminTokenBtn?.addEventListener('click', () => disableAdminToken(disableAdminTokenBtn));
 ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
+ttsDevicesHelpBtn?.addEventListener('click', () => toggleHelpBox(ttsDevicesHelpBtn, ttsDevicesHelpText));
 ttsReconnectBtn?.addEventListener('click', () => reconnectTts(ttsReconnectBtn));
 discoveryHelpBtn?.addEventListener('click', () => toggleDiscoveryHelp());
 bindStaticHelpTooltips();

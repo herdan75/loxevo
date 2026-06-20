@@ -375,14 +375,21 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
           <summary><span class="summary-label">TTS-Geräte</span><span id="configTtsDevicesCount" class="count-badge">0</span></summary>
           <div class="config-section-body">
           <div class="section-head compact">
-            <p>Echo-Geräte aus Alexa laden und bei Standard, Alle oder Alarm anhaken. Die Seriennummern werden automatisch in die Felder übernommen.</p>
+            <p>Echo-Geräte aus Alexa laden und bei Standard, Alle/Fallback oder Alarm anhaken. Die Seriennummern werden automatisch in die Felder übernommen.</p>
             <div class="actions">
+              <button id="ttsDevicesHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="ttsDevicesHelpText" aria-label="TTS-Geräte erklären" title="Erklärt Standard, Alle/Fallback und Alarm.">i</button>
               <label class="checkbox-row inline">
                 <input id="showAllTtsDeviceTypes" type="checkbox">
                 <span>Alle Gerätetypen anzeigen</span>
               </label>
               <button id="refreshTtsDevicesBtn" type="button" class="secondary">Alexa-Geräte suchen</button>
             </div>
+          </div>
+          <div id="ttsDevicesHelpText" class="help-box tts-devices-help" hidden>
+            <p><strong>Standard-Geräte:</strong> Diese Geräte werden für normale TTS-Meldungen verwendet, wenn kein anderes Ziel angegeben ist.</p>
+            <p><strong>Alle Geräte:</strong> Allgemeine Geräteliste und Fallback. Wird verwendet, wenn keine Standard-Geräte gesetzt sind oder wenn LoxEvo mehrere verfügbare TTS-Ziele kennen soll. Alexa-Gruppen können hier sinnvoll sein.</p>
+            <p><strong>Alarm-Geräte:</strong> Diese Geräte werden für Alarm- und Warnmeldungen verwendet.</p>
+            <p><strong>Hinweis:</strong> Wenn eine Alexa-Gruppe ausgewählt ist, sollten enthaltene Einzelgeräte meist nicht zusätzlich in derselben Liste gewählt werden, sonst kann dieselbe Ansage doppelt oder leicht zeitversetzt kommen.</p>
           </div>
           <div id="ttsDeviceList" class="device-picker"></div>
           <div class="form-row three">
@@ -391,7 +398,7 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
               <textarea id="ttsDefaultDevices" rows="4" placeholder="Ein Gerät pro Zeile"></textarea>
             </label>
             <label>
-              Alle Geräte
+              Alle/Fallback
               <textarea id="ttsAllDevices" rows="4" placeholder="Ein Gerät pro Zeile"></textarea>
             </label>
             <label>
@@ -399,6 +406,7 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
               <textarea id="ttsAlarmDevices" rows="4" placeholder="Ein Gerät pro Zeile"></textarea>
             </label>
           </div>
+          <p class="field-note tts-devices-tip">Tipp: Für normale Meldungen ein Standardgerät wählen, für Alarmmeldungen bevorzugt eine Alexa-Gruppe wählen.</p>
           </div>
         </details>
 

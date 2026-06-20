@@ -27,6 +27,7 @@ export class TtsService {
     this.lastAuthError = null;
     this.loginProxyActive = false;
     this.loginUrl = null;
+    this.loginProxyRemote = null;
     this.loginProxyStartedAt = null;
     this.loginProxyExpiresAt = null;
     this.loginProxyReconnectTimer = null;
@@ -64,46 +65,84 @@ export class TtsService {
     }
 
     this.remote = new AlexaRemote();
-    this.attachCookiePersistence(auth);
+    this.auth = auth;
+    this.attachCookiePersistence(this.remote, auth);
 
-    await this.initAlexaRemote();
+    await this.initAlexaRemote(this.remote, auth, { commit: true });
   }
 
-  async initAlexaRemote() {
+  async initAlexaRemote(remote = this.remote, auth = this.auth, options = {}) {
+    const result = await this.initializeRemoteCandidate(remote, auth);
+    if (!options.commit) return result;
+
+    if (!result.ok) {
+      if (result.loginRequired) {
+        this.markWaitingForLogin(result.error);
+      } else {
+        this.markUnavailable('Alexa-Verbindung konnte nicht initialisiert werden.', result.error);
+      }
+      return false;
+    }
+
+    await this.commitRemoteCandidate(remote, auth);
+    return true;
+  }
+
+  async initializeRemoteCandidate(remote, auth) {
     return await new Promise((resolve) => {
       let firstCallbackHandled = false;
-      const finishFirstCallback = (success = false) => {
+      const finishFirstCallback = (result) => {
         if (firstCallbackHandled) return;
         firstCallbackHandled = true;
-        resolve(success);
+        resolve(result);
       };
 
-      this.remote.init(this.buildInitOptions(this.auth), (error) => {
+      remote.init(this.buildInitOptions(auth), (error) => {
         if (error) {
           if (isProxyLoginPrompt(error)) {
-            this.markWaitingForLogin(error);
-            finishFirstCallback(false);
+            finishFirstCallback({
+              ok: false,
+              loginRequired: true,
+              loginUrl: extractLoginUrl(error),
+              error
+            });
             return;
           }
 
-          this.markUnavailable('Alexa-Verbindung konnte nicht initialisiert werden.', error);
-          finishFirstCallback(false);
+          finishFirstCallback({ ok: false, loginRequired: false, error });
           return;
         }
 
-        this.ready = true;
-        this.lastError = null;
-        this.clearLoginProxyState();
-        this.stopLoginProxyReconnectTimer();
-        this.startAuthRefreshTimer();
-        const sequenceMode = this.hasNativeSequenceSupport() ? 'native Sequenzen' : 'sendSequenceCommand-Fallback';
-        console.log(`TTS ist mit alexa-remote2 verbunden (${sequenceMode}).`);
-        this.emitAuthEvent('ready', 'Alexa TTS ist bereit.');
-        this.persistCookie().catch((persistError) => {
-          console.warn(`Alexa-Cookie konnte nicht gespeichert werden: ${persistError.message}`);
-        });
-        finishFirstCallback(true);
+        finishFirstCallback({ ok: true });
       });
+    });
+  }
+
+  async commitRemoteCandidate(remote, auth) {
+    const previousRemote = this.remote;
+    const previousLoginProxyRemote = this.loginProxyRemote;
+    const shouldDisposePrevious = previousRemote && previousRemote !== remote;
+
+    this.remote = remote;
+    this.auth = auth;
+    this.ready = true;
+    this.lastError = null;
+    this.clearLoginProxyState();
+    this.stopLoginProxyReconnectTimer();
+    this.startAuthRefreshTimer();
+
+    if (shouldDisposePrevious) {
+      await this.disposeRemote(previousRemote);
+    }
+    if (previousLoginProxyRemote && previousLoginProxyRemote !== remote && previousLoginProxyRemote !== previousRemote) {
+      await this.disposeRemote(previousLoginProxyRemote);
+    }
+
+    const sequenceMode = this.hasNativeSequenceSupport() ? 'native Sequenzen' : 'sendSequenceCommand-Fallback';
+    console.log(`TTS ist mit alexa-remote2 verbunden (${sequenceMode}).`);
+    this.emitAuthEvent('ready', 'Alexa TTS ist bereit.');
+    this.persistCookie(undefined, undefined, undefined, remote, auth).catch((persistError) => {
+      console.warn(`Alexa-Cookie konnte nicht gespeichert werden: ${persistError.message}`);
     });
   }
 
@@ -143,22 +182,24 @@ export class TtsService {
     return options;
   }
 
-  attachCookiePersistence(auth) {
-    this.auth = auth;
-    if (!this.remote || typeof this.remote.on !== 'function') return;
+  attachCookiePersistence(remote = this.remote, auth = this.auth) {
+    if (remote === this.remote) {
+      this.auth = auth;
+    }
+    if (!remote || typeof remote.on !== 'function') return;
 
-    this.remote.on('cookie', (cookie, csrf, macDms) => {
-      this.persistCookie(cookie, csrf, macDms).catch((error) => {
+    remote.on('cookie', (cookie, csrf, macDms) => {
+      this.persistCookie(cookie, csrf, macDms, remote, auth).catch((error) => {
         console.warn(`Alexa-Cookie konnte nicht gespeichert werden: ${error.message}`);
       });
     });
   }
 
-  async persistCookie(cookie, csrf, macDms) {
+  async persistCookie(cookie, csrf, macDms, sourceRemote = this.remote, sourceAuth = this.auth) {
     if (!this.config.cookieFile) return false;
 
-    const cookieData = isPlainObject(this.remote?.cookieData) ? this.remote.cookieData : {};
-    const sourceData = isPlainObject(this.auth?.originalData) ? this.auth.originalData : {};
+    const cookieData = isPlainObject(sourceRemote?.cookieData) ? sourceRemote.cookieData : {};
+    const sourceData = isPlainObject(sourceAuth?.originalData) ? sourceAuth.originalData : {};
     const hasRemoteCookieData = Object.keys(cookieData).length > 0;
     const hasCookieEventData = Boolean(
       firstNonEmptyString(cookie, csrf) ||
@@ -202,7 +243,9 @@ export class TtsService {
     if (isSameJsonData(sourceData, nextData)) return false;
 
     await writeFile(this.config.cookieFile, `${JSON.stringify(nextData, null, 2)}\n`, 'utf8');
-    this.auth = parseAlexaCookieFile(JSON.stringify(nextData));
+    if (sourceRemote === this.remote || sourceAuth === this.auth) {
+      this.auth = parseAlexaCookieFile(JSON.stringify(nextData));
+    }
     this.lastCookiePersistAt = new Date().toISOString();
     this.emitAuthEvent('cookie-updated', 'Alexa-Cookie wurde aktualisiert.');
     console.log(`Alexa-Cookie wurde aktualisiert: ${this.config.cookieFile}`);
@@ -239,6 +282,7 @@ export class TtsService {
     this.stopAuthRefreshTimer();
     this.loginProxyActive = true;
     this.loginUrl = extractLoginUrl(error);
+    this.loginProxyRemote = this.remote;
     this.loginProxyStartedAt = startedAt.toISOString();
     this.loginProxyExpiresAt = new Date(startedAt.getTime() + timeoutMinutes * 60_000).toISOString();
     this.loginProxyReconnectAttempts = 0;
@@ -251,6 +295,7 @@ export class TtsService {
   clearLoginProxyState() {
     this.loginProxyActive = false;
     this.loginUrl = null;
+    this.loginProxyRemote = null;
     this.loginProxyStartedAt = null;
     this.loginProxyExpiresAt = null;
     this.loginProxyReconnectAttempts = 0;
@@ -320,7 +365,8 @@ export class TtsService {
       return;
     }
 
-    const hasRemoteCookieData = isPlainObject(this.remote?.cookieData) && Object.keys(this.remote.cookieData).length > 0;
+    const remoteWithLoginProxy = this.loginProxyRemote || this.remote;
+    const hasRemoteCookieData = isPlainObject(remoteWithLoginProxy?.cookieData) && Object.keys(remoteWithLoginProxy.cookieData).length > 0;
     const cookieFileChanged = await this.cookieFileChangedAfterLoginStart();
     if (!hasRemoteCookieData && !cookieFileChanged) {
       this.startLoginProxyReconnectTimer();
@@ -330,7 +376,9 @@ export class TtsService {
     this.loginProxyReconnectRunning = true;
     this.loginProxyReconnectAttempts += 1;
     try {
-      const cookiePersisted = hasRemoteCookieData ? await this.persistCookie() : false;
+      const cookiePersisted = hasRemoteCookieData
+        ? await this.persistCookie(undefined, undefined, undefined, remoteWithLoginProxy, this.auth)
+        : false;
       if (!cookieFileChanged && !cookiePersisted) {
         this.startLoginProxyReconnectTimer();
         return;
@@ -403,6 +451,7 @@ export class TtsService {
   }
 
   async reconnect(reason = 'manual-reconnect') {
+    const previousReady = this.ready && this.remote;
     this.stopAuthRefreshTimer();
     this.stopLoginProxyReconnectTimer();
     this.emitAuthEvent('refresh-started', `Alexa TTS wird neu verbunden (${reason}).`);
@@ -415,30 +464,84 @@ export class TtsService {
 
       const auth = parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
       this.emitAuthEvent('cookie-read', 'Alexa-Cookie-Datei wurde neu gelesen.');
-      await this.disposeRemote();
-      this.remote = new AlexaRemote();
-      this.attachCookiePersistence(auth);
-      const initialized = await this.initAlexaRemote();
-      if (!initialized) {
+      const candidateRemote = new AlexaRemote();
+      this.attachCookiePersistence(candidateRemote, auth);
+      const result = await this.initAlexaRemote(candidateRemote, auth, { commit: false });
+      if (!result.ok) {
+        if (previousReady) {
+          this.lastAuthError = summarizeAuthError(result.error);
+          if (result.loginRequired) {
+            this.setLoginProxyRecommendation(result.error, candidateRemote);
+            this.emitAuthEvent('login-required', 'Neue Amazon-Anmeldung empfohlen; bestehende TTS-Verbindung bleibt aktiv.');
+          } else {
+            this.startAuthRefreshTimer();
+            await this.disposeRemote(candidateRemote);
+          }
+          this.emitAuthEvent('refresh-failed', 'Neue Alexa-TTS-Verbindung konnte nicht ersetzt werden; bestehende Verbindung bleibt aktiv.');
+          return {
+            ok: false,
+            ready: this.ready,
+            status: this.getStatus(),
+            error: 'Neue Verbindung konnte nicht ersetzt werden, bestehende TTS-Verbindung bleibt aktiv.'
+          };
+        }
+
+        if (result.loginRequired) {
+          this.remote = candidateRemote;
+          this.auth = auth;
+          this.markWaitingForLogin(result.error);
+        } else {
+          this.markUnavailable('Alexa TTS konnte nicht neu verbunden werden.', result.error);
+          await this.disposeRemote(candidateRemote);
+        }
         this.emitAuthEvent('refresh-failed', 'Alexa TTS konnte nicht neu verbunden werden.');
         return { ok: false, ready: this.ready, status: this.getStatus() };
       }
 
+      await this.commitRemoteCandidate(candidateRemote, auth);
       this.lastAuthRefreshAt = new Date().toISOString();
       this.lastAuthError = null;
       this.emitAuthEvent('refresh-ok', 'Alexa TTS wurde neu verbunden.');
       return { ok: true, ready: this.ready, status: this.getStatus() };
     } catch (error) {
-      this.ready = false;
       this.lastAuthError = summarizeAuthError(error);
-      this.lastError = `Alexa TTS konnte nicht neu verbunden werden. ${error.message}`;
+      if (!previousReady) {
+        this.ready = false;
+        this.lastError = `Alexa TTS konnte nicht neu verbunden werden. ${error.message}`;
+      } else {
+        this.startAuthRefreshTimer();
+      }
       this.emitAuthEvent('refresh-failed', 'Alexa TTS konnte nicht neu verbunden werden.');
-      return { ok: false, ready: false, status: this.getStatus(), error: this.lastError };
+      return {
+        ok: false,
+        ready: this.ready,
+        status: this.getStatus(),
+        error: previousReady
+          ? 'Neue Verbindung konnte nicht ersetzt werden, bestehende TTS-Verbindung bleibt aktiv.'
+          : this.lastError
+      };
     }
   }
 
-  async disposeRemote() {
-    const remote = this.remote;
+  setLoginProxyRecommendation(error, remote = null) {
+    const startedAt = new Date();
+    const timeoutMinutes = numberInRange(
+      this.config.loginProxyReconnectTimeoutMinutes,
+      DEFAULT_LOGIN_RECONNECT_TIMEOUT_MINUTES,
+      1,
+      60
+    );
+    this.loginProxyActive = true;
+    this.loginUrl = extractLoginUrl(error);
+    this.loginProxyRemote = remote;
+    this.loginProxyStartedAt = startedAt.toISOString();
+    this.loginProxyExpiresAt = new Date(startedAt.getTime() + timeoutMinutes * 60_000).toISOString();
+    this.loginProxyReconnectAttempts = 0;
+    this.lastAuthError = `Neue Amazon-Anmeldung empfohlen. ${error.message}`;
+    this.startLoginProxyReconnectTimer();
+  }
+
+  async disposeRemote(remote = this.remote) {
     if (!remote) return;
     const cleanupMethods = ['stopProxyServer', 'stopProxy', 'close', 'disconnect', 'stop'];
     for (const method of cleanupMethods) {
@@ -580,12 +683,18 @@ export class TtsService {
   }
 
   async refreshAuthInternal(reason, error) {
+    const previousReady = this.ready && this.remote;
     this.stopAuthRefreshTimer();
     this.lastAuthError = summarizeAuthError(error);
     this.emitAuthEvent('refresh-started', `Alexa-Auth wird erneuert (${reason}).`);
 
     if (!hasReusableAuthData(this.auth)) {
-      this.markWaitingForLogin(new Error('Keine wiederverwendbaren Cookie-Daten vorhanden.'));
+      if (previousReady) {
+        this.lastAuthError = 'Keine wiederverwendbaren Cookie-Daten vorhanden; bestehende TTS-Verbindung bleibt aktiv.';
+        this.startAuthRefreshTimer();
+      } else {
+        this.markWaitingForLogin(new Error('Keine wiederverwendbaren Cookie-Daten vorhanden.'));
+      }
       this.emitAuthEvent('refresh-failed', 'Alexa-Auth konnte nicht automatisch erneuert werden.');
       throw new Error(this.lastError || 'Amazon-Login erforderlich.');
     }
@@ -596,19 +705,36 @@ export class TtsService {
       this.AlexaRemote = AlexaRemote;
     }
 
-    this.ready = false;
-    await this.disposeRemote();
-    this.remote = new AlexaRemote();
-    this.attachCookiePersistence(this.auth);
-    const initialized = await this.initAlexaRemote();
-    if (!initialized) {
+    const auth = this.auth;
+    const candidateRemote = new AlexaRemote();
+    this.attachCookiePersistence(candidateRemote, auth);
+    const result = await this.initAlexaRemote(candidateRemote, auth, { commit: false });
+    if (!result.ok) {
+      if (previousReady) {
+        this.lastAuthError = summarizeAuthError(result.error);
+        if (result.loginRequired) {
+          this.setLoginProxyRecommendation(result.error, candidateRemote);
+          this.emitAuthEvent('login-required', 'Neue Amazon-Anmeldung empfohlen; bestehende TTS-Verbindung bleibt aktiv.');
+        } else {
+          this.startAuthRefreshTimer();
+          await this.disposeRemote(candidateRemote);
+        }
+      } else if (result.loginRequired) {
+        this.remote = candidateRemote;
+        this.auth = auth;
+        this.markWaitingForLogin(result.error);
+      } else {
+        this.markUnavailable('Alexa-Auth konnte nicht automatisch erneuert werden.', result.error);
+        await this.disposeRemote(candidateRemote);
+      }
       this.emitAuthEvent('refresh-failed', 'Alexa-Auth konnte nicht automatisch erneuert werden.');
       throw new Error(this.lastError || 'Amazon-Login erforderlich.');
     }
 
+    await this.commitRemoteCandidate(candidateRemote, auth);
     this.lastAuthRefreshAt = new Date().toISOString();
     this.emitAuthEvent('refresh-ok', 'Alexa-Auth wurde erneuert.');
-    await this.persistCookie();
+    await this.persistCookie(undefined, undefined, undefined, candidateRemote, auth);
   }
 
   emitAuthEvent(status, text) {

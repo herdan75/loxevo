@@ -1142,6 +1142,11 @@ async function reconnectTts(button) {
       showToast('Alexa TTS neu verbunden', 'ok');
       return;
     }
+    if (payload.status?.ready) {
+      setButtonFeedback(button, 'success', 'Bleibt aktiv');
+      showToast('Neue Verbindung konnte nicht ersetzt werden, bestehende TTS-Verbindung bleibt aktiv.', 'warning');
+      return;
+    }
     setButtonFeedback(button, 'success', 'Noch offen');
     showToast('Alexa TTS ist noch nicht bereit. Amazon-Login abschliessen oder Cookie prüfen.', 'warning');
   } catch (error) {

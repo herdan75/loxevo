@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.21 - 2026-06-20
+
+- Alexa-TTS Reconnect und Auth-Refresh sind jetzt nicht-destruktiv: eine neue AlexaRemote-Verbindung wird zuerst als Candidate aufgebaut und ersetzt die bestehende Verbindung nur bei erfolgreicher Initialisierung.
+- Wenn ein manueller Reconnect im bereits bereiten Zustand fehlschlägt oder einen neuen Amazon-Login verlangt, bleibt die bestehende TTS-Verbindung aktiv; die Web-UI meldet diesen Zwischenzustand entsprechend ruhiger.
+- Tests für die Candidate-Reconnect-Logik ergänzt.
+
 ## 1.0.20 - 2026-06-20
 
 - Alexa-TTS Auto-Reconnect prüft nach Amazon-Login zusätzlich vorhandene `remote.cookieData`, persistiert sie und versucht danach die Neuverbindung.

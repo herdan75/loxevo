@@ -158,6 +158,12 @@ function normalizeConfig(config) {
   config.discovery.helperUrl ||= 'http://127.0.0.1:18091';
   config.discovery.helperToken ||= '';
   config.discovery.helperTimeoutMs = Number(config.discovery.helperTimeoutMs || 5000);
+  config.tts ||= {};
+  config.tts.authRefreshIntervalHours = numberInRange(config.tts.authRefreshIntervalHours, 24, 1, 168);
+  config.tts.usePushConnection = config.tts.usePushConnection === true;
+  config.tts.loginProxyAutoReconnect = config.tts.loginProxyAutoReconnect !== false;
+  config.tts.loginProxyReconnectIntervalSeconds = numberInRange(config.tts.loginProxyReconnectIntervalSeconds, 10, 5, 120);
+  config.tts.loginProxyReconnectTimeoutMinutes = numberInRange(config.tts.loginProxyReconnectTimeoutMinutes, 15, 1, 60);
   if (config.commands && typeof config.commands === 'object') {
     for (const command of Object.values(config.commands)) {
       if (!command || typeof command !== 'object') continue;
@@ -205,6 +211,12 @@ function normalizeConfig(config) {
       }
     }
   }
+}
+
+function numberInRange(value, fallback, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
 }
 
 function normalizeConfigCommandKey(value) {

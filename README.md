@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: Source available](https://img.shields.io/badge/License-source--available-orange.svg)](LICENSE)
 
-> **Status: Version 1.0.18 / getestete lauffähige Version**
+> **Status: Version 1.0.19 / getestete lauffähige Version**
 >
 > LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte, Alexa-Gerätesuche, Alexa-TTS, Rückmeldungen, Backup und Web-UI wurden soweit möglich getestet. Trotzdem können in einzelnen Loxone-/Alexa-Umgebungen noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
@@ -77,9 +77,9 @@ http://<loxberry>:8080
 In `data/config.json` ist `loxone.dryRun` standardmässig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie im Protokoll, sendet aber noch nichts an Loxone.
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
-TTS braucht das Paket `alexa-remote2` und eine gültige Alexa-Cookie-Datei. Das Paket wird bewusst nicht fest im Docker-Build installiert, damit LoxEvo auch dann startet, wenn npm-Versionen wechseln. Installiere oder aktualisiere es in der Web-UI unter `Wartung`; im Docker/LoxBerry-Betrieb landet es im gemounteten `/config`-Bereich.
-Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCookie` verwendet werden. Bei JSON-Dateien übergibt LoxEvo die gespeicherte CookieData-Struktur vollständig an `alexa-remote2`, nutzt Felder wie `csrf`, `macDms`, `refreshToken` und `deviceSerial`, falls vorhanden, und speichert echte Cookie-Updates wieder in die Datei. Bei einem Alexa-Auth-Fehler versucht LoxEvo einmal eine Reinitialisierung mit den gespeicherten CookieData und wiederholt den TTS-Befehl.
-Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen lokalen Login-Proxy. LoxEvo setzt dafür automatisch die LAN-IP des LoxBerry; bei Bedarf kann `tts.proxyOwnIp` und `tts.proxyPort` in der Web-UI angepasst werden.
+TTS braucht das Paket `alexa-remote2` und eine gültige Alexa-Cookie-Datei. Empfohlen ist `alexa-remote2` ab Version `8.0.4`. Das Paket wird bewusst nicht fest im Docker-Build installiert, damit LoxEvo auch dann startet, wenn npm-Versionen wechseln. Installiere oder aktualisiere es in der Web-UI unter `Wartung`; im Docker/LoxBerry-Betrieb landet es im gemounteten `/config`-Bereich.
+Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCookie` verwendet werden. Für stabilen Dauerbetrieb ist die vollständige JSON-CookieData aus dem Amazon-Login-Proxy besser. Bei JSON-Dateien übergibt LoxEvo die gespeicherte CookieData-Struktur vollständig an `alexa-remote2`, nutzt Felder wie `csrf`, `macDms`, `refreshToken` und `deviceSerial`, falls vorhanden, und speichert echte Cookie-Updates wieder in die Datei. TTS nutzt standardmässig keine Alexa-PushConnection und führt stattdessen einen eigenen geplanten Auth-Refresh aus. Bei einem Alexa-Auth-Fehler versucht LoxEvo einmal eine Reinitialisierung mit den gespeicherten CookieData und wiederholt den TTS-Befehl.
+Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen lokalen Login-Proxy. LoxEvo setzt dafür automatisch die LAN-IP des LoxBerry; bei Bedarf kann `tts.proxyOwnIp` und `tts.proxyPort` in der Web-UI angepasst werden. Nach erfolgreichem Amazon-Login verbindet sich LoxEvo automatisch neu; falls das nicht sofort klappt, kann in der TTS-Konfiguration der Button `Alexa TTS neu verbinden` genutzt werden.
 Normale TTS-Ausgaben verwenden zuerst `defaultDevices`, danach `allDevices` und zuletzt `alarmDevices`. Dadurch funktionieren normale Meldungen auch dann weiter, wenn keine Standardgeräte gepflegt sind, aber andere Alexa-Gerätelisten vorhanden sind.
 Für den LoxBerry-Test siehe [docs/loxberry-deploy.md](docs/loxberry-deploy.md).
 
@@ -105,7 +105,7 @@ Wichtig für Live-Tests: Die Web-UI zeigt und speichert Loxone-Zugangsdaten. Lox
 
 Optional kann in der Web-UI unter `Wartung` ein Admin-Passwort für sensible Bereiche aktiviert werden.
 
-Wenn das Admin-Passwort gesetzt ist, verlangt LoxEvo für Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update, Dry-Run-Umschaltung und Alexa-Gerätesuche-Start/Stopp technisch den Header `X-LoxEvo-Admin-Token`. Die Web-UI fragt das Admin-Passwort bei Bedarf ab und merkt es nur für die aktuelle Browser-Sitzung. Alexa-/Hue-Bridge, Loxone-Befehle, TTS-Endpunkte, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Alexa- und Loxone-Aufrufe nicht brechen.
+Wenn das Admin-Passwort gesetzt ist, verlangt LoxEvo für Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update, TTS-Neuverbindung, Dry-Run-Umschaltung und Alexa-Gerätesuche-Start/Stopp technisch den Header `X-LoxEvo-Admin-Token`. Die Web-UI fragt das Admin-Passwort bei Bedarf ab und merkt es nur für die aktuelle Browser-Sitzung. Alexa-/Hue-Bridge, Loxone-Befehle, normale TTS-Endpunkte, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Alexa- und Loxone-Aufrufe nicht brechen.
 
 Das über die Web-UI gesetzte Admin-Passwort wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab. Der normale Backup-Export enthält diesen Hash nicht. Alternativ kann der Schutz weiterhin per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser Wert hat Vorrang und wird ausserhalb der Web-UI verwaltet.
 

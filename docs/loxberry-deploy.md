@@ -35,8 +35,8 @@ public/
 
 `data/config.json` enthält deine Loxone- und LoxEvo-Konfiguration.
 `data/Node.txt` ist die Alexa-Cookie-Datei für `alexa-remote2`.
-LoxEvo akzeptiert sowohl eine reine Cookie-Zeile als auch JSON-Dateien mit `localCookie`. Bei JSON-Dateien werden `localCookie`, `csrf` und die gespeicherten Registrierungsdaten wie `macDms` und `refreshToken` verwendet.
-Wenn Amazon eine neue Anmeldung verlangt, zeigt das Log eine lokale Proxy-URL. Diese URL muss die LAN-IP des LoxBerry enthalten. Falls dort `undefined` oder eine falsche IP steht, in der Web-UI unter `Konfiguration -> Alexa TTS` die Proxy-IP eintragen.
+LoxEvo akzeptiert sowohl eine reine Cookie-Zeile als auch JSON-Dateien mit `localCookie`. Für stabilen Dauerbetrieb ist die vollständige JSON-CookieData aus dem Amazon-Login-Proxy besser, weil dabei auch `csrf`, `macDms`, `refreshToken` und Registrierungsdaten erhalten bleiben.
+Wenn Amazon eine neue Anmeldung verlangt, zeigt die Web-UI eine lokale Proxy-URL. Diese URL muss die LAN-IP des LoxBerry enthalten. Falls dort `undefined` oder eine falsche IP steht, in der Web-UI unter `Konfiguration -> Alexa TTS` die Proxy-IP eintragen. Nach erfolgreichem Login verbindet LoxEvo automatisch neu; falls das nicht sofort klappt, kann in der TTS-Konfiguration `Alexa TTS neu verbinden` geklickt werden.
 Der komplette Ordner `data/` ist für private lokale Daten gedacht und wird nicht ins GitHub-Repository übernommen.
 
 Vor dem ersten Start:
@@ -148,4 +148,4 @@ In der Web-UI unter `Wartung` eine Version auswählen und installieren. Danach L
 
 `Alexa-Verbindung konnte nicht initialisiert werden`
 
-Der Cookie ist wahrscheinlich abgelaufen oder passt nicht mehr zum Amazon-Konto. In diesem Fall muss die Cookie-Datei erneuert werden.
+Der Cookie ist wahrscheinlich abgelaufen oder passt nicht mehr zum Amazon-Konto. In diesem Fall die angezeigte Amazon-Login-URL öffnen und den Login abschliessen. Danach versucht LoxEvo die TTS-Verbindung automatisch neu aufzubauen; alternativ in der TTS-Konfiguration `Alexa TTS neu verbinden` klicken.

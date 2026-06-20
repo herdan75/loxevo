@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -8,6 +8,9 @@ const COMMAND_TIMEOUT_MS = 5000;
 const NATIVE_SEQUENCE_TIMEOUT_MS = 8000;
 const NATIVE_FIRE_AND_FORGET_MS = 100;
 const MEDIA_VOLUME_TIMEOUT_MS = 1200;
+const DEFAULT_AUTH_REFRESH_HOURS = 24;
+const DEFAULT_LOGIN_RECONNECT_INTERVAL_SECONDS = 10;
+const DEFAULT_LOGIN_RECONNECT_TIMEOUT_MINUTES = 15;
 
 export class TtsService {
   constructor(config, handlers = {}) {
@@ -23,6 +26,13 @@ export class TtsService {
     this.lastAuthRefreshAt = null;
     this.lastAuthError = null;
     this.loginProxyActive = false;
+    this.loginUrl = null;
+    this.loginProxyStartedAt = null;
+    this.loginProxyExpiresAt = null;
+    this.loginProxyReconnectTimer = null;
+    this.loginProxyReconnectRunning = false;
+    this.loginProxyReconnectAttempts = 0;
+    this.authRefreshTimer = null;
     this.authRefreshPromise = null;
   }
 
@@ -83,7 +93,9 @@ export class TtsService {
 
         this.ready = true;
         this.lastError = null;
-        this.loginProxyActive = false;
+        this.clearLoginProxyState();
+        this.stopLoginProxyReconnectTimer();
+        this.startAuthRefreshTimer();
         const sequenceMode = this.hasNativeSequenceSupport() ? 'native Sequenzen' : 'sendSequenceCommand-Fallback';
         console.log(`TTS ist mit alexa-remote2 verbunden (${sequenceMode}).`);
         this.emitAuthEvent('ready', 'Alexa TTS ist bereit.');
@@ -105,7 +117,7 @@ export class TtsService {
       alexaServiceHost: this.config.alexaServiceHost || 'layla.amazon.de',
       acceptLanguage: this.config.acceptLanguage || defaultAcceptLanguage(this.config.amazonPage || auth?.amazonPage || storedCookieData?.amazonPage),
       proxyOwnIp: this.getProxyOwnIp(),
-      usePushConnection: true
+      usePushConnection: this.config.usePushConnection === true
     };
 
     const proxyPort = Number(this.config.proxyPort || 0);
@@ -161,7 +173,9 @@ export class TtsService {
     if (!localCookie) return;
 
     const nextCsrf = firstNonEmptyString(cookieData.csrf, csrf, sourceData.csrf);
-    const nextTokenDate = cookieData.tokenDate || sourceData.tokenDate || (hasRemoteCookieData || hasCookieEventData ? Date.now() : undefined);
+    const previousCookie = firstNonEmptyString(sourceData.localCookie, sourceData.cookie, sourceData.loginCookie);
+    const cookieChanged = Boolean(previousCookie && localCookie !== previousCookie);
+    const nextTokenDate = cookieData.tokenDate || sourceData.tokenDate || (hasCookieEventData || cookieChanged ? Date.now() : undefined);
     const nextData = {
       ...sourceData,
       ...cookieData,
@@ -200,17 +214,134 @@ export class TtsService {
   markUnavailable(message, error) {
     this.ready = false;
     this.remote = null;
-    this.loginProxyActive = false;
+    this.stopAuthRefreshTimer();
+    this.stopLoginProxyReconnectTimer();
+    this.clearLoginProxyState();
     this.lastError = error?.message ? `${message} (${error.message})` : message;
     console.warn(`TTS nicht bereit: ${this.lastError}`);
   }
 
   markWaitingForLogin(error) {
+    const startedAt = new Date();
+    const timeoutMinutes = numberInRange(
+      this.config.loginProxyReconnectTimeoutMinutes,
+      DEFAULT_LOGIN_RECONNECT_TIMEOUT_MINUTES,
+      1,
+      60
+    );
     this.ready = false;
+    this.stopAuthRefreshTimer();
     this.loginProxyActive = true;
+    this.loginUrl = extractLoginUrl(error);
+    this.loginProxyStartedAt = startedAt.toISOString();
+    this.loginProxyExpiresAt = new Date(startedAt.getTime() + timeoutMinutes * 60_000).toISOString();
+    this.loginProxyReconnectAttempts = 0;
     this.lastError = `Amazon-Login erforderlich. ${error.message}`;
     this.emitAuthEvent('login-required', 'Amazon-Login ist erforderlich.');
+    this.startLoginProxyReconnectTimer();
     console.warn(`TTS wartet auf Amazon-Login: ${error.message}`);
+  }
+
+  clearLoginProxyState() {
+    this.loginProxyActive = false;
+    this.loginUrl = null;
+    this.loginProxyStartedAt = null;
+    this.loginProxyExpiresAt = null;
+    this.loginProxyReconnectAttempts = 0;
+  }
+
+  startAuthRefreshTimer() {
+    this.stopAuthRefreshTimer();
+    if (!this.config.enabled || !this.ready) return;
+    const intervalMs = numberInRange(
+      this.config.authRefreshIntervalHours,
+      DEFAULT_AUTH_REFRESH_HOURS,
+      1,
+      168
+    ) * 60 * 60 * 1000;
+    this.authRefreshTimer = setTimeout(() => {
+      this.authRefreshTimer = null;
+      this.refreshAuth('scheduled-refresh').catch((error) => {
+        this.lastAuthError = summarizeAuthError(error);
+        this.emitAuthEvent('refresh-failed', 'Geplanter Alexa-Auth-Refresh ist fehlgeschlagen.');
+      });
+    }, intervalMs);
+    this.authRefreshTimer.unref?.();
+  }
+
+  stopAuthRefreshTimer() {
+    if (this.authRefreshTimer) {
+      clearTimeout(this.authRefreshTimer);
+      this.authRefreshTimer = null;
+    }
+  }
+
+  startLoginProxyReconnectTimer() {
+    this.stopLoginProxyReconnectTimer();
+    if (!this.loginProxyActive || this.config.loginProxyAutoReconnect === false || !this.config.cookieFile) return;
+    const intervalMs = numberInRange(
+      this.config.loginProxyReconnectIntervalSeconds,
+      DEFAULT_LOGIN_RECONNECT_INTERVAL_SECONDS,
+      5,
+      120
+    ) * 1000;
+    this.loginProxyReconnectTimer = setTimeout(() => {
+      this.loginProxyReconnectTimer = null;
+      this.checkLoginProxyReconnect().catch((error) => {
+        this.lastAuthError = summarizeAuthError(error);
+      });
+    }, intervalMs);
+    this.loginProxyReconnectTimer.unref?.();
+  }
+
+  stopLoginProxyReconnectTimer() {
+    if (this.loginProxyReconnectTimer) {
+      clearTimeout(this.loginProxyReconnectTimer);
+      this.loginProxyReconnectTimer = null;
+    }
+  }
+
+  async checkLoginProxyReconnect() {
+    if (!this.loginProxyActive || this.loginProxyReconnectRunning) {
+      this.startLoginProxyReconnectTimer();
+      return;
+    }
+
+    const expiresAt = Date.parse(this.loginProxyExpiresAt || '');
+    if (Number.isFinite(expiresAt) && Date.now() > expiresAt) {
+      this.lastAuthError = 'Automatischer TTS-Reconnect nach Amazon-Login ist abgelaufen.';
+      this.emitAuthEvent('refresh-failed', 'Automatischer TTS-Reconnect ist abgelaufen.');
+      return;
+    }
+
+    if (!(await this.cookieFileChangedAfterLoginStart())) {
+      this.startLoginProxyReconnectTimer();
+      return;
+    }
+
+    this.loginProxyReconnectRunning = true;
+    this.loginProxyReconnectAttempts += 1;
+    try {
+      const result = await this.reconnect('login-proxy-cookie-updated');
+      if (result.ok) return;
+    } finally {
+      this.loginProxyReconnectRunning = false;
+    }
+
+    if (this.loginProxyActive) {
+      this.startLoginProxyReconnectTimer();
+    }
+  }
+
+  async cookieFileChangedAfterLoginStart() {
+    const startedAt = Date.parse(this.loginProxyStartedAt || '');
+    if (!Number.isFinite(startedAt)) return false;
+    try {
+      const fileStat = await stat(this.config.cookieFile);
+      return fileStat.mtimeMs >= startedAt - 1000;
+    } catch {
+      return false;
+    }
   }
 
   getStatus() {
@@ -251,8 +382,45 @@ export class TtsService {
       lastCookiePersistAt: this.lastCookiePersistAt,
       lastAuthRefreshAt: this.lastAuthRefreshAt,
       lastAuthError: this.lastAuthError,
-      loginProxyActive: this.loginProxyActive
+      loginProxyActive: this.loginProxyActive,
+      loginUrl: this.loginUrl,
+      loginProxyStartedAt: this.loginProxyStartedAt,
+      loginProxyExpiresAt: this.loginProxyExpiresAt
     };
+  }
+
+  async reconnect(reason = 'manual-reconnect') {
+    this.stopAuthRefreshTimer();
+    this.stopLoginProxyReconnectTimer();
+    this.emitAuthEvent('refresh-started', `Alexa TTS wird neu verbunden (${reason}).`);
+    try {
+      let AlexaRemote = this.AlexaRemote;
+      if (!AlexaRemote) {
+        AlexaRemote = loadAlexaRemote2();
+        this.AlexaRemote = AlexaRemote;
+      }
+
+      const auth = parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
+      this.emitAuthEvent('cookie-read', 'Alexa-Cookie-Datei wurde neu gelesen.');
+      this.remote = new AlexaRemote();
+      this.attachCookiePersistence(auth);
+      const initialized = await this.initAlexaRemote();
+      if (!initialized) {
+        this.emitAuthEvent('refresh-failed', 'Alexa TTS konnte nicht neu verbunden werden.');
+        return { ok: false, ready: this.ready, status: this.getStatus() };
+      }
+
+      this.lastAuthRefreshAt = new Date().toISOString();
+      this.lastAuthError = null;
+      this.emitAuthEvent('refresh-ok', 'Alexa TTS wurde neu verbunden.');
+      return { ok: true, ready: this.ready, status: this.getStatus() };
+    } catch (error) {
+      this.ready = false;
+      this.lastAuthError = summarizeAuthError(error);
+      this.lastError = `Alexa TTS konnte nicht neu verbunden werden. ${error.message}`;
+      this.emitAuthEvent('refresh-failed', 'Alexa TTS konnte nicht neu verbunden werden.');
+      return { ok: false, ready: false, status: this.getStatus(), error: this.lastError };
+    }
   }
 
   async speak(text, devices = this.getDefaultSpeakDevices()) {
@@ -380,6 +548,7 @@ export class TtsService {
   }
 
   async refreshAuthInternal(reason, error) {
+    this.stopAuthRefreshTimer();
     this.lastAuthError = summarizeAuthError(error);
     this.emitAuthEvent('refresh-started', `Alexa-Auth wird erneuert (${reason}).`);
 
@@ -773,6 +942,12 @@ function normalizeVolume(value, fallback) {
   return Math.min(100, Math.max(0, Math.round(volume)));
 }
 
+function numberInRange(value, fallback, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
+}
+
 function serialNumberMapToDevices(value) {
   if (!isPlainObject(value)) return [];
   return Object.entries(value).map(([serialNumber, device]) => ({
@@ -967,6 +1142,12 @@ function defaultAcceptLanguage(amazonPage) {
 
 function isProxyLoginPrompt(error) {
   return /please open https?:\/\//i.test(error?.message || String(error || ''));
+}
+
+function extractLoginUrl(error) {
+  const text = String(error?.message || error || '');
+  const match = text.match(/https?:\/\/[^\s"'<>]+/i);
+  return match ? match[0].replace(/[).,;]+$/, '') : null;
 }
 
 function isAuthError(error) {

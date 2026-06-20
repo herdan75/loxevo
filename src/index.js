@@ -187,6 +187,11 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
     return await handleTtsDevices(res);
   }
 
+  if (req.method === 'POST' && pathParts[1] === 'tts' && pathParts[2] === 'reconnect') {
+    const result = await tts.reconnect('manual-api');
+    return sendJson(res, { ok: Boolean(result.ok), status: result.status, error: result.error }, result.ok ? 200 : 503);
+  }
+
   if (req.method === 'GET' && pathParts[1] === 'alexa-bridge' && pathParts[2] === 'status') {
     return sendJson(res, getAlexaBridgeStatus());
   }
@@ -277,6 +282,7 @@ function requiresAdminToken(req, pathParts) {
   const subAction = pathParts[3] || '';
 
   if (method === 'POST' && resource === 'admin' && action === 'token') return true;
+  if (method === 'POST' && resource === 'tts' && action === 'reconnect') return true;
   if (method === 'POST' && resource === 'discovery' && ['start', 'stop'].includes(action)) return true;
   if (method === 'GET' && resource === 'config') return true;
   if (method === 'PUT' && resource === 'config') return true;
@@ -1017,9 +1023,7 @@ async function getPreflightStatus() {
       title: 'Alexa TTS',
       checks: [
         preflightCheck(config.tts?.enabled ? (ttsStatus.ready ? 'ok' : 'error') : 'optional', 'Alexa-Verbindung', ttsPreflightDetail(ttsStatus)),
-        preflightCheck(config.tts?.enabled ? (alexaRemoteVersion ? 'ok' : 'warning') : 'optional', 'alexa-remote2', alexaRemoteVersion
-          ? `Installiert: ${alexaRemoteVersion}.`
-          : 'Nicht lokal gefunden. Wenn TTS genutzt wird, im Register Wartung installieren.'),
+        preflightCheck(config.tts?.enabled ? alexaRemoteLevel(alexaRemoteVersion) : 'optional', 'alexa-remote2', describeAlexaRemoteVersion(alexaRemoteVersion)),
         preflightCheck(config.tts?.enabled ? cookieLevel(cookieInfo, ttsStatus) : 'optional', 'Cookie-Datei', describeCookieInfo(cookieInfo, config.tts?.enabled)),
         preflightCheck(config.tts?.enabled ? (configuredCount(ttsStatus.defaultSpeakDevices) > 0 ? 'ok' : 'warning') : 'optional', 'Sprech-Geräte', ttsSpeakDevicesDetail(ttsStatus)),
         preflightCheck(config.tts?.enabled ? (configuredCount(ttsStatus.alarmDevices) > 0 ? 'ok' : 'info') : 'optional', 'Alarm-Geräte', configuredCount(ttsStatus.alarmDevices) > 0
@@ -1324,6 +1328,21 @@ function describeVersion(version, commit) {
   return `${pieces.join(', ')}.`;
 }
 
+function alexaRemoteLevel(version) {
+  if (!version) return 'warning';
+  return compareVersions(version, '8.0.4') < 0 ? 'warning' : 'ok';
+}
+
+function describeAlexaRemoteVersion(version) {
+  if (!version) {
+    return 'Nicht lokal gefunden. Wenn TTS genutzt wird, im Register Wartung installieren.';
+  }
+  if (compareVersions(version, '8.0.4') < 0) {
+    return `Installiert: ${version}. Für stabile Authentifizierung wird alexa-remote2 >= 8.0.4 empfohlen.`;
+  }
+  return `Installiert: ${version}.`;
+}
+
 function describeCookieInfo(info, enabled) {
   if (!enabled) {
     return `TTS ist deaktiviert. Konfigurierter Pfad: ${info.path}.`;
@@ -1339,14 +1358,32 @@ function describeCookieInfo(info, enabled) {
     if (info.hasMacDms) details.push('macDms');
     if (info.tokenAgeHours !== null && info.tokenAgeHours !== undefined) details.push(`Token-Alter ca. ${info.tokenAgeHours} h`);
     const parseDetail = info.parseError ? ` Parse-Hinweis: ${info.parseError}` : '';
-    return `Lesbar: ${info.path}. Grösse: ${formatBytes(info.size)}, geändert: ${formatDateTimeForDetail(info.modifiedAt)}. Felder: ${details.join(', ') || 'keine erkannten Auth-Felder'}.${parseDetail}`;
+    const warnings = cookieInfoWarnings(info);
+    const warningDetail = warnings.length ? ` Hinweise: ${warnings.join(' ')}` : '';
+    return `Lesbar: ${info.path}. Grösse: ${formatBytes(info.size)}, geändert: ${formatDateTimeForDetail(info.modifiedAt)}. Felder: ${details.join(', ') || 'keine erkannten Auth-Felder'}.${parseDetail}${warningDetail}`;
   }
   return `Nicht lesbar: ${info.path}. ${info.error || ''}`.trim();
 }
 
 function cookieLevel(info, status) {
-  if (info.exists) return 'ok';
-  return status.ready ? 'warning' : 'error';
+  if (!info.exists) return status.ready ? 'warning' : 'error';
+  if (info.parseError) return 'error';
+  if (!info.hasLocalCookie) return 'error';
+  if (!info.json) return 'warning';
+  if (cookieInfoWarnings(info).length) return 'warning';
+  return 'ok';
+}
+
+function cookieInfoWarnings(info) {
+  const warnings = [];
+  if (!info.json) {
+    warnings.push('Roh-Cookie erkannt; für stabilen Dauerbetrieb ist eine vollständige JSON-CookieData aus dem Amazon-Login-Proxy besser.');
+  }
+  if (info.json && !info.hasCsrf) warnings.push('csrf fehlt.');
+  if (info.json && !info.hasMacDms) warnings.push('macDms fehlt.');
+  if (info.json && !info.hasRefreshToken) warnings.push('refreshToken fehlt; automatische Erneuerung kann eingeschränkt sein.');
+  if (Number.isFinite(info.tokenAgeHours) && info.tokenAgeHours > 168) warnings.push('tokenDate ist älter als 7 Tage.');
+  return warnings;
 }
 
 function describeBackupInfo(info) {

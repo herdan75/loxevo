@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.19 - 2026-06-20
+
+- Alexa-TTS verbindet sich nach einem Amazon-Login über den Login-Proxy automatisch oder per Button `Alexa TTS neu verbinden` neu, ohne dass LoxEvo komplett neu gestartet werden muss.
+- TTS nutzt standardmässig keine Alexa-PushConnection mehr und plant stattdessen einen eigenen Auth-Refresh; `alexa-remote2 >= 8.0.4` wird für stabile Authentifizierung empfohlen.
+- Cookie-Diagnose und Systemprüfung unterscheiden Roh-Cookies und vollständige JSON-CookieData deutlicher und warnen bei fehlenden Auth-Feldern ohne Cookie- oder Token-Inhalte offenzulegen.
+
 ## 1.0.18 - 2026-06-14
 
 - Alexa-TTS nutzt für normale Sprachausgaben jetzt automatisch `defaultDevices`, danach `allDevices` und zuletzt `alarmDevices`; damit fallen normale Meldungen nicht aus, wenn nur Fallback-Geräte gepflegt sind.

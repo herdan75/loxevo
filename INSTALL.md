@@ -31,7 +31,7 @@ http://<loxberry-ip>:8080
 
 Die Web-UI ist für das eigene LAN gedacht. Port `8080` sollte nicht direkt ins Internet freigegeben werden, weil darüber Loxone-Zugangsdaten und Steuerbefehle konfiguriert werden.
 
-Optional kann ein Admin-Passwort für sensible Web-UI-Aktionen direkt in der Web-UI unter `Wartung` aktiviert werden. Ohne Admin-Passwort läuft LoxEvo wie bisher. Mit aktivem Schutz fragt die Web-UI bei Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update, Dry-Run-Umschaltung und Alexa-Gerätesuche-Start/Stopp nach dem Admin-Passwort. Loxone-Befehle, TTS-Aufrufe und virtuelle Alexa-Geräte bleiben weiterhin ohne Admin-Passwort erreichbar.
+Optional kann ein Admin-Passwort für sensible Web-UI-Aktionen direkt in der Web-UI unter `Wartung` aktiviert werden. Ohne Admin-Passwort läuft LoxEvo wie bisher. Mit aktivem Schutz fragt die Web-UI bei Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update, TTS-Neuverbindung, Dry-Run-Umschaltung und Alexa-Gerätesuche-Start/Stopp nach dem Admin-Passwort. Loxone-Befehle, normale TTS-Aufrufe und virtuelle Alexa-Geräte bleiben weiterhin ohne Admin-Passwort erreichbar.
 
 Das Web-UI-Passwort wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab und nimmt diesen nicht in den normalen Backup-Export auf. Optional kann der Schutz auch per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser technische Wert hat Vorrang und wird ausserhalb der Web-UI gepflegt.
 
@@ -64,14 +64,14 @@ Wichtig: `config.example.json` bleibt absichtlich allgemein und enthält nur Pla
 
 ## TTS aktivieren
 
-1. In der Web-UI unter `Wartung` `alexa-remote2` installieren oder aktualisieren.
+1. In der Web-UI unter `Wartung` `alexa-remote2` installieren oder aktualisieren. Empfohlen ist mindestens Version `8.0.4`.
 2. Alexa-Cookie-Datei als `data/Node.txt` ablegen.
 3. In der Web-UI unter `Konfiguration` TTS aktivieren.
 4. Cookie-Datei auf `/config/Node.txt` setzen.
 5. Unter `TTS-Geräte` Alexa-Geräte suchen und per Checkbox zuordnen.
 6. Speichern und TTS-Status prüfen.
 
-Wenn `alexa-remote2` oder die Cookie-Datei noch fehlen, startet LoxEvo trotzdem. Die Web-UI zeigt dann im Bereich `Einrichtung` und in der TTS-Konfiguration, was noch fehlt.
+Wenn `alexa-remote2` oder die Cookie-Datei noch fehlen, startet LoxEvo trotzdem. Die Web-UI zeigt dann im Bereich `Einrichtung` und in der TTS-Konfiguration, was noch fehlt. Für stabilen Dauerbetrieb ist eine vollständige JSON-CookieData aus dem Amazon-Login-Proxy besser als eine reine Cookie-Zeile. Wenn Amazon eine neue Anmeldung verlangt, die angezeigte Proxy-URL am PC im Browser öffnen; nach erfolgreichem Login verbindet LoxEvo automatisch neu oder per Button `Alexa TTS neu verbinden`.
 
 ## Betrieb
 
@@ -209,7 +209,7 @@ In der Web-UI unter `Wartung` eine Version auswählen und `Installieren` klicken
 
 - `data/Node.txt` prüfen
 - In der Web-UI Cookie-Datei auf `/config/Node.txt` setzen
-- Container neu starten
+- Falls Amazon eine neue Anmeldung verlangt, den angezeigten Login-Link öffnen. Danach verbindet LoxEvo automatisch neu; falls nicht, in der TTS-Konfiguration `Alexa TTS neu verbinden` klicken.
 
 `Loxone antwortet nicht`:
 

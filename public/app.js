@@ -89,6 +89,8 @@ const commandViewFilter = document.querySelector('#commandViewFilter');
 const commandOnlyInvalid = document.querySelector('#commandOnlyInvalid');
 const configTtsDevicesCount = document.querySelector('#configTtsDevicesCount');
 const ttsConfigStatus = document.querySelector('#ttsConfigStatus');
+const ttsAuthDetails = document.querySelector('#ttsAuthDetails');
+const ttsReconnectBtn = document.querySelector('#ttsReconnectBtn');
 const ttsHelpBtn = document.querySelector('#ttsHelpBtn');
 const ttsHelpText = document.querySelector('#ttsHelpText');
 const setupPanel = document.querySelector('#setupPanel');
@@ -199,6 +201,7 @@ alexaBridgeDebugHelpBtn?.addEventListener('click', () => toggleHelpBox(alexaBrid
 saveAdminTokenBtn?.addEventListener('click', () => saveAdminToken(saveAdminTokenBtn));
 disableAdminTokenBtn?.addEventListener('click', () => disableAdminToken(disableAdminTokenBtn));
 ttsHelpBtn?.addEventListener('click', () => toggleTtsHelp());
+ttsReconnectBtn?.addEventListener('click', () => reconnectTts(ttsReconnectBtn));
 discoveryHelpBtn?.addEventListener('click', () => toggleDiscoveryHelp());
 bindStaticHelpTooltips();
 startDiscoveryBtn?.addEventListener('click', () => runDiscoveryAction('start', startDiscoveryBtn));
@@ -1073,6 +1076,7 @@ function renderTtsStatus() {
     target.textContent = text;
     target.className = className;
   });
+  renderTtsAuthDetails();
   renderSystemNotice();
 }
 
@@ -1095,6 +1099,51 @@ function ttsStatusView() {
     text: 'TTS ist deaktiviert.',
     className: 'service-status disabled'
   };
+}
+
+function renderTtsAuthDetails() {
+  if (!ttsAuthDetails) return;
+  const auth = ttsStatus?.auth || {};
+  const lines = [];
+
+  if (ttsStatus?.enabled) {
+    lines.push(`Cookie: ${auth.cookieJson ? 'JSON-CookieData' : 'Roh-Cookie oder nicht lesbar'}`);
+    if (!auth.cookieJson) {
+      lines.push('Hinweis: Für stabilen Dauerbetrieb ist eine vollständige JSON-CookieData aus dem Amazon-Login-Proxy besser.');
+    }
+    if (auth.lastAuthRefreshAt) lines.push(`Letzter Auth-Refresh: ${formatDateTime(auth.lastAuthRefreshAt)}`);
+    if (auth.lastCookiePersistAt) lines.push(`Cookie zuletzt gespeichert: ${formatDateTime(auth.lastCookiePersistAt)}`);
+    if (auth.lastAuthError) lines.push(`Letzter Auth-Hinweis: ${escapeHtml(auth.lastAuthError)}`);
+    if (auth.loginProxyActive) {
+      const loginLink = auth.loginUrl
+        ? `<a href="${escapeAttribute(auth.loginUrl)}" target="_blank" rel="noopener">Amazon-Login öffnen</a>`
+        : 'Amazon-Login-Link im Docker-Log prüfen';
+      lines.push(`Amazon-Login erforderlich: ${loginLink}. Nach erfolgreichem Login verbindet LoxEvo automatisch neu; falls nicht, den Button „Alexa TTS neu verbinden“ nutzen.`);
+    }
+  }
+
+  ttsAuthDetails.hidden = !lines.length;
+  ttsAuthDetails.innerHTML = lines.map((line) => `<p>${line}</p>`).join('');
+}
+
+async function reconnectTts(button) {
+  setButtonFeedback(button, 'pending', 'Verbindet');
+  try {
+    const response = await adminFetch('/api/tts/reconnect', { method: 'POST' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || 'Alexa TTS konnte nicht neu verbunden werden.');
+    }
+    ttsStatus = payload.status;
+    renderTtsStatus();
+    await loadEvents();
+    setButtonFeedback(button, 'success', 'Verbunden');
+    showToast(payload.ok ? 'Alexa TTS neu verbunden' : 'Alexa TTS ist noch nicht bereit', payload.ok ? 'ok' : 'warning');
+  } catch (error) {
+    await loadTtsStatus();
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
 }
 
 async function loadTtsDevices(button) {
@@ -1500,7 +1549,7 @@ function humanizeTtsStatusError(errorText = '') {
   const text = String(errorText || '').toLowerCase();
   if (text.includes('please open http://') || text.includes('please open https://')) {
     const loginUrl = String(errorText || '').match(/https?:\/\/[^\s)]+/)?.[0] || '';
-    return `Amazon-Login ist erforderlich. Öffne ${loginUrl || 'die Login-Adresse aus dem Docker-Log'} im Browser, melde dich an und starte LoxEvo danach neu.`;
+    return `Amazon-Login ist erforderlich. Öffne ${loginUrl || 'die Login-Adresse aus dem Docker-Log'} im Browser und melde dich an. Danach verbindet LoxEvo automatisch neu; falls nicht, nutze „Alexa TTS neu verbinden“.`;
   }
   if (text.includes('cookie') && (text.includes('enoent') || text.includes('no such file'))) {
     return 'TTS ist aktiviert, aber die Cookie-Datei wurde nicht gefunden. Der Info-Button in der Konfiguration erklärt die nächsten Schritte.';
@@ -4364,6 +4413,10 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value);
 }
 
 function formatDateTime(value) {

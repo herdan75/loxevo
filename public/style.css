@@ -636,6 +636,28 @@ h2 {
   margin-bottom: 12px;
 }
 
+.tts-auth-details {
+  margin: -4px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid #d9e6ea;
+  border-radius: 6px;
+  background: #fbfdfe;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tts-auth-details p {
+  margin: 0;
+}
+
+.tts-auth-details p + p {
+  margin-top: 4px;
+}
+
+.tts-reconnect-actions {
+  margin: 0 0 12px;
+}
+
 .info-button {
   display: inline-flex;
   align-items: center;

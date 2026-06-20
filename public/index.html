@@ -279,8 +279,12 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
               <div id="ttsConfigStatus" class="service-status">TTS-Status wird geladen...</div>
               <button id="ttsHelpBtn" type="button" class="info-button" aria-expanded="false" aria-controls="ttsHelpText" aria-label="TTS-Hilfe anzeigen">i</button>
             </div>
+            <div id="ttsAuthDetails" class="tts-auth-details" hidden></div>
+            <div class="actions tts-reconnect-actions">
+              <button id="ttsReconnectBtn" type="button" class="secondary">Alexa TTS neu verbinden</button>
+            </div>
             <div id="ttsHelpText" class="help-box" hidden>
-              Die rote Meldung bedeutet: TTS ist eingeschaltet, aber LoxEvo kann noch nicht über Alexa sprechen. Häufig fehlt die Cookie-Datei <code>Node.txt</code> oder sie passt nicht zum Amazon-Konto. LoxEvo akzeptiert reine Cookie-Dateien und JSON-Dateien mit <code>localCookie</code>. Im Docker/LoxBerry-Betrieb muss die Datei im lokalen Ordner <code>data/Node.txt</code> liegen; im Formular bleibt der Pfad <code>/config/Node.txt</code>. Falls Amazon eine neue Anmeldung verlangt, nutzt <code>alexa-remote2</code> die Proxy-IP. Diese sollte die LAN-IP des LoxBerry sein. Wenn <code>alexa-remote2</code> fehlt, installiere es im Register <strong>Wartung</strong> und starte LoxEvo danach neu.
+              Die rote Meldung bedeutet: TTS ist eingeschaltet, aber LoxEvo kann noch nicht über Alexa sprechen. Häufig fehlt die Cookie-Datei <code>Node.txt</code> oder sie passt nicht zum Amazon-Konto. Für stabilen Dauerbetrieb ist eine vollständige JSON-CookieData aus dem Amazon-Login-Proxy besser als eine reine Cookie-Zeile. Im Docker/LoxBerry-Betrieb muss die Datei im lokalen Ordner <code>data/Node.txt</code> liegen; im Formular bleibt der Pfad <code>/config/Node.txt</code>. Falls Amazon eine neue Anmeldung verlangt, öffne den angezeigten Login-Link im Browser. Danach verbindet LoxEvo automatisch neu; falls nicht, nutze <strong>Alexa TTS neu verbinden</strong>. Wenn <code>alexa-remote2</code> fehlt, installiere es im Register <strong>Wartung</strong>.
             </div>
             <label class="checkbox-row">
               <input id="ttsEnabled" type="checkbox">

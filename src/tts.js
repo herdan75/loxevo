@@ -353,7 +353,9 @@ export class TtsService {
       60
     );
     const loginUrl = proxyResult?.loginUrl || extractLoginUrl(proxyResult?.error);
-    this.stopAuthRefreshTimer();
+    if (!(previousReady && previousRemote)) {
+      this.stopAuthRefreshTimer();
+    }
     this.authState = AUTH_STATE.WAIT_PROXY;
     this.ready = previousReady && Boolean(previousRemote);
     if (this.ready) {
@@ -474,6 +476,7 @@ export class TtsService {
         await this.expireLoginProxySession();
         return;
       }
+      await this.tryCompleteLoginProxySessionFromCookie();
       this.startLoginProxyReconnectTimer();
       return;
     }
@@ -532,6 +535,59 @@ export class TtsService {
 
     if (this.loginProxyActive) {
       this.startLoginProxyReconnectTimer();
+    }
+  }
+
+  async tryCompleteLoginProxySessionFromCookie() {
+    const session = this.loginProxySession;
+    if (!session || !this.loginProxyActive || this.loginProxyReconnectRunning) {
+      return false;
+    }
+
+    const remoteCookieData = isPlainObject(session.remote?.cookieData) ? session.remote.cookieData : null;
+    const hasNewRemoteCookieData = this.hasNewLoginProxyCookieData(remoteCookieData);
+    const cookieFileChanged = await this.cookieFileChangedAfterLoginStart();
+    if (!hasNewRemoteCookieData && !cookieFileChanged) {
+      return false;
+    }
+
+    this.loginProxyReconnectRunning = true;
+    try {
+      let auth = session.auth || this.auth;
+      let canCommitSessionRemote = false;
+
+      if (hasNewRemoteCookieData) {
+        const persisted = await this.persistCookie(undefined, undefined, undefined, session.remote, session.auth);
+        if (persisted && this.config.cookieFile) {
+          auth = parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
+          this.loginProxyLastHandledCookieMtimeMs = await this.getCookieFileMtimeMs() || Date.now();
+        }
+        this.loginProxyRemoteCookieFingerprint = cookieDataFingerprint(remoteCookieData);
+        canCommitSessionRemote = persisted || hasReusableAuthData(auth);
+      } else if (cookieFileChanged) {
+        this.loginProxyLastHandledCookieMtimeMs = await this.getCookieFileMtimeMs() || Date.now();
+        if (this.config.cookieFile) {
+          auth = parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
+        }
+        canCommitSessionRemote = Boolean(remoteCookieData && hasReusableAuthData(auth));
+      }
+
+      if (!canCommitSessionRemote || !hasReusableAuthData(auth)) {
+        return false;
+      }
+
+      await this.commitRemoteCandidate(session.remote, auth);
+      this.lastAuthRefreshAt = new Date().toISOString();
+      this.lastAuthError = null;
+      this.emitAuthEvent('wait-proxy-success', 'Amazon-Login wurde ueber Cookie-Daten abgeschlossen.');
+      this.emitAuthEvent('candidate-committed', 'Neue Alexa-TTS-Verbindung wurde uebernommen.');
+      return true;
+    } catch (error) {
+      this.lastAuthError = summarizeAuthError(error);
+      this.deferNextLoginProxyReconnect();
+      return false;
+    } finally {
+      this.loginProxyReconnectRunning = false;
     }
   }
 
@@ -971,7 +1027,16 @@ export class TtsService {
   async refreshAuthInternal(reason, error) {
     const previousReady = this.ready && this.remote;
     if (this.loginProxySession && this.loginProxyActive) {
-      this.emitAuthEvent('wait-proxy-still-active', 'Amazon-Login wartet bereits auf Abschluss.');
+      if (previousReady) {
+        const refreshed = await this.refreshExistingRemoteAuth(reason, error);
+        if (this.loginProxySession && this.loginProxyActive) {
+          this.authState = AUTH_STATE.WAIT_PROXY;
+        }
+        if (!refreshed) {
+          this.startAuthRefreshTimer();
+        }
+        return;
+      }
       throw new Error(this.lastError || this.lastAuthError || 'Amazon-Login wartet auf Abschluss.');
     }
     this.stopAuthRefreshTimer();

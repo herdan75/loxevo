@@ -202,6 +202,67 @@ describe('TTS reconnect candidate handling', () => {
     assert.equal(oldRemote.stopped, false);
     assert.match(service.lastAuthError, /final failed/);
   });
+
+  it('commits the same proxy candidate when cookieData appears without a final callback', async () => {
+    const service = await createReconnectService(ProxyNoFinalRemote);
+    let timerStarts = 0;
+    service.startLoginProxyReconnectTimer = () => {
+      timerStarts += 1;
+    };
+
+    const result = await service.reconnect('test-proxy-cookie-complete');
+    const candidateRemote = service.loginProxySession.remote;
+    timerStarts = 0;
+    candidateRemote.cookieData = {
+      localCookie: 'session-id=new',
+      csrf: 'csrf-token-new',
+      amazonPage: 'amazon.de',
+      tokenDate: Date.now() + 1000,
+      dataVersion: 2
+    };
+
+    assert.equal(result.waitProxy, true);
+    assert.equal(service.ready, false);
+
+    await service.checkLoginProxyReconnect();
+
+    assert.equal(service.ready, true);
+    assert.equal(service.remote, candidateRemote);
+    assert.equal(service.loginProxyActive, false);
+    assert.equal(timerStarts, 1);
+    const stored = JSON.parse(await readFile(service.config.cookieFile, 'utf8'));
+    assert.equal(stored.localCookie, 'session-id=new');
+  });
+
+  it('keeps the auth refresh timer active when WAIT_PROXY starts from an existing ready remote', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    const oldRemote = new TrackableRemote();
+    const candidateRemote = new TrackableRemote();
+    let stops = 0;
+    service.ready = true;
+    service.remote = oldRemote;
+    service.stopAuthRefreshTimer = () => {
+      stops += 1;
+    };
+    service.startLoginProxyReconnectTimer = () => {};
+
+    service.beginLoginProxySession({
+      remote: candidateRemote,
+      auth: service.auth,
+      proxyResult: {
+        error: new Error('Please open http://127.0.0.1:12345/ in your browser'),
+        loginUrl: 'http://127.0.0.1:12345/'
+      },
+      previousReady: true,
+      previousRemote: oldRemote,
+      sequence: 1
+    });
+
+    assert.equal(stops, 0);
+    assert.equal(service.ready, true);
+    assert.equal(service.remote, oldRemote);
+    assert.equal(service.loginProxySession.remote, candidateRemote);
+  });
 });
 
 describe('TTS auth refresh retry', () => {
@@ -228,6 +289,36 @@ describe('TTS auth refresh retry', () => {
 
     assert.equal(attempts, 2);
     assert.equal(remote.refreshes, 1);
+  });
+
+  it('refreshes the old ready remote during WAIT_PROXY without creating an error loop', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    const oldRemote = new RefreshableRemote();
+    const candidateRemote = new TrackableRemote();
+    service.ready = true;
+    service.remote = oldRemote;
+    service.authState = 'READY';
+    service.startLoginProxyReconnectTimer = () => {};
+
+    service.beginLoginProxySession({
+      remote: candidateRemote,
+      auth: service.auth,
+      proxyResult: {
+        error: new Error('Please open http://127.0.0.1:12345/ in your browser'),
+        loginUrl: 'http://127.0.0.1:12345/'
+      },
+      previousReady: true,
+      previousRemote: oldRemote,
+      sequence: 1
+    });
+
+    await service.refreshAuthInternal('scheduled-refresh', new Error('auth check'));
+
+    assert.equal(oldRemote.refreshes, 1);
+    assert.equal(service.remote, oldRemote);
+    assert.equal(service.ready, true);
+    assert.equal(service.authState, 'WAIT_PROXY');
+    assert.equal(service.loginProxyActive, true);
   });
 });
 
@@ -327,6 +418,38 @@ describe('TTS login proxy reconnect polling', () => {
     assert.equal(service.remote, oldRemote);
     assert.equal(oldRemote.stopped, false);
   });
+
+  it('keeps WAIT_PROXY timer checks quiet when no new cookie data exists', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    const events = [];
+    const oldRemote = new TrackableRemote();
+    const candidateRemote = new TrackableRemote();
+    let timerStarts = 0;
+    service.handlers = { addEvent: (event) => events.push(event) };
+    service.ready = true;
+    service.remote = oldRemote;
+    service.startLoginProxyReconnectTimer = () => {
+      timerStarts += 1;
+    };
+    service.beginLoginProxySession({
+      remote: candidateRemote,
+      auth: service.auth,
+      proxyResult: {
+        error: new Error('Please open http://127.0.0.1:12345/ in your browser'),
+        loginUrl: 'http://127.0.0.1:12345/'
+      },
+      previousReady: true,
+      previousRemote: oldRemote,
+      sequence: 1
+    });
+    events.length = 0;
+
+    await service.checkLoginProxyReconnect();
+    await service.checkLoginProxyReconnect();
+
+    assert.equal(timerStarts, 3);
+    assert.deepEqual(events.map((event) => event.status), []);
+  });
 });
 
 async function createReconnectService(AlexaRemoteClass) {
@@ -394,6 +517,12 @@ class ProxyThenFailRemote extends TrackableRemote {
   init(_options, callback) {
     callback(new Error('Please open http://127.0.0.1:12345/ in your browser'));
     setTimeout(() => callback(new Error('final failed')), 5);
+  }
+}
+
+class ProxyNoFinalRemote extends TrackableRemote {
+  init(_options, callback) {
+    callback(new Error('Please open http://127.0.0.1:12345/ in your browser'));
   }
 }
 

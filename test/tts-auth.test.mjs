@@ -135,6 +135,100 @@ describe('TTS reconnect candidate handling', () => {
     assert.equal(service.loginProxyActive, true);
     assert.equal(service.loginProxyRemote instanceof LoginRequiredRemote, true);
   });
+
+  it('treats a proxy prompt as WAIT_PROXY and commits the same candidate after final success', async () => {
+    const service = await createReconnectService(ProxyThenSuccessRemote);
+
+    const result = await service.reconnect('test-proxy-success');
+
+    assert.equal(result.waitProxy, true);
+    assert.equal(service.authState, 'WAIT_PROXY');
+    assert.equal(service.loginProxyActive, true);
+    assert.equal(service.loginUrl, 'http://127.0.0.1:12345/');
+
+    await waitFor(() => service.ready === true && service.remote instanceof ProxyThenSuccessRemote);
+
+    assert.equal(service.authState, 'READY');
+    assert.equal(service.loginProxyActive, false);
+  });
+
+  it('keeps the old ready remote while a proxy candidate is waiting', async () => {
+    const service = await createReconnectService(ProxyThenSuccessRemote);
+    const oldRemote = new TrackableRemote();
+    service.remote = oldRemote;
+    service.ready = true;
+    service.authState = 'READY';
+
+    const result = await service.reconnect('test-ready-proxy-success');
+
+    assert.equal(result.waitProxy, true);
+    assert.equal(service.ready, true);
+    assert.equal(service.remote, oldRemote);
+    assert.equal(oldRemote.stopped, false);
+
+    await waitFor(() => service.remote instanceof ProxyThenSuccessRemote);
+
+    assert.equal(oldRemote.stopped, true);
+    assert.equal(service.ready, true);
+  });
+
+  it('does not create a second proxy candidate while WAIT_PROXY is active', async () => {
+    CountingProxyRemote.constructed = 0;
+    const service = await createReconnectService(CountingProxyRemote);
+
+    const first = await service.reconnect('test-proxy-once');
+    const second = await service.reconnect('test-proxy-again');
+
+    assert.equal(first.waitProxy, true);
+    assert.equal(second.waitProxy, true);
+    assert.equal(CountingProxyRemote.constructed, 1);
+    assert.equal(service.loginUrl, 'http://127.0.0.1:12345/');
+  });
+
+  it('keeps the old ready remote when proxy candidate later fails', async () => {
+    const service = await createReconnectService(ProxyThenFailRemote);
+    const oldRemote = new TrackableRemote();
+    service.remote = oldRemote;
+    service.ready = true;
+    service.authState = 'READY';
+
+    const result = await service.reconnect('test-proxy-final-failure');
+
+    assert.equal(result.waitProxy, true);
+    await waitFor(() => service.loginProxyActive === false);
+
+    assert.equal(service.ready, true);
+    assert.equal(service.remote, oldRemote);
+    assert.equal(oldRemote.stopped, false);
+    assert.match(service.lastAuthError, /final failed/);
+  });
+});
+
+describe('TTS auth refresh retry', () => {
+  it('uses refreshAlexaCookies on the existing ready remote before reconnecting', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    const remote = new RefreshableRemote();
+    service.remote = remote;
+    service.ready = true;
+    service.authState = 'READY';
+    let attempts = 0;
+    service.reconnect = async () => {
+      throw new Error('reconnect should not be used');
+    };
+
+    await service.withAuthRetry('test-auth-refresh', async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        const error = new Error('unauthorized');
+        error.statusCode = 401;
+        throw error;
+      }
+      return 'ok';
+    });
+
+    assert.equal(attempts, 2);
+    assert.equal(remote.refreshes, 1);
+  });
 });
 
 describe('TTS login proxy reconnect polling', () => {
@@ -287,4 +381,53 @@ class LoginRequiredRemote extends TrackableRemote {
   init(_options, callback) {
     callback(new Error('Please open http://127.0.0.1:12345/ in your browser'));
   }
+}
+
+class ProxyThenSuccessRemote extends TrackableRemote {
+  init(_options, callback) {
+    callback(new Error('Please open http://127.0.0.1:12345/ in your browser'));
+    setTimeout(() => callback(null), 5);
+  }
+}
+
+class ProxyThenFailRemote extends TrackableRemote {
+  init(_options, callback) {
+    callback(new Error('Please open http://127.0.0.1:12345/ in your browser'));
+    setTimeout(() => callback(new Error('final failed')), 5);
+  }
+}
+
+class CountingProxyRemote extends LoginRequiredRemote {
+  static constructed = 0;
+
+  constructor() {
+    super();
+    CountingProxyRemote.constructed += 1;
+  }
+}
+
+class RefreshableRemote extends TrackableRemote {
+  constructor() {
+    super();
+    this.refreshes = 0;
+    this.cookieData = {
+      localCookie: 'session-id=abc',
+      csrf: 'csrf-token',
+      tokenDate: Date.now()
+    };
+  }
+
+  refreshAlexaCookies(callback) {
+    this.refreshes += 1;
+    callback(null, this.cookieData);
+  }
+}
+
+async function waitFor(predicate, timeoutMs = 1000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.equal(predicate(), true);
 }

@@ -1032,7 +1032,7 @@ export class TtsService {
         if (this.loginProxySession && this.loginProxyActive) {
           this.authState = AUTH_STATE.WAIT_PROXY;
         }
-        if (!refreshed) {
+        if (this.ready) {
           this.startAuthRefreshTimer();
         }
         return;

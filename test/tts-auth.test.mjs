@@ -299,6 +299,10 @@ describe('TTS auth refresh retry', () => {
     service.remote = oldRemote;
     service.authState = 'READY';
     service.startLoginProxyReconnectTimer = () => {};
+    let timerStarts = 0;
+    service.startAuthRefreshTimer = () => {
+      timerStarts += 1;
+    };
 
     service.beginLoginProxySession({
       remote: candidateRemote,
@@ -319,6 +323,7 @@ describe('TTS auth refresh retry', () => {
     assert.equal(service.ready, true);
     assert.equal(service.authState, 'WAIT_PROXY');
     assert.equal(service.loginProxyActive, true);
+    assert.equal(timerStarts, 1);
   });
 });
 

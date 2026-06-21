@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.23 - 2026-06-21
+
+- Alexa-TTS WAIT_PROXY ist robuster: LoxEvo kann eine laufende Amazon-Login-Proxy-Session jetzt auch über neue CookieData derselben Proxy-Remote abschliessen, falls `alexa-remote2` keinen finalen Callback liefert.
+- Bestehende TTS-Verbindungen bleiben während einer empfohlenen Neuanmeldung weiter aktiv; der geplante Auth-Refresh der alten Verbindung wird nicht unnötig gestoppt und nach einem Refresh wieder geplant.
+- Tests für WAIT_PROXY-Abschluss ohne finalen Callback, ruhige Timer-Prüfungen und Auth-Refresh während einer Login-Wartephase ergänzt.
+
 ## 1.0.22 - 2026-06-20
 
 - Sensible lokale Dateien werden beim Schreiben best-effort auf private Dateirechte gesetzt: Alexa-Cookie, LoxEvo-Konfiguration und Admin-Token nutzen `0600`, wenn das Dateisystem dies zulässt.

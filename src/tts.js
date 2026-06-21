@@ -34,6 +34,9 @@ export class TtsService {
     this.loginProxyReconnectTimer = null;
     this.loginProxyReconnectRunning = false;
     this.loginProxyReconnectAttempts = 0;
+    this.loginProxyLastHandledCookieMtimeMs = null;
+    this.loginProxyReconnectBackoffUntil = null;
+    this.loginProxyRemoteCookieFingerprint = null;
     this.authRefreshTimer = null;
     this.authRefreshPromise = null;
   }
@@ -287,7 +290,7 @@ export class TtsService {
     this.loginProxyRemote = this.remote;
     this.loginProxyStartedAt = startedAt.toISOString();
     this.loginProxyExpiresAt = new Date(startedAt.getTime() + timeoutMinutes * 60_000).toISOString();
-    this.loginProxyReconnectAttempts = 0;
+    this.resetLoginProxyReconnectState(startedAt);
     this.lastError = `Amazon-Login erforderlich. ${error.message}`;
     this.emitAuthEvent('login-required', 'Amazon-Login ist erforderlich.');
     this.startLoginProxyReconnectTimer();
@@ -301,6 +304,17 @@ export class TtsService {
     this.loginProxyStartedAt = null;
     this.loginProxyExpiresAt = null;
     this.loginProxyReconnectAttempts = 0;
+    this.loginProxyLastHandledCookieMtimeMs = null;
+    this.loginProxyReconnectBackoffUntil = null;
+    this.loginProxyRemoteCookieFingerprint = null;
+  }
+
+  resetLoginProxyReconnectState(startedAt = new Date()) {
+    const startedMs = startedAt instanceof Date ? startedAt.getTime() : Date.parse(startedAt);
+    this.loginProxyReconnectAttempts = 0;
+    this.loginProxyLastHandledCookieMtimeMs = Number.isFinite(startedMs) ? startedMs : null;
+    this.loginProxyReconnectBackoffUntil = null;
+    this.loginProxyRemoteCookieFingerprint = cookieDataFingerprint(this.auth?.originalData);
   }
 
   startAuthRefreshTimer() {
@@ -355,7 +369,10 @@ export class TtsService {
   }
 
   async checkLoginProxyReconnect() {
-    if (!this.loginProxyActive || this.loginProxyReconnectRunning) {
+    if (!this.loginProxyActive) {
+      return;
+    }
+    if (this.loginProxyReconnectRunning) {
       this.startLoginProxyReconnectTimer();
       return;
     }
@@ -367,26 +384,43 @@ export class TtsService {
       return;
     }
 
+    if (this.loginProxyReconnectBackoffUntil && Date.now() < this.loginProxyReconnectBackoffUntil) {
+      this.startLoginProxyReconnectTimer();
+      return;
+    }
+
     const remoteWithLoginProxy = this.loginProxyRemote || this.remote;
-    const hasRemoteCookieData = isPlainObject(remoteWithLoginProxy?.cookieData) && Object.keys(remoteWithLoginProxy.cookieData).length > 0;
+    const remoteCookieData = isPlainObject(remoteWithLoginProxy?.cookieData) ? remoteWithLoginProxy.cookieData : null;
+    const hasNewRemoteCookieData = this.hasNewLoginProxyCookieData(remoteCookieData);
     const cookieFileChanged = await this.cookieFileChangedAfterLoginStart();
-    if (!hasRemoteCookieData && !cookieFileChanged) {
+    if (!hasNewRemoteCookieData && !cookieFileChanged) {
       this.startLoginProxyReconnectTimer();
       return;
     }
 
     this.loginProxyReconnectRunning = true;
-    this.loginProxyReconnectAttempts += 1;
     try {
-      const cookiePersisted = hasRemoteCookieData
+      let reconnectReason = null;
+      const cookiePersisted = hasNewRemoteCookieData
         ? await this.persistCookie(undefined, undefined, undefined, remoteWithLoginProxy, this.auth)
         : false;
-      if (!cookieFileChanged && !cookiePersisted) {
+      if (cookiePersisted) {
+        this.loginProxyRemoteCookieFingerprint = cookieDataFingerprint(remoteCookieData);
+        reconnectReason = 'login-proxy-cookie-data';
+        this.loginProxyLastHandledCookieMtimeMs = await this.getCookieFileMtimeMs() || Date.now();
+      } else if (cookieFileChanged) {
+        this.loginProxyLastHandledCookieMtimeMs = await this.getCookieFileMtimeMs() || Date.now();
+        reconnectReason = 'login-proxy-cookie-updated';
+      }
+
+      if (!reconnectReason) {
         this.startLoginProxyReconnectTimer();
         return;
       }
-      const result = await this.reconnect(cookiePersisted ? 'login-proxy-cookie-data' : 'login-proxy-cookie-updated');
+      this.loginProxyReconnectAttempts += 1;
+      const result = await this.reconnect(reconnectReason);
       if (result.ok) return;
+      this.deferNextLoginProxyReconnect();
     } finally {
       this.loginProxyReconnectRunning = false;
     }
@@ -399,12 +433,57 @@ export class TtsService {
   async cookieFileChangedAfterLoginStart() {
     const startedAt = Date.parse(this.loginProxyStartedAt || '');
     if (!Number.isFinite(startedAt)) return false;
+    const lastHandledAt = Number.isFinite(this.loginProxyLastHandledCookieMtimeMs)
+      ? this.loginProxyLastHandledCookieMtimeMs
+      : startedAt;
     try {
-      const fileStat = await stat(this.config.cookieFile);
-      return fileStat.mtimeMs >= startedAt - 1000;
+      const mtimeMs = await this.getCookieFileMtimeMs();
+      return Number.isFinite(mtimeMs) && mtimeMs > lastHandledAt + 1;
     } catch {
       return false;
     }
+  }
+
+  async getCookieFileMtimeMs() {
+    if (!this.config.cookieFile) return NaN;
+    const fileStat = await stat(this.config.cookieFile);
+    return fileStat.mtimeMs;
+  }
+
+  hasNewLoginProxyCookieData(cookieData) {
+    if (!isPlainObject(cookieData) || !Object.keys(cookieData).length) return false;
+
+    const sourceData = isPlainObject(this.auth?.originalData) ? this.auth.originalData : {};
+    const localCookie = firstNonEmptyString(cookieData.localCookie, cookieData.cookie, cookieData.loginCookie);
+    const csrf = firstNonEmptyString(cookieData.csrf);
+    const previousCookie = firstNonEmptyString(sourceData.localCookie, sourceData.cookie, sourceData.loginCookie, this.auth?.cookie);
+    const previousCsrf = firstNonEmptyString(sourceData.csrf, this.auth?.csrf);
+    const tokenDateMs = cookieDataTimeMs(cookieData.tokenDate);
+    const previousTokenDateMs = cookieDataTimeMs(sourceData.tokenDate);
+    const loginStartedAt = Date.parse(this.loginProxyStartedAt || '');
+
+    const cookieChanged = Boolean(localCookie && previousCookie && localCookie !== previousCookie);
+    const csrfChanged = Boolean(csrf && previousCsrf && csrf !== previousCsrf);
+    const tokenDateIsFresh = Number.isFinite(tokenDateMs) &&
+      Number.isFinite(loginStartedAt) &&
+      tokenDateMs > loginStartedAt &&
+      (!Number.isFinite(previousTokenDateMs) || tokenDateMs > previousTokenDateMs);
+
+    if (!cookieChanged && !csrfChanged && !tokenDateIsFresh) return false;
+
+    const fingerprint = cookieDataFingerprint(cookieData);
+    return Boolean(fingerprint && fingerprint !== this.loginProxyRemoteCookieFingerprint);
+  }
+
+  deferNextLoginProxyReconnect() {
+    const intervalMs = numberInRange(
+      this.config.loginProxyReconnectIntervalSeconds,
+      DEFAULT_LOGIN_RECONNECT_INTERVAL_SECONDS,
+      5,
+      120
+    ) * 1000;
+    const multiplier = Math.min(Math.max(this.loginProxyReconnectAttempts, 1), 12);
+    this.loginProxyReconnectBackoffUntil = Date.now() + Math.min(intervalMs * multiplier, 5 * 60_000);
   }
 
   getStatus() {
@@ -538,7 +617,7 @@ export class TtsService {
     this.loginProxyRemote = remote;
     this.loginProxyStartedAt = startedAt.toISOString();
     this.loginProxyExpiresAt = new Date(startedAt.getTime() + timeoutMinutes * 60_000).toISOString();
-    this.loginProxyReconnectAttempts = 0;
+    this.resetLoginProxyReconnectState(startedAt);
     this.lastAuthError = `Neue Amazon-Anmeldung empfohlen. ${error.message}`;
     this.startLoginProxyReconnectTimer();
   }
@@ -1353,6 +1432,27 @@ function tokenAgeMsFromDate(value) {
   const date = typeof value === 'number' ? new Date(value) : new Date(String(value));
   const time = date.getTime();
   return Number.isFinite(time) ? Date.now() - time : NaN;
+}
+
+function cookieDataTimeMs(value) {
+  if (!value) return NaN;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) return parsed;
+  const date = new Date(String(value));
+  const time = date.getTime();
+  return Number.isFinite(time) ? time : NaN;
+}
+
+function cookieDataFingerprint(value) {
+  if (!isPlainObject(value)) return null;
+  const data = {};
+  for (const key of ['localCookie', 'cookie', 'loginCookie', 'csrf', 'refreshToken', 'deviceSerial', 'deviceId', 'tokenDate']) {
+    if (value[key] !== undefined) {
+      data[key] = value[key];
+    }
+  }
+  return Object.keys(data).length ? stableStringify(data) : null;
 }
 
 function isSameJsonData(left, right) {

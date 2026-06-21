@@ -137,6 +137,104 @@ describe('TTS reconnect candidate handling', () => {
   });
 });
 
+describe('TTS login proxy reconnect polling', () => {
+  it('does not reconnect only because the login proxy remote still has stale cookieData', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    const startedAt = new Date(Date.now() - 10_000);
+    let reconnects = 0;
+    let timerStarts = 0;
+    service.ready = false;
+    service.loginProxyActive = true;
+    service.loginProxyStartedAt = startedAt.toISOString();
+    service.loginProxyExpiresAt = new Date(Date.now() + 60_000).toISOString();
+    service.loginProxyLastHandledCookieMtimeMs = Date.now() + 10_000;
+    service.loginProxyRemoteCookieFingerprint = null;
+    service.loginProxyRemote = {
+      cookieData: {
+        localCookie: 'session-id=abc',
+        csrf: 'csrf-token',
+        tokenDate: 1710000000000
+      }
+    };
+    service.reconnect = async () => {
+      reconnects += 1;
+      return { ok: false, status: service.getStatus() };
+    };
+    service.startLoginProxyReconnectTimer = () => {
+      timerStarts += 1;
+    };
+
+    await service.checkLoginProxyReconnect();
+
+    assert.equal(reconnects, 0);
+    assert.equal(timerStarts, 1);
+  });
+
+  it('reconnects once when the cookie file changed after login started', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    const startedAt = new Date(Date.now() - 10_000);
+    let reconnects = 0;
+    let reason = '';
+    let timerStarts = 0;
+    service.ready = false;
+    service.loginProxyActive = true;
+    service.loginProxyStartedAt = startedAt.toISOString();
+    service.loginProxyExpiresAt = new Date(Date.now() + 60_000).toISOString();
+    service.loginProxyLastHandledCookieMtimeMs = startedAt.getTime();
+    service.loginProxyRemote = {};
+    service.reconnect = async (value) => {
+      reconnects += 1;
+      reason = value;
+      return { ok: false, status: service.getStatus() };
+    };
+    service.startLoginProxyReconnectTimer = () => {
+      timerStarts += 1;
+    };
+
+    await writeFile(service.config.cookieFile, JSON.stringify({
+      localCookie: 'session-id=new',
+      csrf: 'csrf-token-new',
+      amazonPage: 'amazon.de',
+      dataVersion: 2
+    }), 'utf8');
+
+    await service.checkLoginProxyReconnect();
+    await service.checkLoginProxyReconnect();
+
+    assert.equal(reconnects, 1);
+    assert.equal(reason, 'login-proxy-cookie-updated');
+    assert.equal(timerStarts, 2);
+  });
+
+  it('keeps a ready remote active when login proxy reconnect candidate fails', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    const oldRemote = new TrackableRemote();
+    const startedAt = new Date(Date.now() - 10_000);
+    service.ready = true;
+    service.remote = oldRemote;
+    service.loginProxyActive = true;
+    service.loginProxyStartedAt = startedAt.toISOString();
+    service.loginProxyExpiresAt = new Date(Date.now() + 60_000).toISOString();
+    service.loginProxyLastHandledCookieMtimeMs = startedAt.getTime();
+    service.loginProxyRemote = {};
+    service.reconnect = async () => ({ ok: false, ready: service.ready, status: service.getStatus() });
+    service.startLoginProxyReconnectTimer = () => {};
+
+    await writeFile(service.config.cookieFile, JSON.stringify({
+      localCookie: 'session-id=new',
+      csrf: 'csrf-token-new',
+      amazonPage: 'amazon.de',
+      dataVersion: 2
+    }), 'utf8');
+
+    await service.checkLoginProxyReconnect();
+
+    assert.equal(service.ready, true);
+    assert.equal(service.remote, oldRemote);
+    assert.equal(oldRemote.stopped, false);
+  });
+});
+
 async function createReconnectService(AlexaRemoteClass) {
   const dir = await mkdtemp(join(tmpdir(), 'loxevo-tts-'));
   const cookieFile = join(dir, 'Node.txt');

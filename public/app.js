@@ -4342,13 +4342,13 @@ function renderEvents(events) {
   const bufferInfo = document.createElement('p');
   bufferInfo.className = 'empty';
   bufferInfo.textContent = rawEvents.length
-    ? `Im Speicher: ${rawEvents.length} / ${MAX_EVENT_BUFFER_SIZE} Ereignisse. Angezeigt werden bis zu 50 kompaktierte Einträge. Der Export enthält alle gespeicherten RAM-Ereignisse.`
-    : `Im Speicher: 0 / ${MAX_EVENT_BUFFER_SIZE} Ereignisse.`;
+    ? `Gespeichert: ${rawEvents.length} von ${MAX_EVENT_BUFFER_SIZE} Einträgen. Angezeigt werden bis zu 50 zusammengefasste Einträge. Der Export enthält alle gespeicherten Einträge.`
+    : `Gespeichert: 0 von ${MAX_EVENT_BUFFER_SIZE} Einträgen.`;
   eventsEl.append(bufferInfo);
   if (!compactedEvents.length) {
     const empty = document.createElement('p');
     empty.className = 'empty';
-    empty.textContent = 'Noch keine Befehle.';
+    empty.textContent = rawEvents.length ? 'Keine Einträge im aktuellen Filter.' : 'Noch keine Protokolleinträge.';
     eventsEl.append(empty);
     return;
   }

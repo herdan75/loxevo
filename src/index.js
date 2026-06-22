@@ -27,6 +27,8 @@ let discoveryControl = new DiscoveryControl(config);
 let bridgeHttpServer = null;
 let bridgeHttpStatus = { enabled: false, ready: false, error: null, port: null };
 const events = [];
+const MAX_EVENTS = 300;
+const MAX_DIAGNOSTIC_EVENTS = 200;
 const dedupedEventTimes = new Map();
 const oncePerProcessEventKeys = new Set();
 const startedAt = new Date();
@@ -506,7 +508,15 @@ async function exportDiagnostics(res) {
     preflight: sanitizeDiagnosticValue(await getPreflightStatus()),
     dependencies: sanitizeDiagnosticValue([await getDependencyStatus('alexa-remote2')]),
     configSummary: sanitizeConfigForDiagnostics(config),
-    recentEvents: events.slice(0, 50).map(sanitizeEventForDiagnostics)
+    recentEvents: events.slice(0, MAX_DIAGNOSTIC_EVENTS).map(sanitizeEventForDiagnostics),
+    eventBuffer: {
+      storedEventCount: events.length,
+      maxStoredEvents: MAX_EVENTS,
+      exportedEventCount: Math.min(events.length, MAX_DIAGNOSTIC_EVENTS),
+      maxDiagnosticEvents: MAX_DIAGNOSTIC_EVENTS,
+      persistent: false,
+      clearedOnRestart: true
+    }
   };
 
   addEvent({ type: 'diagnostics', status: 'exported', text: 'Diagnose exportiert.' });
@@ -2198,7 +2208,7 @@ function addEvent(event) {
     at: new Date().toISOString(),
     ...normalizedEvent
   });
-  events.splice(50);
+  events.splice(MAX_EVENTS);
 }
 
 function shouldSuppressEvent(event) {

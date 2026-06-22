@@ -4316,13 +4316,22 @@ async function loadEvents(button) {
 
 function renderEvents(events) {
   if (!eventsEl) return;
-  const compactedEvents = compactEvents(filterEvents(events || []));
+  const rawEvents = Array.isArray(events) ? events : [];
+  const compactedEvents = compactEvents(filterEvents(rawEvents));
+  eventsEl.innerHTML = '';
+  if (rawEvents.length > 50) {
+    const note = document.createElement('p');
+    note.className = 'empty';
+    note.textContent = `Es werden bis zu 50 kompaktierte Einträge angezeigt. Im Speicher liegen aktuell ${rawEvents.length} Ereignisse.`;
+    eventsEl.append(note);
+  }
   if (!compactedEvents.length) {
-    eventsEl.innerHTML = '<p class="empty">Noch keine Befehle.</p>';
+    const empty = document.createElement('p');
+    empty.className = 'empty';
+    empty.textContent = 'Noch keine Befehle.';
+    eventsEl.append(empty);
     return;
   }
-
-  eventsEl.innerHTML = '';
   compactedEvents.slice(0, 50).forEach((event) => {
     const row = document.createElement('div');
     row.className = 'event-row';

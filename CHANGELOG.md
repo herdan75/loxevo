@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.24 - 2026-06-22
+
+- Das interne Protokoll nutzt weiterhin nur einen flüchtigen RAM-Ringpuffer, hält nun aber bis zu 300 Ereignisse für bessere Fehleranalysen vor.
+- Der Protokoll-Tab bietet einen direkten JSON-Export aller aktuell gespeicherten, bereinigten RAM-Protokolleinträge; Docker-Logs werden dabei nicht exportiert.
+- Die Protokolltexte, Leerzustände und Filter wurden verständlicher formuliert; Systemereignisse sind nun unter dem Filter `System` zusammengefasst.
+
 ## 1.0.23 - 2026-06-21
 
 - Alexa-TTS WAIT_PROXY ist robuster: LoxEvo kann eine laufende Amazon-Login-Proxy-Session jetzt auch über neue CookieData derselben Proxy-Remote abschliessen, falls `alexa-remote2` keinen finalen Callback liefert.

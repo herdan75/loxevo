@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: Source available](https://img.shields.io/badge/License-source--available-orange.svg)](LICENSE)
 
-> **Status: Version 1.0.23 / getestete lauffähige Version**
+> **Status: Version 1.0.24 / getestete lauffähige Version**
 >
 > LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte, Alexa-Gerätesuche, Alexa-TTS, Rückmeldungen, Backup und Web-UI wurden soweit möglich getestet. Trotzdem können in einzelnen Loxone-/Alexa-Umgebungen noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
 

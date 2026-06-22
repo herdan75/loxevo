@@ -7,6 +7,7 @@ const alarmBtn = document.querySelector('#alarmBtn');
 const refreshEventsBtn = document.querySelector('#refreshEventsBtn');
 const eventsEl = document.querySelector('#events');
 const clearEventsBtn = document.querySelector('#clearEventsBtn');
+const exportEventsBtn = document.querySelector('#exportEventsBtn');
 const eventSearch = document.querySelector('#eventSearch');
 const eventFilterButtons = document.querySelectorAll('.event-filter');
 const dryRunToggle = document.querySelector('#dryRunToggle');
@@ -147,6 +148,7 @@ const LAST_BACKUP_EXPORT_KEY = 'loxevoLastBackupExportAt';
 const SETUP_WIZARD_SKIPPED_KEY = 'loxevoSetupWizardSkipped';
 const SHOW_ALL_TTS_DEVICE_TYPES_KEY = 'loxevoShowAllTtsDeviceTypes';
 const HELP_TOOLTIP_MARGIN = 10;
+const MAX_EVENT_BUFFER_SIZE = 300;
 const NEW_COMMAND_CATEGORY = 'Neue Befehle';
 const NEW_COMMAND_LABEL = 'Neuer noch nicht konfigurierter Befehl';
 const LOXONE_UUID_PATTERN = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-(?:[0-9a-f]{16}|[0-9a-f]{4}-[0-9a-f]{12}))$/i;
@@ -168,6 +170,7 @@ speakBtn.addEventListener('click', () => postTtsTest('speak', speakBtn));
 alarmBtn.addEventListener('click', () => postTtsTest('alarm', alarmBtn));
 refreshEventsBtn.addEventListener('click', () => loadEvents(refreshEventsBtn));
 clearEventsBtn?.addEventListener('click', () => clearEvents(clearEventsBtn));
+exportEventsBtn?.addEventListener('click', () => exportEvents(exportEventsBtn));
 alexaBridgeDebug?.addEventListener('change', () => setAlexaBridgeDebug(alexaBridgeDebug.checked));
 dryRunToggle.addEventListener('change', () => setDryRun(dryRunToggle.checked));
 refreshDashboardBtn?.addEventListener('click', () => refreshDashboard(refreshDashboardBtn));
@@ -700,7 +703,24 @@ async function exportDiagnostics(button) {
     downloadBlob(blob, filenameFromResponse(response) || `loxevo-diagnostics-${timestampForFile(new Date())}.json`);
     await loadEvents();
     setButtonFeedback(button, 'success', 'Exportiert');
-    showToast('Diagnose exportiert', 'ok');
+    showToast('Diagnosebericht exportiert', 'ok');
+  } catch (error) {
+    setButtonFeedback(button, 'error', 'Fehler');
+    showToast(error.message, 'error');
+  }
+}
+
+async function exportEvents(button) {
+  setButtonFeedback(button, 'pending', 'Exportiert');
+  try {
+    const response = await adminFetch('/api/events/export', { cache: 'no-store' });
+    await ensureOk(response);
+    const payload = await response.json();
+    const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: 'application/json' });
+    downloadBlob(blob, filenameFromResponse(response) || `loxevo-protokoll-${timestampForFile(new Date())}.json`);
+    await loadEvents();
+    setButtonFeedback(button, 'success', 'Exportiert');
+    showToast('Protokoll exportiert', 'ok');
   } catch (error) {
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
@@ -4319,12 +4339,12 @@ function renderEvents(events) {
   const rawEvents = Array.isArray(events) ? events : [];
   const compactedEvents = compactEvents(filterEvents(rawEvents));
   eventsEl.innerHTML = '';
-  if (rawEvents.length > 50) {
-    const note = document.createElement('p');
-    note.className = 'empty';
-    note.textContent = `Es werden bis zu 50 kompaktierte Einträge angezeigt. Im Speicher liegen aktuell ${rawEvents.length} Ereignisse.`;
-    eventsEl.append(note);
-  }
+  const bufferInfo = document.createElement('p');
+  bufferInfo.className = 'empty';
+  bufferInfo.textContent = rawEvents.length
+    ? `Im Speicher: ${rawEvents.length} / ${MAX_EVENT_BUFFER_SIZE} Ereignisse. Angezeigt werden bis zu 50 kompaktierte Einträge. Der Export enthält alle gespeicherten RAM-Ereignisse.`
+    : `Im Speicher: 0 / ${MAX_EVENT_BUFFER_SIZE} Ereignisse.`;
+  eventsEl.append(bufferInfo);
   if (!compactedEvents.length) {
     const empty = document.createElement('p');
     empty.className = 'empty';
@@ -4409,7 +4429,7 @@ function eventBucket(event) {
   if (event.status === 'error') return 'error';
   if (type.startsWith('tts')) return 'tts';
   if (type.startsWith('alexa')) return 'alexa';
-  if (type === 'backup') return 'backup';
+  if (['backup', 'diagnostics', 'dependency-update', 'admin-security', 'events', 'config'].includes(type)) return 'system';
   if (['command', 'light', 'alexa-command'].includes(type)) return 'loxone';
   return 'all';
 }

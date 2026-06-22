@@ -441,7 +441,7 @@ Content-Type: application/json
             <p>Lokaler Statuscheck für Konfiguration, Schreibrechte, Loxone, Alexa TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup.</p>
           </div>
           <div class="actions">
-            <button id="exportDiagnosticsBtn" type="button" class="secondary">Diagnose exportieren</button>
+            <button id="exportDiagnosticsBtn" type="button" class="secondary" title="Exportiert Systemstatus, bereinigte Konfigurationsübersicht und Protokollauszug.">Diagnosebericht exportieren</button>
             <button id="refreshPreflightBtn" type="button" class="secondary">Systemprüfung aktualisieren</button>
           </div>
         </div>
@@ -579,6 +579,7 @@ Content-Type: application/json
           </div>
           <div class="actions">
             <button id="clearEventsBtn" type="button" class="secondary">Protokoll leeren</button>
+            <button id="exportEventsBtn" type="button" class="secondary">Protokoll exportieren</button>
             <button id="refreshEventsBtn" type="button">Aktualisieren</button>
           </div>
         </div>
@@ -588,7 +589,7 @@ Content-Type: application/json
           <button type="button" class="event-filter" data-event-filter="loxone">Loxone</button>
           <button type="button" class="event-filter" data-event-filter="alexa">Alexa</button>
           <button type="button" class="event-filter" data-event-filter="tts">TTS</button>
-          <button type="button" class="event-filter" data-event-filter="backup">Backup</button>
+          <button type="button" class="event-filter" data-event-filter="system">System</button>
           <input id="eventSearch" type="search" placeholder="Protokoll durchsuchen">
         </div>
         <div class="event-debug-row">
@@ -601,7 +602,7 @@ Content-Type: application/json
             <p>Nur zur Fehlersuche aktivieren. Dann protokolliert LoxEvo einzelne Alexa/Hue-Abfragen und Antworten, zum Beispiel gefundene Geräte, alte Geräte-IDs und 404-Antworten. Im Normalbetrieb sollte die Option aus bleiben, damit das Protokoll übersichtlich bleibt.</p>
           </div>
         </div>
-        <p class="empty">Das Protokoll ist ein flüchtiger Ringpuffer im Arbeitsspeicher. Es wird beim Neustart gelöscht. Für Analysen kann der Diagnose-Export genutzt werden.</p>
+        <p class="empty">Das Protokoll ist ein flüchtiger Ringpuffer im Arbeitsspeicher. Es wird beim Neustart gelöscht. Der Export enthält die aktuell gespeicherten RAM-Ereignisse, nicht die Docker-Logs.</p>
         <div id="events" class="events"></div>
       </section>
       </section>

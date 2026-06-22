@@ -148,6 +148,10 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
     return sendJson(res, config);
   }
 
+  if (req.method === 'GET' && pathParts[1] === 'events' && pathParts[2] === 'export') {
+    return exportEvents(res);
+  }
+
   if (req.method === 'GET' && pathParts[1] === 'events') {
     return sendJson(res, events);
   }
@@ -292,6 +296,7 @@ function requiresAdminToken(req, pathParts) {
   if (method === 'GET' && resource === 'backup') return true;
   if (method === 'POST' && resource === 'backup' && action === 'restore') return true;
   if (method === 'GET' && resource === 'diagnostics') return true;
+  if (method === 'GET' && resource === 'events' && action === 'export') return true;
   if (method === 'POST' && resource === 'events' && action === 'clear') return true;
   if (method === 'POST' && resource === 'dependencies' && action === 'alexa-remote2' && subAction === 'update') return true;
   if (method === 'POST' && resource === 'system' && action === 'restart') return true;
@@ -521,6 +526,28 @@ async function exportDiagnostics(res) {
 
   addEvent({ type: 'diagnostics', status: 'exported', text: 'Diagnose exportiert.' });
   return sendJsonDownload(res, diagnostics, `loxevo-diagnostics-${timestampForFile(exportedAt)}.json`);
+}
+
+function exportEvents(res) {
+  const exportedAt = new Date().toISOString();
+  const exportedEvents = events.slice(0, MAX_EVENTS).map(sanitizeEventForDiagnostics);
+  const payload = {
+    app: config.server?.name || 'LoxEvo',
+    formatVersion: 1,
+    exportedAt,
+    eventBuffer: {
+      storedEventCount: events.length,
+      maxStoredEvents: MAX_EVENTS,
+      exportedEventCount: exportedEvents.length,
+      persistent: false,
+      clearedOnRestart: true,
+      source: 'memory-ring-buffer'
+    },
+    events: exportedEvents
+  };
+
+  addEvent({ type: 'events', status: 'exported', text: 'Protokoll exportiert.' });
+  return sendJsonDownload(res, payload, `loxevo-protokoll-${timestampForFile(exportedAt)}.json`);
 }
 
 function summarizeTtsStatus(status) {

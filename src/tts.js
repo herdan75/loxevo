@@ -12,6 +12,7 @@ const MEDIA_VOLUME_TIMEOUT_MS = 1200;
 const DEFAULT_AUTH_REFRESH_HOURS = 24;
 const DEFAULT_LOGIN_RECONNECT_INTERVAL_SECONDS = 10;
 const DEFAULT_LOGIN_RECONNECT_TIMEOUT_MINUTES = 15;
+const COOKIE_REFRESH_TIMEOUT_MS = 15_000;
 const AUTH_STATE = Object.freeze({
   DISABLED: 'DISABLED',
   NOT_READY: 'NOT_READY',
@@ -304,6 +305,188 @@ export class TtsService {
     this.emitAuthEvent('cookie-updated', 'Alexa-Cookie wurde aktualisiert.');
     console.log(`Alexa-Cookie wurde aktualisiert: ${this.config.cookieFile}`);
     return true;
+  }
+
+  getStoredCookieData(sourceAuth = this.auth, sourceRemote = this.remote) {
+    const sourceData = isPlainObject(sourceAuth?.originalData) ? sourceAuth.originalData : {};
+    const authCookieData = isPlainObject(sourceAuth?.cookieData) ? sourceAuth.cookieData : {};
+    const remoteCookieData = isPlainObject(sourceRemote?.cookieData) ? sourceRemote.cookieData : {};
+    const data = {
+      ...sourceData,
+      ...authCookieData,
+      ...remoteCookieData
+    };
+    const localCookie = firstNonEmptyString(data.localCookie, data.cookie, data.loginCookie, sourceAuth?.cookie);
+    if (localCookie) {
+      data.localCookie = localCookie;
+    }
+    const csrf = firstNonEmptyString(data.csrf, sourceAuth?.csrf);
+    if (csrf) {
+      data.csrf = csrf;
+    }
+    const macDmsValue = firstNonEmptyObject(data.macDms, sourceAuth?.macDms);
+    if (macDmsValue) {
+      data.macDms = macDmsValue;
+    }
+    data.amazonPage = firstNonEmptyString(data.amazonPage, sourceAuth?.amazonPage, this.config.amazonPage, 'amazon.de');
+    data.deviceAppName = firstNonEmptyString(data.deviceAppName, sourceAuth?.deviceAppName, this.config.deviceAppName);
+    data.dataVersion = data.dataVersion || 2;
+    return data;
+  }
+
+  buildCookieRefreshOptions(cookieData) {
+    const formerRegistrationData = {
+      ...cookieData,
+      localCookie: firstNonEmptyString(cookieData.localCookie, cookieData.cookie, cookieData.loginCookie),
+      loginCookie: firstNonEmptyString(cookieData.loginCookie, cookieData.localCookie, cookieData.cookie)
+    };
+    return {
+      amazonPage: firstNonEmptyString(this.config.amazonPage, cookieData.amazonPage, 'amazon.de'),
+      baseAmazonPage: firstNonEmptyString(this.config.baseAmazonPage, cookieData.baseAmazonPage, 'amazon.com'),
+      acceptLanguage: this.config.acceptLanguage || defaultAcceptLanguage(cookieData.amazonPage || this.config.amazonPage),
+      deviceAppName: firstNonEmptyString(cookieData.deviceAppName, this.config.deviceAppName),
+      logger: null,
+      formerRegistrationData
+    };
+  }
+
+  async refreshStoredAlexaCookieData(reason = 'auth-error') {
+    const cookieData = this.getStoredCookieData();
+    const refreshToken = firstNonEmptyString(cookieData.refreshToken);
+    const localCookie = firstNonEmptyString(cookieData.localCookie, cookieData.cookie, cookieData.loginCookie);
+    if (!refreshToken && !localCookie) {
+      return false;
+    }
+
+    let tokenRefreshError = null;
+    if (refreshToken && firstNonEmptyString(cookieData.loginCookie, cookieData.localCookie, cookieData.cookie)) {
+      try {
+        const refreshed = await this.refreshStoredCookieViaToken(cookieData);
+        if (refreshed) {
+          await this.applyRefreshedCookieData(refreshed);
+          this.emitAuthEvent('token-refresh-ok', 'Alexa-Cookie wurde per Refresh-Token erneuert.');
+          return true;
+        }
+      } catch (error) {
+        tokenRefreshError = error;
+      }
+    }
+
+    try {
+      const refreshed = await this.refreshStoredCookieViaSpa(cookieData);
+      if (refreshed) {
+        await this.applyRefreshedCookieData(refreshed);
+        this.emitAuthEvent('spa-cookie-refresh-ok', 'Alexa-Cookie wurde über Alexa-Websession erneuert.');
+        return true;
+      }
+    } catch (error) {
+      this.lastAuthError = summarizeAuthError(error);
+      return false;
+    }
+
+    if (tokenRefreshError) {
+      this.lastAuthError = summarizeAuthError(tokenRefreshError);
+    }
+    return false;
+  }
+
+  async refreshStoredCookieViaToken(cookieData) {
+    const alexaCookie = this.alexaCookieModule || this.remote?.alexaCookie || loadAlexaCookie2();
+    if (!alexaCookie || typeof alexaCookie.refreshAlexaCookie !== 'function') {
+      return null;
+    }
+
+    const options = this.buildCookieRefreshOptions(cookieData);
+    const result = await withTimeout(
+      callAlexaCookieRefresh(alexaCookie, options),
+      COOKIE_REFRESH_TIMEOUT_MS,
+      'Alexa-Cookie-Token-Refresh Timeout.'
+    );
+    if (!isPlainObject(result)) return null;
+    return normalizeRefreshedCookieData(cookieData, result);
+  }
+
+  async refreshStoredCookieViaSpa(cookieData) {
+    const localCookie = firstNonEmptyString(cookieData.localCookie, cookieData.cookie, cookieData.loginCookie);
+    if (!localCookie) return null;
+    const fetchFn = this.fetch || globalThis.fetch;
+    if (typeof fetchFn !== 'function') return null;
+
+    const amazonPage = firstNonEmptyString(cookieData.amazonPage, this.config.amazonPage, 'amazon.de');
+    const response = await withTimeout(
+      fetchFn(`https://alexa.${amazonPage}/spa/index.html`, {
+        method: 'GET',
+        redirect: 'manual',
+        headers: {
+          Cookie: localCookie,
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': this.config.acceptLanguage || defaultAcceptLanguage(amazonPage),
+          'User-Agent': this.config.userAgent || 'Mozilla/5.0'
+        }
+      }),
+      COOKIE_REFRESH_TIMEOUT_MS,
+      'Alexa-SPA-Cookie-Refresh Timeout.'
+    );
+    const status = Number(response?.status || 0);
+    const allowedRedirect = [301, 302, 303, 307, 308].includes(status);
+    if (status >= 400 || (!response?.ok && !allowedRedirect)) {
+      throw new Error(`Alexa-SPA-Cookie-Refresh fehlgeschlagen (${status || 'unbekannt'}).`);
+    }
+
+    const setCookies = getSetCookieHeaders(response?.headers);
+    const mergedCookie = mergeCookieHeader(localCookie, setCookies);
+    const csrf = firstNonEmptyString(extractCookieValue(mergedCookie, 'csrf'), cookieData.csrf);
+    const changed = Boolean(setCookies.length && mergedCookie !== localCookie) || csrf !== cookieData.csrf;
+    if (!changed) return null;
+
+    return normalizeRefreshedCookieData(cookieData, {
+      localCookie: mergedCookie,
+      csrf,
+      tokenDate: Date.now()
+    });
+  }
+
+  async applyRefreshedCookieData(refreshedData) {
+    const data = normalizeRefreshedCookieData(this.getStoredCookieData(), refreshedData);
+    const persisted = await this.persistCookie(data.localCookie, data.csrf, data.macDms, { cookieData: data }, this.auth);
+    if (!persisted && this.auth) {
+      this.auth = parseAlexaCookieFile(JSON.stringify(data));
+    }
+    await this.applyCookieDataToRemote(data);
+    this.lastAuthRefreshAt = new Date().toISOString();
+    this.lastAuthError = null;
+    if (this.ready) {
+      this.authState = AUTH_STATE.READY;
+      this.lastError = null;
+    }
+    return true;
+  }
+
+  async applyCookieDataToRemote(cookieData) {
+    if (!this.remote || !isPlainObject(cookieData)) return;
+    this.remote.cookieData = {
+      ...(isPlainObject(this.remote.cookieData) ? this.remote.cookieData : {}),
+      ...cookieData
+    };
+    if (cookieData.localCookie) {
+      this.remote.cookie = cookieData.localCookie;
+    }
+    if (cookieData.csrf) {
+      this.remote.csrf = cookieData.csrf;
+    }
+    if (isPlainObject(cookieData.macDms)) {
+      this.remote.macDms = cookieData.macDms;
+    }
+    if (typeof this.remote.setCookie === 'function' && cookieData.localCookie) {
+      try {
+        const result = this.remote.setCookie(cookieData.localCookie);
+        if (result && typeof result.then === 'function') {
+          await result;
+        }
+      } catch (error) {
+        this.lastAuthError = summarizeAuthError(error);
+      }
+    }
   }
 
   getProxyOwnIp() {
@@ -998,22 +1181,41 @@ export class TtsService {
   async refreshExistingRemoteAuth(reason = 'auth-error', error = null) {
     if (!this.ready || !this.remote) return false;
     const method = ['refreshAlexaCookies', 'refreshCookie'].find((name) => typeof this.remote?.[name] === 'function');
-    if (!method) return false;
 
-    this.emitAuthEvent('refresh-started', `Alexa-Auth wird auf der bestehenden Verbindung erneuert (${reason}).`);
-    try {
-      await withTimeout(callMaybeCallback(this.remote, method), NATIVE_SEQUENCE_TIMEOUT_MS, 'Alexa-Auth-Refresh Timeout.');
-      await this.persistCookie(undefined, undefined, undefined, this.remote, this.auth);
-      this.lastAuthRefreshAt = new Date().toISOString();
-      this.lastAuthError = null;
-      this.authState = AUTH_STATE.READY;
-      this.emitAuthEvent('auth-refresh-existing-ok', 'Alexa-Auth wurde auf der bestehenden Verbindung erneuert.');
-      return true;
-    } catch (refreshError) {
-      this.lastAuthError = summarizeAuthError(refreshError || error);
-      this.emitAuthEvent('auth-refresh-existing-failed', 'Alexa-Auth konnte auf der bestehenden Verbindung nicht erneuert werden.');
-      return false;
+    this.emitAuthEvent('existing-cookie-refresh-started', `Alexa-Auth wird auf der bestehenden Verbindung erneuert (${reason}).`);
+    let methodError = null;
+    if (method) {
+      try {
+        const refreshResult = await withTimeout(callMaybeCallback(this.remote, method), NATIVE_SEQUENCE_TIMEOUT_MS, 'Alexa-Auth-Refresh Timeout.');
+        if (isPlainObject(refreshResult)) {
+          this.remote.cookieData = {
+            ...(isPlainObject(this.remote.cookieData) ? this.remote.cookieData : {}),
+            ...refreshResult
+          };
+        }
+        await this.persistCookie(undefined, undefined, undefined, this.remote, this.auth);
+        this.lastAuthRefreshAt = new Date().toISOString();
+        this.lastAuthError = null;
+        this.authState = AUTH_STATE.READY;
+        this.emitAuthEvent('existing-cookie-refresh-ok', 'Alexa-Auth wurde auf der bestehenden Verbindung erneuert.');
+        return true;
+      } catch (refreshError) {
+        methodError = refreshError;
+      }
     }
+
+    try {
+      if (await this.refreshStoredAlexaCookieData(reason)) {
+        this.emitAuthEvent('existing-cookie-refresh-ok', 'Alexa-Auth wurde mit gespeicherten Cookie-Daten erneuert.');
+        return true;
+      }
+    } catch (refreshError) {
+      methodError = refreshError;
+    }
+
+    this.lastAuthError = summarizeAuthError(methodError || error);
+    this.emitAuthEvent('existing-cookie-refresh-failed', 'Alexa-Auth konnte auf der bestehenden Verbindung nicht erneuert werden.');
+    return false;
   }
 
   async refreshAuth(reason = 'auth-error', error = null) {
@@ -1026,6 +1228,9 @@ export class TtsService {
 
   async refreshAuthInternal(reason, error) {
     const previousReady = this.ready && this.remote;
+    if (reason === 'scheduled-refresh') {
+      this.emitAuthEvent('scheduled-refresh-started', 'Geplanter Alexa-Auth-Refresh wurde gestartet.');
+    }
     if (this.loginProxySession && this.loginProxyActive) {
       if (previousReady) {
         const refreshed = await this.refreshExistingRemoteAuth(reason, error);
@@ -1035,14 +1240,27 @@ export class TtsService {
         if (this.ready) {
           this.startAuthRefreshTimer();
         }
-        return;
+        if (refreshed) return;
       }
       throw new Error(this.lastError || this.lastAuthError || 'Amazon-Login wartet auf Abschluss.');
     }
+
+    if (previousReady) {
+      this.stopAuthRefreshTimer();
+      const refreshed = await this.refreshExistingRemoteAuth(reason, error);
+      if (refreshed) {
+        this.ready = true;
+        this.authState = AUTH_STATE.READY;
+        this.lastError = null;
+        this.startAuthRefreshTimer();
+        return;
+      }
+    }
+
     this.stopAuthRefreshTimer();
     this.authState = AUTH_STATE.REFRESHING;
     this.lastAuthError = summarizeAuthError(error);
-    this.emitAuthEvent('refresh-started', `Alexa-Auth wird erneuert (${reason}).`);
+    this.emitAuthEvent('candidate-refresh-started', `Neue Alexa-TTS-Verbindung wird vorbereitet (${reason}).`);
 
     if (!hasReusableAuthData(this.auth)) {
       if (previousReady) {
@@ -1053,7 +1271,7 @@ export class TtsService {
         this.markWaitingForLogin(new Error('Keine wiederverwendbaren Cookie-Daten vorhanden.'));
       }
       this.emitAuthEvent('refresh-failed', 'Alexa-Auth konnte nicht automatisch erneuert werden.');
-      throw new Error(this.lastError || 'Amazon-Login erforderlich.');
+      throw new Error(this.lastError || this.lastAuthError || 'Amazon-Login erforderlich.');
     }
 
     let AlexaRemote = this.AlexaRemote;
@@ -1076,7 +1294,8 @@ export class TtsService {
         this.lastAuthError = summarizeAuthError(result.error);
         if (result.loginRequired) {
           this.setLoginProxyRecommendation(result.error, candidateRemote, auth, previousReady, this.remote, sequence);
-          this.emitAuthEvent('login-required', 'Neue Amazon-Anmeldung empfohlen; bestehende TTS-Verbindung bleibt aktiv.');
+          this.startAuthRefreshTimer();
+          this.emitAuthEvent('candidate-refresh-login-required', 'Neue Amazon-Anmeldung empfohlen; bestehende TTS-Verbindung bleibt aktiv.');
         } else {
           this.authState = AUTH_STATE.READY;
           this.startAuthRefreshTimer();
@@ -1453,6 +1672,23 @@ function loadAlexaRemote2() {
   throw lastError;
 }
 
+function loadAlexaCookie2() {
+  const requires = [
+    createRequire(join(getDependencyInstallDir(), 'package.json')),
+    appRequire
+  ];
+
+  for (const requireFn of requires) {
+    try {
+      const module = requireFn('alexa-cookie2');
+      return module.default || module;
+    } catch {
+      // Optional dependency path; fall through to the next resolver.
+    }
+  }
+  return null;
+}
+
 function normalizeVolume(value, fallback) {
   const volume = Number(value);
   if (!Number.isFinite(volume)) {
@@ -1582,6 +1818,115 @@ function firstText(...values) {
 
 function firstNonEmptyString(...values) {
   return values.find((value) => typeof value === 'string' && value.trim().length > 0);
+}
+
+function normalizeRefreshedCookieData(previousData = {}, refreshedData = {}) {
+  const refreshed = isPlainObject(refreshedData) ? refreshedData : {};
+  const data = {
+    ...(isPlainObject(previousData) ? previousData : {}),
+    ...refreshed
+  };
+  const localCookie = firstNonEmptyString(
+    refreshed.localCookie,
+    refreshed.cookie,
+    data.localCookie,
+    data.cookie,
+    data.loginCookie
+  );
+  if (localCookie) {
+    data.localCookie = localCookie;
+  }
+  const loginCookie = firstNonEmptyString(refreshed.loginCookie, data.loginCookie);
+  if (loginCookie) {
+    data.loginCookie = loginCookie;
+  }
+  const csrf = firstNonEmptyString(refreshed.csrf, data.csrf);
+  if (csrf) {
+    data.csrf = csrf;
+  }
+  const macDmsValue = firstNonEmptyObject(refreshed.macDms, data.macDms);
+  if (macDmsValue) {
+    data.macDms = macDmsValue;
+  }
+  data.dataVersion = data.dataVersion || 2;
+  data.tokenDate = refreshed.tokenDate || Date.now();
+  return data;
+}
+
+function callAlexaCookieRefresh(alexaCookie, options) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      if (error) reject(error);
+      else resolve(value);
+    };
+
+    try {
+      const result = alexaCookie.refreshAlexaCookie(options, finish);
+      if (result && typeof result.then === 'function') {
+        result.then((value) => finish(null, value)).catch((error) => finish(error));
+      } else if (result !== undefined) {
+        finish(null, result);
+      }
+    } catch (error) {
+      finish(error);
+    }
+  });
+}
+
+function getSetCookieHeaders(headers) {
+  if (!headers) return [];
+  if (typeof headers.getSetCookie === 'function') {
+    return headers.getSetCookie().filter(Boolean);
+  }
+  if (typeof headers.raw === 'function') {
+    const raw = headers.raw();
+    if (Array.isArray(raw?.['set-cookie'])) {
+      return raw['set-cookie'].filter(Boolean);
+    }
+  }
+  if (typeof headers.get === 'function') {
+    const value = headers.get('set-cookie');
+    if (value) return splitSetCookieHeader(value);
+  }
+  return [];
+}
+
+function splitSetCookieHeader(value) {
+  return String(value || '')
+    .split(/,(?=\s*[^;,=]+=)/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function mergeCookieHeader(currentCookie, setCookies = []) {
+  const cookies = new Map();
+  const addPair = (entry) => {
+    const pair = String(entry || '').split(';')[0].trim();
+    const index = pair.indexOf('=');
+    if (index <= 0) return;
+    cookies.set(pair.slice(0, index), pair);
+  };
+
+  String(currentCookie || '').split(';').forEach(addPair);
+  setCookies.forEach(addPair);
+  return Array.from(cookies.values()).join('; ');
+}
+
+function extractCookieValue(cookieHeader, name) {
+  const target = String(name || '').trim();
+  if (!target) return '';
+  for (const entry of String(cookieHeader || '').split(';')) {
+    const pair = entry.trim();
+    const index = pair.indexOf('=');
+    if (index <= 0) continue;
+    if (pair.slice(0, index) === target) {
+      return pair.slice(index + 1);
+    }
+  }
+  return '';
 }
 
 export function parseAlexaCookieFile(content) {

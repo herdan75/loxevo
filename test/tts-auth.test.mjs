@@ -325,6 +325,207 @@ describe('TTS auth refresh retry', () => {
     assert.equal(service.loginProxyActive, true);
     assert.equal(timerStarts, 1);
   });
+
+  it('uses stored cookieData refresh before building a candidate on scheduled refresh', async () => {
+    let candidateConstructed = 0;
+    class CandidateRemote extends SuccessRemote {
+      constructor() {
+        super();
+        candidateConstructed += 1;
+      }
+    }
+
+    const service = await createReconnectService(CandidateRemote);
+    await writeCookie(service, {
+      localCookie: 'session-id=old',
+      loginCookie: 'login-cookie=old',
+      refreshToken: 'refresh-token',
+      deviceSerial: 'device-serial',
+      csrf: 'csrf-old',
+      amazonPage: 'amazon.de',
+      dataVersion: 2
+    });
+    service.remote = new TrackableRemote();
+    service.ready = true;
+    service.authState = 'READY';
+    let timerStarts = 0;
+    service.startAuthRefreshTimer = () => {
+      timerStarts += 1;
+    };
+    service.alexaCookieModule = {
+      refreshAlexaCookie(options, callback) {
+        assert.equal(options.formerRegistrationData.refreshToken, 'refresh-token');
+        callback(null, {
+          ...options.formerRegistrationData,
+          localCookie: 'session-id=refreshed',
+          loginCookie: 'login-cookie=refreshed',
+          csrf: 'csrf-new',
+          tokenDate: Date.now()
+        });
+      }
+    };
+
+    await service.refreshAuthInternal('scheduled-refresh', new Error('scheduled check'));
+
+    assert.equal(candidateConstructed, 0);
+    assert.equal(service.ready, true);
+    assert.equal(service.authState, 'READY');
+    assert.equal(service.auth.originalData.localCookie, 'session-id=refreshed');
+    assert.equal(service.remote.cookieData.localCookie, 'session-id=refreshed');
+    assert.equal(timerStarts, 1);
+  });
+
+  it('falls back to Alexa SPA cookie refresh when token refresh is unavailable', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    await writeCookie(service, {
+      localCookie: 'session-id=old; csrf=csrf-old',
+      csrf: 'csrf-old',
+      amazonPage: 'amazon.de',
+      dataVersion: 2
+    });
+    service.remote = new TrackableRemote();
+    service.ready = true;
+    service.authState = 'READY';
+    service.startAuthRefreshTimer = () => {};
+    service.fetch = async (url, options) => {
+      assert.equal(url, 'https://alexa.amazon.de/spa/index.html');
+      assert.equal(options.headers.Cookie, 'session-id=old; csrf=csrf-old');
+      return {
+        ok: true,
+        status: 200,
+        headers: {
+          getSetCookie: () => [
+            'session-id=spa; Path=/; Secure',
+            'csrf=csrf-spa; Path=/; Secure'
+          ]
+        }
+      };
+    };
+
+    const refreshed = await service.refreshExistingRemoteAuth('test-spa-refresh', new Error('401'));
+
+    assert.equal(refreshed, true);
+    assert.equal(service.auth.originalData.localCookie, 'session-id=spa; csrf=csrf-spa');
+    assert.equal(service.auth.originalData.csrf, 'csrf-spa');
+  });
+
+  it('keeps the ready remote when stored refresh fails and candidate requires login', async () => {
+    const service = await createReconnectService(LoginRequiredRemote);
+    await writeCookie(service, {
+      localCookie: 'session-id=old',
+      loginCookie: 'login-cookie=old',
+      refreshToken: 'refresh-token',
+      csrf: 'csrf-old',
+      amazonPage: 'amazon.de',
+      dataVersion: 2
+    });
+    const oldRemote = new TrackableRemote();
+    service.remote = oldRemote;
+    service.ready = true;
+    service.authState = 'READY';
+    service.startLoginProxyReconnectTimer = () => {};
+    service.startAuthRefreshTimer = () => {};
+    service.alexaCookieModule = {
+      refreshAlexaCookie(_options, callback) {
+        callback(new Error('refresh token expired'));
+      }
+    };
+    service.fetch = async () => ({
+      ok: false,
+      status: 403,
+      headers: {
+        getSetCookie: () => []
+      }
+    });
+
+    await assert.rejects(
+      () => service.refreshAuthInternal('scheduled-refresh', new Error('scheduled check')),
+      /Amazon-Login|erforderlich/
+    );
+
+    assert.equal(service.ready, true);
+    assert.equal(service.remote, oldRemote);
+    assert.equal(service.authState, 'WAIT_PROXY');
+    assert.equal(service.loginProxyActive, true);
+    assert.equal(oldRemote.stopped, false);
+  });
+
+  it('retries a TTS action after refreshing stored cookieData', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    await writeCookie(service, {
+      localCookie: 'session-id=old',
+      loginCookie: 'login-cookie=old',
+      refreshToken: 'refresh-token',
+      csrf: 'csrf-old',
+      amazonPage: 'amazon.de',
+      dataVersion: 2
+    });
+    service.remote = new TrackableRemote();
+    service.ready = true;
+    service.authState = 'READY';
+    service.alexaCookieModule = {
+      refreshAlexaCookie(options, callback) {
+        callback(null, {
+          ...options.formerRegistrationData,
+          localCookie: 'session-id=retry',
+          csrf: 'csrf-retry',
+          tokenDate: Date.now()
+        });
+      }
+    };
+    let attempts = 0;
+
+    const result = await service.withAuthRetry('tts-speak', async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        const error = new Error('unauthorized');
+        error.statusCode = 401;
+        throw error;
+      }
+      return 'spoken';
+    });
+
+    assert.equal(result, 'spoken');
+    assert.equal(attempts, 2);
+    assert.equal(service.auth.originalData.localCookie, 'session-id=retry');
+  });
+
+  it('does not include refreshed cookie secrets in auth events', async () => {
+    const events = [];
+    const service = await createReconnectService(SuccessRemote);
+    await writeCookie(service, {
+      localCookie: 'secret-cookie-old',
+      loginCookie: 'secret-login-old',
+      refreshToken: 'secret-refresh-token',
+      csrf: 'secret-csrf-old',
+      amazonPage: 'amazon.de',
+      dataVersion: 2
+    });
+    service.handlers = { addEvent: (event) => events.push(event) };
+    service.remote = new TrackableRemote();
+    service.ready = true;
+    service.authState = 'READY';
+    service.alexaCookieModule = {
+      refreshAlexaCookie(options, callback) {
+        callback(null, {
+          ...options.formerRegistrationData,
+          localCookie: 'secret-cookie-new',
+          loginCookie: 'secret-login-new',
+          refreshToken: 'secret-refresh-token',
+          csrf: 'secret-csrf-new',
+          tokenDate: Date.now()
+        });
+      }
+    };
+
+    await service.refreshExistingRemoteAuth('test-no-secret-events');
+
+    const eventText = JSON.stringify(events);
+    assert.equal(eventText.includes('secret-cookie'), false);
+    assert.equal(eventText.includes('secret-login'), false);
+    assert.equal(eventText.includes('secret-refresh-token'), false);
+    assert.equal(eventText.includes('secret-csrf'), false);
+  });
 });
 
 describe('TTS login proxy reconnect polling', () => {
@@ -479,6 +680,11 @@ async function createReconnectService(AlexaRemoteClass) {
   service.AlexaRemote = AlexaRemoteClass;
   service.auth = parseAlexaCookieFile(await readFile(cookieFile, 'utf8'));
   return service;
+}
+
+async function writeCookie(service, data) {
+  await writeFile(service.config.cookieFile, JSON.stringify(data), 'utf8');
+  service.auth = parseAlexaCookieFile(await readFile(service.config.cookieFile, 'utf8'));
 }
 
 class TrackableRemote {

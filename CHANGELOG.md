@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.25 - 2026-06-27
+
+- Alexa-TTS erneuert gespeicherte CookieData robuster: vor einem neuen Verbindungs-Candidate wird zuerst ein Refresh über vorhandene Cookie-/Token-Daten versucht.
+- Wenn der Token-Refresh nicht verfügbar ist, nutzt LoxEvo als Fallback die bestehende Alexa-Websession, ohne Cookie-, Token- oder CSRF-Werte ins Protokoll zu schreiben.
+- Bestehende bereite TTS-Verbindungen bleiben während Login-Wartephasen und fehlgeschlagenen Candidate-Versuchen aktiv; TTS-Befehle werden nach erfolgreicher Auth-Erneuerung einmal wiederholt.
+
 ## 1.0.24 - 2026-06-22
 
 - Das interne Protokoll nutzt weiterhin nur einen flüchtigen RAM-Ringpuffer, hält nun aber bis zu 300 Ereignisse für bessere Fehleranalysen vor.

@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.26 - 2026-07-02
+
+- Alexa-TTS versucht beim Kaltstart jetzt vor dem ersten AlexaRemote-Init einen gespeicherten Cookie-/Token-Refresh, wenn strukturierte CookieData vorhanden ist.
+- Wenn der erste Startversuch trotzdem einen Amazon-Login verlangt, wird einmalig ein weiterer gespeicherter Refresh mit anschliessendem Init-Retry versucht, bevor WAIT_PROXY geöffnet wird.
+- Tests für Kaltstart-Refresh, LoginRequired-Retry und unverändertes WAIT_PROXY-Verhalten bei fehlgeschlagenem Startup-Refresh ergänzt.
+
 ## 1.0.25 - 2026-06-27
 
 - Alexa-TTS erneuert gespeicherte CookieData robuster: vor einem neuen Verbindungs-Candidate wird zuerst ein Refresh über vorhandene Cookie-/Token-Daten versucht.

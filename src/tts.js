@@ -74,18 +74,129 @@ export class TtsService {
 
     let auth;
     try {
-      auth = parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
+      auth = await this.readAlexaCookieAuth();
       this.emitAuthEvent('cookie-read', 'Alexa-Cookie-Datei wurde gelesen.');
     } catch (error) {
       this.markUnavailable(`Alexa-Cookie konnte nicht gelesen werden: ${this.config.cookieFile}`, error);
       return;
     }
 
-    this.remote = new AlexaRemote();
-    this.auth = auth;
-    this.attachCookiePersistence(this.remote, auth);
+    auth = await this.refreshStoredAuthBeforeInitialInit(auth);
+    await this.initAlexaRemoteAtStartup(AlexaRemote, auth);
+  }
 
-    await this.initAlexaRemote(this.remote, auth, { commit: true });
+  async readAlexaCookieAuth() {
+    return parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
+  }
+
+  shouldAttemptStartupCookieRefresh(auth) {
+    if (!hasReusableAuthData(auth) || !isPlainObject(auth?.cookieData)) return false;
+    const data = auth.cookieData;
+    return Boolean(firstNonEmptyString(
+      data.refreshToken,
+      data.localCookie,
+      data.cookie,
+      data.loginCookie
+    ));
+  }
+
+  async refreshStoredAuthBeforeInitialInit(auth) {
+    if (!this.shouldAttemptStartupCookieRefresh(auth)) return auth;
+    this.auth = auth;
+    this.emitAuthEvent('startup-cookie-refresh-started', 'Alexa-Cookie wird vor dem Start erneuert.');
+    try {
+      const refreshed = await this.refreshStoredAlexaCookieData('startup-refresh');
+      if (!refreshed) {
+        this.emitAuthEvent('startup-cookie-refresh-failed', 'Alexa-Cookie konnte vor dem Start nicht automatisch erneuert werden.');
+        return auth;
+      }
+      const nextAuth = await this.readAlexaCookieAuth();
+      this.auth = nextAuth;
+      this.emitAuthEvent('startup-cookie-refresh-ok', 'Alexa-Cookie wurde vor dem Start erneuert.');
+      return nextAuth;
+    } catch (error) {
+      this.lastAuthError = summarizeAuthError(error);
+      this.emitAuthEvent('startup-cookie-refresh-failed', 'Alexa-Cookie konnte vor dem Start nicht automatisch erneuert werden.');
+      return auth;
+    }
+  }
+
+  async initAlexaRemoteAtStartup(AlexaRemote, auth) {
+    let remote = new AlexaRemote();
+    this.remote = remote;
+    this.auth = auth;
+    this.attachCookiePersistence(remote, auth);
+    let sequence = ++this.initSequence;
+    let result = await this.initializeRemoteCandidate(remote, auth, { sequence });
+
+    if (result.ok) {
+      await this.commitRemoteCandidate(remote, auth);
+      return true;
+    }
+
+    if (startupResultNeedsLogin(result)) {
+      const retry = await this.retryStartupInitAfterLoginRequired(AlexaRemote, auth);
+      if (retry.ok) return true;
+      if (retry.remote && retry.result) {
+        if (retry.remote !== remote) {
+          await this.disposeRemote(remote);
+        }
+        remote = retry.remote;
+        auth = retry.auth;
+        result = retry.result;
+        sequence = retry.sequence;
+      }
+    }
+
+    if (result.waitProxy) {
+      this.beginLoginProxySession({ remote, auth, proxyResult: result, previousReady: false, sequence });
+      return false;
+    }
+    if (result.loginRequired) {
+      this.markWaitingForLogin(result.error, { remote, auth, sequence });
+      return false;
+    }
+
+    this.markUnavailable('Alexa-Verbindung konnte nicht initialisiert werden.', result.error);
+    return false;
+  }
+
+  async retryStartupInitAfterLoginRequired(AlexaRemote, auth) {
+    if (!this.shouldAttemptStartupCookieRefresh(auth)) {
+      return { ok: false };
+    }
+
+    this.auth = auth;
+    this.emitAuthEvent('startup-login-required-refresh-started', 'Alexa-Cookie wird nach Login-Anforderung erneut geprüft.');
+    let nextAuth = auth;
+    try {
+      const refreshed = await this.refreshStoredAlexaCookieData('startup-login-required');
+      if (!refreshed) {
+        this.emitAuthEvent('startup-login-required-refresh-failed', 'Alexa-Cookie konnte nach Login-Anforderung nicht automatisch erneuert werden.');
+        return { ok: false };
+      }
+      nextAuth = await this.readAlexaCookieAuth();
+      this.auth = nextAuth;
+      this.emitAuthEvent('startup-login-required-refresh-ok', 'Alexa-Cookie wurde nach Login-Anforderung erneuert.');
+    } catch (error) {
+      this.lastAuthError = summarizeAuthError(error);
+      this.emitAuthEvent('startup-login-required-refresh-failed', 'Alexa-Cookie konnte nach Login-Anforderung nicht automatisch erneuert werden.');
+      return { ok: false };
+    }
+
+    const retryRemote = new AlexaRemote();
+    this.attachCookiePersistence(retryRemote, nextAuth);
+    const sequence = ++this.initSequence;
+    const result = await this.initializeRemoteCandidate(retryRemote, nextAuth, { sequence });
+    if (result.ok) {
+      await this.commitRemoteCandidate(retryRemote, nextAuth);
+      return { ok: true };
+    }
+    if (!startupResultNeedsLogin(result)) {
+      await this.disposeRemote(retryRemote);
+      return { ok: false };
+    }
+    return { ok: false, remote: retryRemote, auth: nextAuth, result, sequence };
   }
 
   async initAlexaRemote(remote = this.remote, auth = this.auth, options = {}) {
@@ -2013,6 +2124,14 @@ function extractLoginUrl(error) {
   const text = String(error?.message || error || '');
   const match = text.match(/https?:\/\/[^\s"'<>]+/i);
   return match ? match[0].replace(/[).,;]+$/, '') : null;
+}
+
+function startupResultNeedsLogin(result) {
+  return Boolean(
+    result?.waitProxy ||
+    result?.loginRequired ||
+    isAuthError(result?.error)
+  );
 }
 
 function isAuthError(error) {

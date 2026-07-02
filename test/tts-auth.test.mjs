@@ -266,6 +266,140 @@ describe('TTS reconnect candidate handling', () => {
 });
 
 describe('TTS auth refresh retry', () => {
+  it('refreshes stored cookieData before the initial Alexa init on cold start', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    await writeCookie(service, {
+      localCookie: 'session-id=old',
+      loginCookie: 'login-cookie=old',
+      refreshToken: 'refresh-token',
+      csrf: 'csrf-old',
+      amazonPage: 'amazon.de',
+      dataVersion: 2
+    });
+    const events = [];
+    let initCookie = '';
+    class StartupRemote extends TrackableRemote {
+      init(options, callback) {
+        initCookie = options.cookie.localCookie;
+        callback(null);
+      }
+    }
+    service.AlexaRemote = StartupRemote;
+    service.handlers = { addEvent: (event) => events.push(event) };
+    service.alexaCookieModule = {
+      refreshAlexaCookie(options, callback) {
+        callback(null, {
+          ...options.formerRegistrationData,
+          localCookie: 'session-id=startup-refreshed',
+          loginCookie: 'login-cookie=startup-refreshed',
+          csrf: 'csrf-startup',
+          tokenDate: Date.now()
+        });
+      }
+    };
+
+    await service.initAlexaRemoteAtStartup(StartupRemote, await service.refreshStoredAuthBeforeInitialInit(service.auth));
+
+    assert.equal(service.ready, true);
+    assert.equal(initCookie, 'session-id=startup-refreshed');
+    assert.equal(service.auth.originalData.localCookie, 'session-id=startup-refreshed');
+    assert.equal(events.some((event) => event.status === 'startup-cookie-refresh-started'), true);
+    assert.equal(events.some((event) => event.status === 'startup-cookie-refresh-ok'), true);
+    const eventText = JSON.stringify(events);
+    assert.equal(eventText.includes('session-id='), false);
+    assert.equal(eventText.includes('refresh-token'), false);
+  });
+
+  it('retries initial init once after loginRequired when startup refresh succeeds', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    await writeCookie(service, {
+      localCookie: 'session-id=old',
+      loginCookie: 'login-cookie=old',
+      refreshToken: 'refresh-token',
+      csrf: 'csrf-old',
+      amazonPage: 'amazon.de',
+      dataVersion: 2
+    });
+    const events = [];
+    const initCookies = [];
+    let constructed = 0;
+    class FirstLoginThenReadyRemote extends TrackableRemote {
+      constructor() {
+        super();
+        this.index = ++constructed;
+      }
+
+      init(options, callback) {
+        initCookies.push(options.cookie.localCookie);
+        if (this.index === 1) {
+          callback(new Error('Please open http://127.0.0.1:12345/ in your browser'));
+          return;
+        }
+        callback(null);
+      }
+    }
+    service.AlexaRemote = FirstLoginThenReadyRemote;
+    service.handlers = { addEvent: (event) => events.push(event) };
+    service.alexaCookieModule = {
+      refreshAlexaCookie(options, callback) {
+        callback(null, {
+          ...options.formerRegistrationData,
+          localCookie: 'session-id=login-retry',
+          loginCookie: 'login-cookie=login-retry',
+          csrf: 'csrf-login-retry',
+          tokenDate: Date.now()
+        });
+      }
+    };
+
+    await service.initAlexaRemoteAtStartup(FirstLoginThenReadyRemote, service.auth);
+
+    assert.equal(service.ready, true);
+    assert.equal(service.loginProxyActive, false);
+    assert.equal(constructed, 2);
+    assert.deepEqual(initCookies, ['session-id=old', 'session-id=login-retry']);
+    assert.equal(service.auth.originalData.localCookie, 'session-id=login-retry');
+    assert.equal(events.some((event) => event.status === 'startup-login-required-refresh-started'), true);
+    assert.equal(events.some((event) => event.status === 'startup-login-required-refresh-ok'), true);
+    assert.equal(events.some((event) => event.status === 'login-required'), false);
+  });
+
+  it('keeps previous WAIT_PROXY behavior when startup refresh fails', async () => {
+    const service = await createReconnectService(LoginRequiredRemote);
+    await writeCookie(service, {
+      localCookie: 'session-id=old',
+      loginCookie: 'login-cookie=old',
+      refreshToken: 'refresh-token',
+      csrf: 'csrf-old',
+      amazonPage: 'amazon.de',
+      dataVersion: 2
+    });
+    const events = [];
+    service.handlers = { addEvent: (event) => events.push(event) };
+    service.alexaCookieModule = {
+      refreshAlexaCookie(_options, callback) {
+        callback(new Error('refresh expired'));
+      }
+    };
+    service.fetch = async () => ({
+      ok: false,
+      status: 403,
+      headers: {
+        getSetCookie: () => []
+      }
+    });
+    service.startLoginProxyReconnectTimer = () => {};
+
+    await service.initAlexaRemoteAtStartup(LoginRequiredRemote, service.auth);
+
+    assert.equal(service.ready, false);
+    assert.equal(service.authState, 'WAIT_PROXY');
+    assert.equal(service.loginProxyActive, true);
+    assert.equal(service.loginUrl, 'http://127.0.0.1:12345/');
+    assert.equal(events.some((event) => event.status === 'startup-login-required-refresh-failed'), true);
+    assert.equal(events.some((event) => event.status === 'login-required'), true);
+  });
+
   it('uses refreshAlexaCookies on the existing ready remote before reconnecting', async () => {
     const service = await createReconnectService(SuccessRemote);
     const remote = new RefreshableRemote();

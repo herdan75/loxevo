@@ -575,27 +575,72 @@ export class TtsService {
 
   async applyCookieDataToRemote(cookieData) {
     if (!this.remote || !isPlainObject(cookieData)) return;
-    this.remote.cookieData = {
+    const nextCookieData = {
       ...(isPlainObject(this.remote.cookieData) ? this.remote.cookieData : {}),
       ...cookieData
     };
-    if (cookieData.localCookie) {
-      this.remote.cookie = cookieData.localCookie;
+    const localCookie = firstNonEmptyString(nextCookieData.localCookie, nextCookieData.cookie, nextCookieData.loginCookie);
+    if (localCookie) {
+      nextCookieData.localCookie = localCookie;
+      this.remote.cookie = localCookie;
     }
-    if (cookieData.csrf) {
-      this.remote.csrf = cookieData.csrf;
+    const csrf = firstNonEmptyString(nextCookieData.csrf);
+    if (csrf) {
+      this.remote.csrf = csrf;
     }
-    if (isPlainObject(cookieData.macDms)) {
-      this.remote.macDms = cookieData.macDms;
+    const macDmsValue = firstNonEmptyObject(nextCookieData.macDms);
+    if (macDmsValue) {
+      this.remote.macDms = macDmsValue;
     }
-    if (typeof this.remote.setCookie === 'function' && cookieData.localCookie) {
+    this.remote.cookieData = nextCookieData;
+    if (typeof this.remote.setCookie === 'function' && localCookie) {
       try {
-        const result = this.remote.setCookie(cookieData.localCookie);
+        const result = this.remote.setCookie(localCookie);
         if (result && typeof result.then === 'function') {
           await result;
         }
       } catch (error) {
         this.lastAuthError = summarizeAuthError(error);
+      }
+    }
+    this.applyCookieDataToRemoteOptions(nextCookieData);
+  }
+
+  applyCookieDataToRemoteOptions(cookieData) {
+    if (!this.remote || !isPlainObject(cookieData)) return;
+    const localCookie = firstNonEmptyString(cookieData.localCookie, cookieData.cookie, cookieData.loginCookie);
+    const csrf = firstNonEmptyString(cookieData.csrf);
+    const macDmsValue = firstNonEmptyObject(cookieData.macDms);
+    const formerRegistrationData = buildFormerRegistrationData(cookieData);
+
+    for (const key of ['options', '_options']) {
+      const options = isPlainObject(this.remote[key]) ? this.remote[key] : {};
+      this.remote[key] = options;
+      options.cookie = cookieData;
+      options.cookieJustCreated = false;
+      if (formerRegistrationData) {
+        options.formerRegistrationData = formerRegistrationData;
+      }
+      if (csrf) {
+        options.csrf = csrf;
+      }
+      if (macDmsValue) {
+        options.macDms = macDmsValue;
+      }
+      if (cookieData.amazonPage) {
+        options.amazonPage = cookieData.amazonPage;
+      }
+      if (cookieData.deviceAppName) {
+        options.deviceAppName = cookieData.deviceAppName;
+      }
+      if (localCookie || csrf) {
+        options.headers = isPlainObject(options.headers) ? options.headers : {};
+        if (localCookie) {
+          options.headers.Cookie = localCookie;
+        }
+        if (csrf) {
+          options.headers.csrf = csrf;
+        }
       }
     }
   }
@@ -1282,7 +1327,13 @@ export class TtsService {
       if (!isAuthError(error)) throw error;
       this.lastAuthError = summarizeAuthError(error);
       if (await this.refreshExistingRemoteAuth(reason, error)) {
-        return await action();
+        try {
+          return await action();
+        } catch (retryError) {
+          if (!isAuthError(retryError)) throw retryError;
+          this.lastAuthError = summarizeAuthError(retryError);
+          error = retryError;
+        }
       }
       await this.refreshAuth(reason, error);
       return await action();
@@ -1303,6 +1354,9 @@ export class TtsService {
             ...(isPlainObject(this.remote.cookieData) ? this.remote.cookieData : {}),
             ...refreshResult
           };
+        }
+        if (isPlainObject(this.remote.cookieData)) {
+          await this.applyCookieDataToRemote(this.remote.cookieData);
         }
         await this.persistCookie(undefined, undefined, undefined, this.remote, this.auth);
         this.lastAuthRefreshAt = new Date().toISOString();

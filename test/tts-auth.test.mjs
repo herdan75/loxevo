@@ -403,6 +403,8 @@ describe('TTS auth refresh retry', () => {
   it('uses refreshAlexaCookies on the existing ready remote before reconnecting', async () => {
     const service = await createReconnectService(SuccessRemote);
     const remote = new RefreshableRemote();
+    remote.options = { headers: { Existing: 'keep' } };
+    remote._options = { headers: {} };
     service.remote = remote;
     service.ready = true;
     service.authState = 'READY';
@@ -423,6 +425,49 @@ describe('TTS auth refresh retry', () => {
 
     assert.equal(attempts, 2);
     assert.equal(remote.refreshes, 1);
+    assert.equal(remote.options.cookie.localCookie, 'session-id=abc');
+    assert.equal(remote.options.formerRegistrationData.localCookie, 'session-id=abc');
+    assert.equal(remote.options.headers.Cookie, 'session-id=abc');
+    assert.equal(remote.options.headers.csrf, 'csrf-token');
+    assert.equal(remote.options.headers.Existing, 'keep');
+    assert.equal(remote._options.cookie.localCookie, 'session-id=abc');
+    assert.equal(remote._options.formerRegistrationData.localCookie, 'session-id=abc');
+    assert.equal(remote._options.headers.Cookie, 'session-id=abc');
+    assert.equal(remote._options.headers.csrf, 'csrf-token');
+  });
+
+  it('falls back to full auth refresh when the retry still gets unauthorized', async () => {
+    const service = await createReconnectService(SuccessRemote);
+    service.remote = new RefreshableRemote();
+    service.ready = true;
+    service.authState = 'READY';
+    let existingRefreshes = 0;
+    let fullRefreshes = 0;
+    let attempts = 0;
+
+    service.refreshExistingRemoteAuth = async () => {
+      existingRefreshes += 1;
+      return true;
+    };
+    service.refreshAuth = async () => {
+      fullRefreshes += 1;
+      return true;
+    };
+
+    const result = await service.withAuthRetry('tts-speak', async () => {
+      attempts += 1;
+      if (attempts <= 2) {
+        const error = new Error('401 Unauthorized');
+        error.statusCode = 401;
+        throw error;
+      }
+      return 'spoken';
+    });
+
+    assert.equal(result, 'spoken');
+    assert.equal(attempts, 3);
+    assert.equal(existingRefreshes, 1);
+    assert.equal(fullRefreshes, 1);
   });
 
   it('refreshes the old ready remote during WAIT_PROXY without creating an error loop', async () => {

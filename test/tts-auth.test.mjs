@@ -437,26 +437,26 @@ describe('TTS auth refresh retry', () => {
   });
 
   it('falls back to full auth refresh when the retry still gets unauthorized', async () => {
-    const service = await createReconnectService(SuccessRemote);
-    service.remote = new RefreshableRemote();
+    let candidateConstructed = 0;
+    class ReplacementRemote extends SuccessRemote {
+      constructor() {
+        super();
+        candidateConstructed += 1;
+      }
+    }
+
+    const service = await createReconnectService(ReplacementRemote);
+    const oldRemote = new RefreshableRemote();
+    service.remote = oldRemote;
     service.ready = true;
     service.authState = 'READY';
-    let existingRefreshes = 0;
-    let fullRefreshes = 0;
+    service.startAuthRefreshTimer = () => {};
+    service.refreshStoredAlexaCookieData = async () => false;
     let attempts = 0;
-
-    service.refreshExistingRemoteAuth = async () => {
-      existingRefreshes += 1;
-      return true;
-    };
-    service.refreshAuth = async () => {
-      fullRefreshes += 1;
-      return true;
-    };
 
     const result = await service.withAuthRetry('tts-speak', async () => {
       attempts += 1;
-      if (attempts <= 2) {
+      if (service.remote === oldRemote) {
         const error = new Error('401 Unauthorized');
         error.statusCode = 401;
         throw error;
@@ -466,8 +466,11 @@ describe('TTS auth refresh retry', () => {
 
     assert.equal(result, 'spoken');
     assert.equal(attempts, 3);
-    assert.equal(existingRefreshes, 1);
-    assert.equal(fullRefreshes, 1);
+    assert.equal(oldRemote.refreshes, 1);
+    assert.equal(oldRemote.stopped, true);
+    assert.equal(candidateConstructed, 1);
+    assert.equal(service.remote instanceof ReplacementRemote, true);
+    assert.notEqual(service.remote, oldRemote);
   });
 
   it('refreshes the old ready remote during WAIT_PROXY without creating an error loop', async () => {

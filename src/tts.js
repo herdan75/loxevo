@@ -1335,7 +1335,7 @@ export class TtsService {
           error = retryError;
         }
       }
-      await this.refreshAuth(reason, error);
+      await this.refreshAuth(reason, error, { forceCandidate: true });
       return await action();
     }
   }
@@ -1383,16 +1383,17 @@ export class TtsService {
     return false;
   }
 
-  async refreshAuth(reason = 'auth-error', error = null) {
+  async refreshAuth(reason = 'auth-error', error = null, options = {}) {
     if (this.authRefreshPromise) return await this.authRefreshPromise;
-    this.authRefreshPromise = this.refreshAuthInternal(reason, error).finally(() => {
+    this.authRefreshPromise = this.refreshAuthInternal(reason, error, options).finally(() => {
       this.authRefreshPromise = null;
     });
     return await this.authRefreshPromise;
   }
 
-  async refreshAuthInternal(reason, error) {
+  async refreshAuthInternal(reason, error, options = {}) {
     const previousReady = this.ready && this.remote;
+    const forceCandidate = options.forceCandidate === true;
     if (reason === 'scheduled-refresh') {
       this.emitAuthEvent('scheduled-refresh-started', 'Geplanter Alexa-Auth-Refresh wurde gestartet.');
     }
@@ -1410,7 +1411,7 @@ export class TtsService {
       throw new Error(this.lastError || this.lastAuthError || 'Amazon-Login wartet auf Abschluss.');
     }
 
-    if (previousReady) {
+    if (previousReady && !forceCandidate) {
       this.stopAuthRefreshTimer();
       const refreshed = await this.refreshExistingRemoteAuth(reason, error);
       if (refreshed) {
@@ -1426,6 +1427,14 @@ export class TtsService {
     this.authState = AUTH_STATE.REFRESHING;
     this.lastAuthError = summarizeAuthError(error);
     this.emitAuthEvent('candidate-refresh-started', `Neue Alexa-TTS-Verbindung wird vorbereitet (${reason}).`);
+
+    if (forceCandidate) {
+      try {
+        await this.refreshStoredAlexaCookieData(`${reason}-candidate`);
+      } catch (refreshError) {
+        this.lastAuthError = summarizeAuthError(refreshError);
+      }
+    }
 
     if (!hasReusableAuthData(this.auth)) {
       if (previousReady) {

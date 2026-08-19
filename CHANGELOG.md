@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
 ## Unreleased
 
+## 1.0.28 - 2026-08-19
+
+- Wiederholte Alexa-TTS-Fehler mit `401 Unauthorized` lösen nach dem erfolglosen In-Place-Refresh jetzt ausdrücklich den Aufbau einer neuen `AlexaRemote`-Instanz aus, statt dieselbe abgelehnte Verbindung nochmals scheinbar erfolgreich zu aktualisieren.
+- Vor diesem Verbindungswechsel werden die gespeicherten Cookie-Daten nochmals bestmöglich erneuert; die bisherige Remote bleibt bis zur erfolgreichen Initialisierung des Ersatzes erhalten.
+- Der Regressionstest bildet den vollständigen Ablauf mit zwei `401`-Antworten, echtem Remote-Austausch und erfolgreichem abschliessendem TTS-Versuch ab.
+
 ## 1.0.27 - 2026-08-13
 
 - Alexa-TTS synchronisiert nach einem Cookie-/Token-Refresh nun auch die internen `alexa-remote2` Options- und Header-Strukturen, damit aktualisierte Cookies und CSRF-Daten beim nächsten Speak-Aufruf wirklich verwendet werden.

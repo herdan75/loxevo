@@ -1,6 +1,7 @@
 node_modules/
 config.json
 admin-token.json
+alexa-device-ids.json
 Node.txt
 data/*
 !data/.gitkeep

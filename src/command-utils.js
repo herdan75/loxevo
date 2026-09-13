@@ -36,7 +36,7 @@ export function hasCommandOffTarget(command = {}) {
   const target = readCommandOffTarget(command);
   if (target.type === 'raw') return Boolean(String(target.path || '').trim());
   if (target.type === 'pulse') return false;
-  return Boolean(String(target.value || '').trim());
+  return Boolean(String(target.value ?? '').trim());
 }
 
 export function normalizeCommandType(value) {
@@ -51,8 +51,6 @@ export function normalizeCommandType(value) {
 export function normalizeLoxoneUuid(value) {
   const raw = String(value || '').trim();
   const segment = raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
-  const match = segment.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-(?:[0-9a-f]{16}|[0-9a-f]{4}-[0-9a-f]{12})|[0-9a-f]{32}/i);
-  if (match) return match[0].toLowerCase();
   return segment.toLowerCase();
 }
 

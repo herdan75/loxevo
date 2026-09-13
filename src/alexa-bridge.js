@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { hasCommandOffTarget } from './command-utils.js';
+import { allocateLegacyDeviceId } from './device-ids.js';
+import { INTERNAL_API_RESOURCES } from './http-routes.js';
 
 const SSDP_ADDRESS = '239.255.255.250';
 const SSDP_PORT = 1900;
@@ -18,8 +20,9 @@ export class AlexaBridgeService {
     this.lastError = null;
     this.ssdpBindAddress = '';
     this.ssdpMode = '';
-    this.lastCommandAt = new Map();
     this.deviceStates = new Map();
+    this.requestedStates = new Map();
+    this.deviceExecutions = new Map();
     this.commandCooldownMs = 1500;
     this.actionResetDelayMs = 1200;
     this.actionResetTimers = new Map();
@@ -30,6 +33,13 @@ export class AlexaBridgeService {
   }
 
   async start() {
+    const identityError = this.handlers.getDeviceIdError?.();
+    if (identityError) {
+      this.ready = false;
+      this.lastError = identityError;
+      this.handlers.addEvent?.({ type: 'alexa-bridge', status: 'error', text: identityError });
+      return;
+    }
     if (!this.isEnabled()) {
       this.ready = false;
       this.lastError = null;
@@ -62,8 +72,14 @@ export class AlexaBridgeService {
     }
   }
 
+  async drainCommands() {
+    await Promise.allSettled([...this.deviceExecutions.values()]);
+  }
+
   async stop() {
     await this.stopSsdpTransport();
+    for (const timer of this.actionResetTimers.values()) clearTimeout(timer);
+    this.actionResetTimers.clear();
     this.ready = false;
     this.ssdpMode = '';
     this.discoveryPaused = false;
@@ -100,7 +116,6 @@ export class AlexaBridgeService {
       });
       this.socket = null;
     }
-    this.lastCommandAt.clear();
   }
 
   clearRetry() {
@@ -149,27 +164,15 @@ export class AlexaBridgeService {
     if (!this.isEnabled()) return false;
     if (req.method === 'GET' && url.pathname === '/description.xml') return true;
     if (pathParts[0] !== 'api') return false;
-    const reservedApiRoots = new Set([
-      'admin',
-      'alexa-bridge',
-      'backup',
-      'command',
-      'config',
-      'dependencies',
-      'discovery',
-      'dry-run',
-      'events',
-      'light',
-      'preflight',
-      'setup-status',
-      'system',
-      'tts'
-    ]);
-    return pathParts.length === 1 || !reservedApiRoots.has(pathParts[1]);
+    return pathParts.length === 1 || !INTERNAL_API_RESOURCES.has(pathParts[1]);
   }
 
   async handleHttp(req, res, url, pathParts, readBody, helpers) {
     this.logHueHttp(req, url);
+
+    if (this.handlers.getDeviceIdError?.()) {
+      return helpers.sendJson(res, [{ error: { type: 901, description: 'Device identities unavailable' } }], 503);
+    }
 
     if (req.method === 'GET' && url.pathname === '/description.xml') {
       return helpers.sendXml(res, this.buildDescriptionXml());
@@ -212,6 +215,7 @@ export class AlexaBridgeService {
   }
 
   async handleLightState(res, id, body, helpers) {
+    if (this.handlers.getDeviceIdError?.()) return helpers.sendJson(res, [{ error: { type: 901, description: 'Device identities unavailable' } }], 503);
     const device = this.getDevices().find((item) => item.id === id);
     if (!device) {
       return helpers.sendJson(res, [{ error: { type: 3, description: 'resource not available' } }], 404);
@@ -219,14 +223,29 @@ export class AlexaBridgeService {
 
     const requestedState = typeof body.on === 'boolean' ? body.on : undefined;
     if (requestedState !== undefined) {
-      this.deviceStates.set(id, { on: requestedState, updatedAt: Date.now() });
-      if (requestedState && device.alexaMode === 'action') {
-        this.scheduleActionStateReset(id);
-      }
-
+      const now = Date.now();
+      const previous = this.requestedStates.get(id);
+      const duplicate = previous?.on === requestedState && now - previous.at < this.commandCooldownMs;
       const commandRequest = this.resolveHueCommand(device, requestedState);
-      if (commandRequest) {
-        this.executeHueCommand(commandRequest);
+      if (!duplicate && commandRequest) {
+        const request = { on: requestedState, at: now };
+        this.requestedStates.set(id, request);
+        const options = { offTarget: commandRequest.offTarget === true };
+        const execute = this.handlers.captureCommand?.(commandRequest.commandKey, options) || (() => this.handlers.executeCommand(commandRequest.commandKey, options));
+        const pending = this.deviceExecutions.get(id) || Promise.resolve();
+        const execution = pending.catch(() => {}).then(async () => {
+          await execute();
+          this.deviceStates.set(id, { on: requestedState, updatedAt: Date.now() });
+          if (requestedState && device.alexaMode === 'action') this.scheduleActionStateReset(id);
+        });
+        this.deviceExecutions.set(id, execution);
+        execution.catch((error) => {
+          if (this.requestedStates.get(id) === request) this.requestedStates.delete(id);
+          this.handlers.addEvent?.({ type: 'alexa-command', status: 'error', key: commandRequest.commandKey, text: error.message });
+        }).finally(() => { if (this.deviceExecutions.get(id) === execution) this.deviceExecutions.delete(id); });
+      } else if (!commandRequest && device.alexaMode === 'action' && !requestedState) {
+        this.requestedStates.set(id, { on: false, at: now });
+        this.deviceStates.set(id, { on: false, updatedAt: now });
       }
     }
 
@@ -259,25 +278,6 @@ export class AlexaBridgeService {
       this.deviceStates.set(id, { on: false, updatedAt: Date.now() });
     }, this.actionResetDelayMs);
     this.actionResetTimers.set(id, timer);
-  }
-
-  executeHueCommand(commandRequest) {
-    const commandKey = commandRequest.commandKey;
-    const cooldownKey = commandRequest.offTarget ? `${commandKey}:off` : commandKey;
-    if (!this.shouldExecuteCommand(cooldownKey)) {
-      console.log(`Alexa-Bridge duplicate command ignored: ${cooldownKey}`);
-      return;
-    }
-
-    this.handlers.executeCommand(commandKey, { offTarget: commandRequest.offTarget === true }).catch((error) => {
-      console.warn(`Alexa-Bridge command failed (${commandKey}): ${error.message}`);
-      this.handlers.addEvent?.({
-        type: 'alexa-command',
-        status: 'error',
-        key: commandKey,
-        text: error.message
-      });
-    });
   }
 
   hasInlineOffTarget(commandKey) {
@@ -315,14 +315,6 @@ export class AlexaBridgeService {
 
   getDeviceOnState(id) {
     return Boolean(this.deviceStates.get(id)?.on);
-  }
-
-  shouldExecuteCommand(commandKey) {
-    const now = Date.now();
-    const lastRun = this.lastCommandAt.get(commandKey) || 0;
-    if (now - lastRun < this.commandCooldownMs) return false;
-    this.lastCommandAt.set(commandKey, now);
-    return true;
   }
 
   async startSsdp() {
@@ -577,7 +569,7 @@ export class AlexaBridgeService {
       .filter(([, command]) => command.enabled !== false && command.alexaExpose !== false)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([commandKey, command]) => {
-        const id = makeStableDeviceId(commandKey, usedIds);
+        const id = this.handlers.getDeviceId ? this.handlers.getDeviceId(commandKey) : allocateLegacyDeviceId(commandKey, usedIds);
         return {
           id,
           commandKey,
@@ -585,7 +577,7 @@ export class AlexaBridgeService {
           alexaMode: getAlexaMode(command),
           uniqueId: makeLightUniqueId(bridgeId, id)
         };
-      });
+      }).filter((device) => device.id);
   }
 
   isEnabled() {
@@ -743,20 +735,6 @@ function firstLanAddress() {
   return '127.0.0.1';
 }
 
-function makeStableDeviceId(commandKey, usedIds) {
-  const seed = parseInt(createHash('sha1').update(String(commandKey)).digest('hex').slice(0, 8), 16);
-  const min = 1000;
-  const range = 64000;
-  for (let offset = 0; offset < range; offset += 1) {
-    const id = String(min + ((seed + offset) % range));
-    if (!usedIds.has(id)) {
-      usedIds.add(id);
-      return id;
-    }
-  }
-  return String(min + usedIds.size);
-}
-
 function makeLightUniqueId(bridgeId, deviceId) {
   const suffix = bridgeId.slice(-6).match(/.{1,2}/g) || ['00', '00', '00'];
   const lightPart = Number(deviceId).toString(16).padStart(4, '0').slice(-4).match(/.{1,2}/g) || ['00', '00'];
@@ -798,9 +776,8 @@ export function isSsdpPortInUseError(value) {
   return (
     value?.code === 'EADDRINUSE' ||
     text.includes('eaddrinuse') ||
-    text.includes('udp-port 1900') ||
-    text.includes('bind udp 1900 failed') ||
-    (text.includes('address in use') && text.includes('1900'))
+    (text.includes('ssdp/udp-port 1900') && text.includes('port ist vermutlich')) ||
+    (/address (?:already )?in use/.test(text) && text.includes('1900'))
   );
 }
 

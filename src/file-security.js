@@ -1,7 +1,40 @@
 import { constants } from 'node:fs';
-import { access, chmod, stat } from 'node:fs/promises';
+import { access, chmod, stat, open, rename, rm } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 export const PRIVATE_FILE_MODE = 0o600;
+const pendingWrites = new Map();
+
+export function writePrivateFile(filePath, data, label = 'Datei') {
+  const target = resolve(filePath);
+  const previous = pendingWrites.get(target) || Promise.resolve();
+  const operation = previous.catch(() => {}).then(async () => {
+    const temporary = `${target}.${randomUUID()}.tmp`;
+    let handle;
+    try {
+      handle = await open(temporary, 'wx', PRIVATE_FILE_MODE);
+      await handle.writeFile(data, 'utf8');
+      await handle.sync();
+      await handle.close();
+      handle = null;
+      await rename(temporary, target);
+      await enforcePrivateFileMode(target, label);
+    } finally {
+      await handle?.close().catch(() => {});
+      await rm(temporary, { force: true }).catch(() => {});
+    }
+  });
+  pendingWrites.set(target, operation);
+  operation.finally(() => {
+    if (pendingWrites.get(target) === operation) pendingWrites.delete(target);
+  }).catch(() => {});
+  return operation;
+}
+
+export async function flushPrivateWrites() {
+  await Promise.allSettled([...pendingWrites.values()]);
+}
 
 export function describeFileMode(mode) {
   const normalizedMode = Number(mode) & 0o777;

@@ -2,7 +2,21 @@
 
 Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
-## Unreleased
+## 1.0.29 - 2026-09-13
+
+Stabilitätsstand für `develop`. Prüfstatus, Migration und noch erforderliche Praxisnachweise sind in [Stabilitätsprüfung](docs/stability-validation.md) dokumentiert.
+
+- Konfigurationen, Cookies und Admin-Dateien werden serialisiert und atomar mit privaten Dateirechten geschrieben. Ungültige Konfigurationsstrukturen und doppelte Befehlsschlüssel werden vor dem Speichern abgefangen; eine beschädigte Admin-Datei schaltet den Schutz nicht mehr ab.
+- Formular-Verwerfen, JSON-Speichern und Backup-Import verwenden den übernommenen Datenstand statt alter Kartenwerte. Zusätzliche Befehlsfelder einschließlich `offUuid` bleiben erhalten. Raw-Platzhalter, Nullwerte und unbenutzte Aus-Befehle werden konsistent geprüft.
+- TTS besitzt einen expliziten Lebenszyklus mit begrenzter Initialisierung, vollständigem Abbau alter Remotes, serialisierter Cookie-Persistenz und Generationsschutz. Cookie-basierter Proxy-Abschluss prüft Authentifizierung und Inventar; konkurrierende Auth-Recoverys bleiben begrenzt.
+- Der AlexaRemote-Adapter ist gegen die festgelegte Version `8.1.1` getestet. Veraltete Geräteeinträge werden beim Inventar-Refresh entfernt. Unbekannte Geräte lösen einmal eine Inventarprüfung aus; teilweise oder unbestätigte Ausgaben werden nicht als vollständiger Erfolg gemeldet.
+- Gebündelte Pakete haben Vorrang vor veränderlichen Installationen im Datenordner. Gezielte Overrides für `cookie` 0.7.2 und `qs` 6.16.0 schließen die beim Dependency-Audit gefundenen transitiven Schwachstellen; kein erzwungenes Downgrade von AlexaRemote.
+- Bestehende Alexa-Geräte-IDs werden einmalig mit dem bisherigen Algorithmus übernommen und anschließend in `alexa-device-ids.json` reserviert. Backup-Exporte enthalten diese Zuordnung; kollidierende Importe ersetzen keine bestehenden Geräte.
+- Loxone-Aufrufe haben ein Zeitlimit, senden Zugangsdaten nur an den konfigurierten Ursprung und prüfen auch `LL.Code` in HTTP-200-Antworten. Alexa-Ein/Aus-Folgen werden pro Gerät geordnet und erst nach erfolgreicher Ausführung als Zustand bestätigt.
+- Die Discovery-Hilfe erhält idempotente, serialisierte Suchsessions und behält Wiederherstellungsdaten bei Fehlern. Berechtigungsfehler werden nicht mehr als erwartete Portbelegung behandelt.
+- Diagnose-Routing, Secret-/URL-Bereinigung und Fehlerfilter korrigiert. Der flüchtige RAM-Puffer bleibt auf 300 Ereignisse begrenzt und begrenzt zusätzlich die Einzelgröße. HTTP-Fehler erhalten eine Korrelationskennung.
+- Mobile Überbreiten und Dialogfokus korrigiert; geöffnete Karten bleiben beim Ansichtswechsel erhalten. Suche und Dirty-Prüfung werden verzögert; unabhängige Statusabfragen blockieren den Editor nicht mehr.
+- Node 24, Paket-Lockfile, HTTP-/Browser-/Helper-Tests sowie CI-Builds und Healthchecks für amd64 und arm64 ergänzt. Der passive Langzeittest zeichnet Zustandsänderungen auf, ohne TTS oder Reconnect auszulösen. Container-/ARM- und Amazon-Langzeitnachweise sind vor Freigabe noch erforderlich.
 
 ## 1.0.28 - 2026-08-19
 

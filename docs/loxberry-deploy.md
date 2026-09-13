@@ -1,8 +1,8 @@
 # LoxBerry Docker Deployment
 
-> **Hinweis:** Diese Deployment-Anleitung beschreibt LoxEvo ab Version 1.0.0. Neue Befehle und Live-Zugriffe sollten zuerst bewusst getestet werden.
+> **Stand: 1.0.29 auf develop.** Vor dem ersten Update [Migration und Prüfstatus](stability-validation.md) beachten. Ein erfolgreicher Build ersetzt keinen Test auf dem eigenen LoxBerry.
 
-Diese Anleitung ist für den ersten Test von LoxEvo auf dem LoxBerry gedacht.
+Diese Anleitung beschreibt den kontrollierten Test von LoxEvo auf dem LoxBerry. Neue Installation und Branch-Wechsel sind in [INSTALL.md](../INSTALL.md) beschrieben. `main` wird mit diesem Update nicht verändert.
 
 ## Ziel
 
@@ -27,14 +27,17 @@ In diesem Ordner sollten liegen:
 docker-compose.yml
 Dockerfile
 package.json
+package-lock.json
 data/config.json
 data/Node.txt
+data/alexa-device-ids.json
 src/
 public/
 ```
 
 `data/config.json` enthält deine Loxone- und LoxEvo-Konfiguration.
 `data/Node.txt` ist die Alexa-Cookie-Datei für `alexa-remote2`.
+`data/alexa-device-ids.json` wird aus den bisherigen Zuordnungen erzeugt und muss erhalten bleiben. Eine vorhandene `data/admin-token.json` ebenfalls privat sichern. Das Docker-Image enthält Node 24 und die getestete AlexaRemote-Version `8.1.1`; eine separate Paketinstallation ist nicht nötig.
 LoxEvo akzeptiert sowohl eine reine Cookie-Zeile als auch JSON-Dateien mit `localCookie`. Für stabilen Dauerbetrieb ist die vollständige JSON-CookieData aus dem Amazon-Login-Proxy besser, weil dabei auch `csrf`, `macDms`, `refreshToken` und Registrierungsdaten erhalten bleiben.
 Wenn Amazon eine neue Anmeldung verlangt, zeigt die Web-UI eine lokale Proxy-URL. Diese URL muss die LAN-IP des LoxBerry enthalten. Falls dort `undefined` oder eine falsche IP steht, in der Web-UI unter `Konfiguration -> Alexa TTS` die Proxy-IP eintragen. Nach erfolgreichem Login verbindet LoxEvo automatisch neu; falls das nicht sofort klappt, kann in der TTS-Konfiguration `Alexa TTS neu verbinden` geklickt werden.
 Der komplette Ordner `data/` ist für private lokale Daten gedacht und wird nicht ins GitHub-Repository übernommen.
@@ -86,8 +89,8 @@ Web-UI:
 http://<loxberry-ip>:8080
 ```
 
-Beim ersten Start ist `Dry-Run` aktiv. LoxEvo sendet dann noch keine echten Loxone-Befehle, sondern zeigt die erzeugten URLs im Protokoll.
-Auf der Übersicht kann der Einrichtungsassistent gestartet oder übersprungen werden. Er führt durch Loxone-Zugang, erste Befehle, Betriebsmodus, virtuelle Alexa-Geräte, optionale Gerätesuche, TTS und Backup.
+Bei einer frischen Konfiguration ist `Dry-Run` aktiv. LoxEvo sendet dann noch keine echten Loxone-Befehle; das Protokoll enthält bereinigte Ergebnisse. Die vollständigen konfigurierten Aufrufe stehen unter `Aufrufe & Geräte`. Beim Update bleibt der bisherige Betriebsmodus erhalten.
+Auf der `Statuskontrolle` kann der Einrichtungsassistent gestartet oder übersprungen werden. Er führt durch Loxone-Zugang, erste Befehle, Betriebsmodus, virtuelle Alexa-Geräte, optionale Gerätesuche, TTS und Backup.
 Für virtuelle Alexa-Geräte muss LoxEvo im gleichen Netzwerk wie die Echo-Geräte laufen. Das Docker-Compose-Setup nutzt deshalb `network_mode: host`, damit die lokale Alexa-Gerätesuche über SSDP/UDP 1900 funktioniert.
 Für neuere Echo-Geräte sollte die Alexa-Bridge über Port 80 erreichbar sein. Die normale Web-UI kann auf Port 8080 bleiben; LoxEvo startet dann zusätzlich einen lokalen Alexa/Hue-HTTP-Listener auf Port 80. Falls dieser Port bereits vom LoxBerry-Webserver belegt ist, muss der Portkonflikt vor dem Alexa-Test gelöst werden.
 Eine echte Hue-Bridge ist dafür nicht nötig. LoxEvo stellt nur die lokale Discovery und die Hue-kompatiblen Ein/Aus-Endpunkte bereit, die Alexa zur Gerätesuche und zum Auslösen der konfigurierten Befehle nutzt.
@@ -109,11 +112,19 @@ Der normale Ablauf ist:
 
 So wird der LoxBerry-SSDP-Dienst nur für die eigentliche Suche pausiert.
 
+## Update und Kontrolle
+
+Für den Wechsel auf 1.0.29 den vollständigen Datenordner bei gestopptem Container privat sichern und zunächst mit unverändertem Befehlsbestand starten. Befehle erst nach erfolgreicher ID-Migration ergänzen. Die genauen Git-/Docker-Befehle stehen unter [Updates](../INSTALL.md#updates).
+
+Nach dem Neubau `docker compose ps`, `docker compose logs --tail=80 loxevo` und den Health-Endpunkt prüfen. Danach TTS-Status und Geräteinventar kontrollieren. Die API unterscheidet Authentifizierung, Inventarbereitschaft und Zustellergebnis; `healthy` allein bestätigt keine TTS-Wiedergabe. Normale TTS und Alarm-TTS einmal bewusst testen, anschließend den [passiven 48-Stunden-Beobachter](../README.md#stabilitätsupdate-1029) starten. Bei Fehlern zuerst Protokoll und Inventar sichern, nicht sofort neu starten.
+
+Einen bereits installierten Host-Helper nach dem Beenden der Gerätesuche mit `sudo sh tools/install-discovery-helper.sh` aktualisieren. Er liegt außerhalb des Containers und wird durch einen Image-Neubau nicht ersetzt.
+
 ## Backup und Deinstallation
 
-Vor grösseren Änderungen kann in der Web-UI unter `Wartung` ein Backup exportiert werden. Standardmässig enthält es `data/config.json`; die Alexa-Cookie-Datei `data/Node.txt` wird nur mit exportiert, wenn der Haken dafür gesetzt ist. Der Admin-Passwort-Hash wird nicht im normalen Backup exportiert. Backup-Dateien können sensible Loxone- und Alexa-Daten enthalten und sollten privat bleiben.
+Vor grösseren Änderungen kann in der Web-UI unter `Wartung` ein Backup exportiert werden. Standardmässig enthält es die Konfiguration und die reservierten Alexa-Geräte-IDs; die Alexa-Cookie-Datei `data/Node.txt` wird nur mit exportiert, wenn der Haken dafür gesetzt ist. Der Admin-Passwort-Hash wird nicht im normalen Backup exportiert. Backup-Dateien können sensible Loxone- und Alexa-Daten enthalten und sollten privat bleiben.
 
-Für Fehlersuche kann im gleichen Register ein Diagnosepaket exportiert werden. Es enthält Statusdaten, Systemprüfung, Versionsinformationen und gekürzte letzte Ereignisse. Zugangsdaten, Token und Hostnamen werden dabei nicht im Klartext ausgegeben.
+Für Fehlersuche kann im gleichen Register ein Diagnosebericht exportiert werden. Er enthält Statusdaten, Systemprüfung, Versionsinformationen und bis zu 200 bereinigte Ereignisse. Der direkte Protokollexport enthält bis zu 300 gespeicherte Ereignisse. Beide nutzen den flüchtigen RAM-Puffer, keine Docker-Logs; beim Neustart wird dieser Puffer gelöscht. Zugangsdaten, Token und vollständige URLs werden bereinigt.
 
 Beim Import erstellt LoxEvo zuerst eine Sicherung der aktuellen Konfiguration im Datenordner und spielt danach das Backup ein.
 
@@ -129,7 +140,7 @@ docker compose down
 
 1. In der Web-UI `Dry-Run aktiv` eingeschaltet lassen.
 2. Einen aktiven Befehl testen.
-3. Unter `Befehle & Geräte` die erzeugten Befehls- und TTS-Aufrufe prüfen.
+3. Unter `Aufrufe & Geräte` die erzeugten Befehls- und TTS-Aufrufe prüfen.
 4. Optional unter `Konfiguration -> Alexa-Geräte` die virtuellen Alexa-Geräte aktivieren und speichern.
 5. In der Alexa-App nach neuen Geräten suchen.
 6. TTS-Status kontrollieren und unter `Konfiguration -> TTS-Geräte` die Echo-Geräte aus Alexa laden.
@@ -140,7 +151,7 @@ docker compose down
 
 `alexa-remote2 ist nicht installiert`
 
-In der Web-UI unter `Wartung` eine Version auswählen und installieren. Danach LoxEvo über den Button in der Web-UI oder mit `docker compose restart loxevo` neu starten.
+Version 1.0.29 enthält das Paket bereits. Branch, Commit und Image-Neubau prüfen; keine beliebige andere AlexaRemote-Version installieren. Ohne Docker die Pakete mit `npm ci` aus dem Lockfile installieren.
 
 `Alexa-Cookie konnte nicht gelesen werden`
 

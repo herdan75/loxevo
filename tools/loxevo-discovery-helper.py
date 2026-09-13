@@ -16,6 +16,8 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import tempfile
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -25,11 +27,14 @@ STATE_FILE = Path(os.environ.get("LOXEVO_DISCOVERY_STATE", "/run/loxevo-discover
 BIND = os.environ.get("LOXEVO_DISCOVERY_BIND", "127.0.0.1")
 PORT = int(os.environ.get("LOXEVO_DISCOVERY_PORT", "18091"))
 TOKEN = os.environ.get("LOXEVO_DISCOVERY_TOKEN", "").strip()
+STATE_LOCK = threading.RLock()
 
 
 def run_command(*args: str) -> subprocess.CompletedProcess[str]:
   try:
-    return subprocess.run(args, text=True, capture_output=True, check=False)
+    return subprocess.run(args, text=True, capture_output=True, check=False, timeout=10)
+  except subprocess.TimeoutExpired:
+    return subprocess.CompletedProcess(args, 124, "", "Command timed out")
   except FileNotFoundError as error:
     return subprocess.CompletedProcess(args, 127, "", str(error))
 
@@ -71,13 +76,22 @@ def port_owner() -> str:
 def read_state() -> dict[str, object]:
   try:
     return json.loads(STATE_FILE.read_text(encoding="utf-8"))
-  except (FileNotFoundError, json.JSONDecodeError):
+  except FileNotFoundError:
     return {}
 
 
 def write_state(payload: dict[str, object]) -> None:
   STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-  STATE_FILE.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+  fd, path = tempfile.mkstemp(dir=STATE_FILE.parent, prefix=STATE_FILE.name)
+  try:
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+      handle.write(json.dumps(payload, indent=2) + "\n")
+      handle.flush()
+      os.fsync(handle.fileno())
+    os.replace(path, STATE_FILE)
+  finally:
+    if os.path.exists(path):
+      os.unlink(path)
 
 
 def clear_state() -> None:
@@ -97,8 +111,15 @@ def status_payload() -> dict[str, object]:
 
 
 def start_discovery() -> dict[str, object]:
+  with STATE_LOCK:
+    return _start_discovery()
+
+
+def _start_discovery() -> dict[str, object]:
   active_services = [service["name"] for service in service_status() if service["exists"] and service["active"]]
-  write_state({"previouslyActive": active_services})
+  state = read_state()
+  if "previouslyActive" not in state:
+    write_state({"previouslyActive": active_services})
 
   stopped: list[str] = []
   errors: list[str] = []
@@ -115,14 +136,15 @@ def start_discovery() -> dict[str, object]:
 
 
 def stop_discovery() -> dict[str, object]:
+  with STATE_LOCK:
+    return _stop_discovery()
+
+
+def _stop_discovery() -> dict[str, object]:
   state = read_state()
   previously_active = state.get("previouslyActive")
   if not isinstance(previously_active, list):
-    previously_active = [
-      service["name"]
-      for service in service_status()
-      if service["exists"] and service["enabled"]
-    ]
+    previously_active = []
 
   started: list[str] = []
   errors: list[str] = []
@@ -135,7 +157,8 @@ def stop_discovery() -> dict[str, object]:
     else:
       errors.append(f"{name}: {result.stderr.strip() or result.stdout.strip() or result.returncode}")
 
-  clear_state()
+  if not errors:
+    clear_state()
   payload = status_payload()
   payload.update({"started": started, "errors": errors})
   return payload
@@ -157,10 +180,13 @@ class Handler(BaseHTTPRequestHandler):
   def do_POST(self) -> None:
     if not self.authorized():
       return self.send_json({"error": "unauthorized"}, 401)
-    if self.path == "/start":
-      return self.send_json(start_discovery())
-    if self.path == "/stop":
-      return self.send_json(stop_discovery())
+    try:
+      if self.path == "/start":
+        return self.send_json(start_discovery())
+      if self.path == "/stop":
+        return self.send_json(stop_discovery())
+    except (OSError, ValueError):
+      return self.send_json({"ready": False, "error": "Discovery state could not be read or written."}, 503)
     return self.send_json({"error": "not found"}, 404)
 
   def authorized(self) -> bool:

@@ -1,7 +1,7 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { isCommandType, isValidLoxoneUuid, readCommandTarget } from './command-utils.js';
-import { enforcePrivateFileMode, PRIVATE_FILE_MODE } from './file-security.js';
+import { hasCommandOffTarget, isCommandType, isValidLoxoneUuid, readCommandTarget } from './command-utils.js';
+import { writePrivateFile } from './file-security.js';
 
 const DEFAULT_CONFIG_PATH = './config.json';
 const EXAMPLE_CONFIG_PATH = './config.example.json';
@@ -19,14 +19,49 @@ export async function loadConfig() {
 
 export async function saveConfig(config) {
   const path = process.env.CONFIG_PATH || DEFAULT_CONFIG_PATH;
-  validateConfig(config);
-  normalizeConfig(config);
-  await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
-  await enforcePrivateFileMode(path, 'Konfigurationsdatei');
-  return config;
+  const prepared = prepareConfig(config);
+  await writePrivateFile(path, `${JSON.stringify(prepared, null, 2)}\n`, 'Konfigurationsdatei');
+  return prepared;
 }
 
-function validateConfig(config, options = {}) {
+export function prepareConfig(config) {
+  const next = structuredClone(config);
+  validateConfig(next);
+  normalizeConfig(next);
+  validateConfig(next);
+  return next;
+}
+
+export function validateConfig(config, options = {}) {
+  const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+  if (!object(config)) throw new Error('Konfiguration muss ein Objekt sein.');
+  for (const section of ['server', 'loxone', 'tts', 'alexaBridge', 'discovery', 'bridge']) {
+    if (config[section] !== undefined && !object(config[section])) throw new Error(`${section} muss ein Objekt sein.`);
+  }
+  const httpUrl = (value, name) => {
+    try {
+      if (typeof value !== 'string') throw new Error();
+      const url = new URL(value);
+      if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) throw new Error();
+    } catch { throw new Error(`${name} muss eine gültige HTTP-/HTTPS-URL sein.`); }
+  };
+  httpUrl(config.loxone?.baseUrl, 'loxone.baseUrl');
+  if (config.discovery?.helperUrl) httpUrl(config.discovery.helperUrl, 'discovery.helperUrl');
+  for (const [section, keys] of Object.entries({ tts: ['cookieFile', 'amazonPage', 'alexaServiceHost', 'proxyOwnIp', 'acceptLanguage'], loxone: ['username', 'password'], alexaBridge: ['advertiseIp', 'bridgeId'], discovery: ['helperToken'] })) {
+    for (const key of keys) if (config[section]?.[key] !== undefined && typeof config[section][key] !== 'string') throw new Error(`${section}.${key} muss Text sein.`);
+  }
+  for (const [name, value] of [
+    ['server.port', config.server?.port], ['PORT', process.env.PORT],
+    ['bridge.port', config.bridge?.port], ['alexaBridge.advertisePort', config.alexaBridge?.advertisePort],
+    ['tts.proxyPort', config.tts?.proxyPort]
+  ]) {
+    if (value === undefined || value === '' || (name === 'tts.proxyPort' && Number(value) === 0)) continue;
+    if (!Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > 65535) throw new Error(`${name}: Port muss zwischen 1 und 65535 liegen.`);
+  }
+  for (const key of ['defaultDevices', 'allDevices', 'alarmDevices']) {
+    const value = config.tts?.[key];
+    if (value !== undefined && (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string'))) throw new Error(`tts.${key} muss eine Liste von Gerätekennungen sein.`);
+  }
   const strictCommandValidation = options.strictCommandValidation !== false;
   const reportCommandIssue = (message) => {
     if (strictCommandValidation) {
@@ -44,10 +79,16 @@ function validateConfig(config, options = {}) {
   }
 
   if (config.commands) {
-    if (typeof config.commands !== 'object') {
+    if (!object(config.commands)) {
       throw new Error('commands muss ein Objekt sein.');
     }
+    const keys = new Set();
     for (const [commandName, command] of Object.entries(config.commands)) {
+      const normalizedKey = normalizeConfigCommandKey(commandName);
+      if (!normalizedKey || ['__proto__', 'constructor', 'prototype'].includes(normalizedKey) || keys.has(normalizedKey)) reportCommandIssue(`Befehlsschlüssel "${commandName}" ist ungültig oder doppelt.`);
+      keys.add(normalizedKey);
+      if (!object(command)) throw new Error(`Befehl "${commandName}" muss ein Objekt sein.`);
+      if (command.loxone !== undefined && !object(command.loxone)) throw new Error(`Loxone-Ziel für "${commandName}" muss ein Objekt sein.`);
       if (command.enabled === false) {
         continue;
       }
@@ -62,7 +103,7 @@ function validateConfig(config, options = {}) {
         reportCommandIssue(`Unbekannter Alexa-Modus "${command.alexaMode}" für Befehl "${commandName}".`);
       }
       const offCommand = normalizeConfigCommandKey(command.offCommand);
-      if (offCommand) {
+      if (offCommand && alexaMode !== 'action' && !hasCommandOffTarget(command)) {
         if (offCommand === commandName) {
           reportCommandIssue(`Aus-Befehl "${offCommand}" für Befehl "${commandName}" darf nicht auf sich selbst zeigen.`);
         }
@@ -85,15 +126,16 @@ function validateConfig(config, options = {}) {
       }
 
       if (target.type === 'raw') {
-        if (!target.path) {
+        if (typeof target.path !== 'string' || !target.path.trim()) {
           reportCommandIssue(`Loxone Pfad für Befehl "${commandName}" fehlt.`);
+          continue;
         }
         if (target.path.includes('{uuid}') && !target.uuid) {
           reportCommandIssue(`Loxone UUID für Befehl "${commandName}" fehlt.`);
         } else if (target.path.includes('{uuid}') && target.uuid && !isValidLoxoneUuid(target.uuid)) {
           reportCommandIssue(`Loxone UUID für Befehl "${commandName}" ist ungültig.`);
         }
-        if ((target.path.includes('{value}') || target.path.includes('{command}')) && !target.value) {
+        if ((target.path.includes('{value}') || target.path.includes('{command}')) && String(target.value ?? '').trim() === '') {
           reportCommandIssue(`Loxone Wert für Befehl "${commandName}" fehlt.`);
         }
         continue;
@@ -104,24 +146,25 @@ function validateConfig(config, options = {}) {
       } else if (!isValidLoxoneUuid(target.uuid)) {
         reportCommandIssue(`Loxone UUID für Befehl "${commandName}" ist ungültig.`);
       }
-      if (target.type !== 'pulse' && !target.value) {
+      if (target.type !== 'pulse' && String(target.value ?? '').trim() === '') {
         reportCommandIssue(`Loxone Wert/Befehl für Befehl "${commandName}" fehlt.`);
       }
     }
   }
 
   if (config.rooms) {
-    if (typeof config.rooms !== 'object') {
+    if (!object(config.rooms)) {
       throw new Error('rooms muss ein Objekt sein.');
     }
     for (const [roomName, room] of Object.entries(config.rooms)) {
+      if (!object(room)) throw new Error(`Raum "${roomName}" muss ein Objekt sein.`);
       if (!room.uuid) {
         throw new Error(`UUID für Raum "${roomName}" fehlt.`);
       }
       if (!isValidLoxoneUuid(room.uuid)) {
         throw new Error(`UUID für Raum "${roomName}" ist ungültig.`);
       }
-      if (!room.scenes || typeof room.scenes !== 'object') {
+      if (!object(room.scenes)) {
         throw new Error(`Szenen für Raum "${roomName}" fehlen.`);
       }
     }
@@ -138,8 +181,7 @@ async function readConfigOrCreateDefault(path) {
 
     const example = await readFile(EXAMPLE_CONFIG_PATH, 'utf8');
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, example, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
-    await enforcePrivateFileMode(path, 'Konfigurationsdatei');
+    await writePrivateFile(path, example, 'Konfigurationsdatei');
     console.log(`Keine Konfiguration gefunden. Erstkonfiguration wurde angelegt: ${path}`);
     return example;
   }
@@ -206,6 +248,7 @@ export function normalizeConfig(config) {
       const confirmationText = String(confirmation.text || '').trim();
       if (confirmationEnabled) {
         command.confirmation = {
+          ...confirmation,
           enabled: true,
           text: confirmationText || 'OK'
         };

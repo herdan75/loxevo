@@ -4,11 +4,29 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: Source available](https://img.shields.io/badge/License-source--available-orange.svg)](LICENSE)
 
-> **Status: Version 1.0.28 / getestete lauffähige Version**
+> **Status: Version 1.0.29 / Stabilitätsstand auf develop**
 >
-> LoxEvo ist als lauffähige Docker/LoxBerry-Basis nutzbar. Die Funktionen für Loxone-Befehle, virtuelle Alexa-Geräte, Alexa-Gerätesuche, Alexa-TTS, Rückmeldungen, Backup und Web-UI wurden soweit möglich getestet. Trotzdem können in einzelnen Loxone-/Alexa-Umgebungen noch kleinere Fehler auftreten, deshalb neue Installationen und neue Befehle zuerst bewusst prüfen und Loxone-Kommandos bei Bedarf im Dry-Run testen.
+> Dieser Stand enthält die Stabilitätskorrekturen aus der Programmprüfung. Lokale Backend-, HTTP-, Browser- und Python-Tests sind bestanden. Die Linux-/ARM-CI und der 48-Stunden-Test mit echten Echo-Geräten müssen vor einer Produktionsfreigabe ausgewertet werden. Neue Installationen und Befehle zuerst bewusst prüfen; Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
 Eigene LoxBerry-Zentrale für Alexa, Echo-TTS und Loxone.
+
+### Stabilitätsupdate 1.0.29
+
+Die Änderungen betreffen Datenintegrität, TTS-Lebenszyklus, Geräte-IDs, Diagnose und mobile Bedienung. Umsetzung, Prüfungen und die noch offenen Container-/Langzeittests stehen in [Stabilitätsprüfung](docs/stability-validation.md). Für bestehende Installationen zuerst die [Update- und Migrationshinweise](INSTALL.md#updates) lesen. Dieser Stand wird auf `develop` bereitgestellt; `main` und `pre-develop` werden dabei nicht mitgezogen.
+
+- Der Docker-Build nutzt Node 24 und `npm ci` mit Lockfile. `alexa-remote2` ist mit Version `8.1.1` gebündelt und hat Vorrang vor lokalen Installationen im Datenordner. Diese bleiben unverändert und dienen nur als Fallback in der unterstützten Version. Die Wartung bietet diese Version an; andere Versionen benötigen zuerst entsprechende Vertragstests. Sicherheitskorrekturen für die transitiven Pakete `cookie` und `qs` sind im Lockfile festgelegt.
+- `data/alexa-device-ids.json` gehört zur Installation und zum Backup. Nicht löschen: Die Datei reserviert auch frühere Geräte-IDs. Die erstmalige Migration erhält die Zuordnung des vorhandenen Befehlsbestands; neue Befehle danach anlegen. Befehlsschlüssel nicht zum Umbenennen eines Geräts ändern, sondern Anzeige-/Sprachnamen verwenden.
+- Ein bestätigter TTS-Aufruf bedeutet eine erfolgreiche Amazon-API-Rückmeldung, keinen akustischen Nachweis am Echo. Timeout oder Teilerfolg werden als solche gemeldet. Vor einem Neustart bei Gerätefehlern Status und Inventar sichern.
+- Das Protokoll bleibt flüchtig: maximal 300 Ereignisse, höchstens 8192 JSON-Bytes je Eintrag, bis zu 200 Einträge im Diagnosebericht und 50 zusammengefasste Einträge in der Oberfläche. Es gibt weiterhin keine dauerhafte Ereignisdatei.
+
+Passiver 48-Stunden-Test nach einem kontrollierten Update und manueller Prüfung von normaler TTS sowie Alarm-TTS:
+
+```bash
+cd /mnt/docker/loxevo
+docker compose exec -T loxevo node tools/tts-soak.mjs http://127.0.0.1:8080 48
+```
+
+Das Werkzeug fragt minütlich den Status ab und gibt nur Änderungen aus. Beim ersten Zustand und bei Fehlern erfasst es das bestehende Inventar über `/api/tts/devices?refresh=false`; es erneuert dabei weder Inventar noch Anmeldung und sendet keine Ansage. Gerätekennungen werden für den Vergleich gehasht, Zugangsdaten werden nicht ausgegeben. Es schreibt selbst keine Datei. Der produktive Langzeittest wurde nicht durch lokale Simulation ersetzt.
 
 Die Ziele von LoxEvo:
 
@@ -54,7 +72,7 @@ Loxone
 
 Der aktuelle Stand ist eine Docker-fähige Basis mit HTTP-API, Web-UI, generischen Loxone-Befehlen und integriertem TTS-Modul.
 Loxone-Befehle laufen standardmässig im Dry-Run-Modus, damit lokal gefahrlos getestet werden kann.
-Wenn TTS aktiviert wird, aber `alexa-remote2` oder die Cookie-Datei noch fehlt, startet LoxEvo trotzdem weiter und zeigt den TTS-Status in der Web-UI an.
+Wenn TTS aktiviert wird, aber noch keine gültige Alexa-Anmeldung vorliegt, startet die HTTP-Oberfläche trotzdem weiter und zeigt den TTS-Status in der Web-UI an.
 Optional kann LoxEvo virtuelle Alexa-Geräte im lokalen Netzwerk bereitstellen. Alexa findet diese Geräte über die lokale Gerätesuche; ein Einschaltbefehl wie `Alexa, <Gerätename> an` löst dann den passenden LoxEvo-Befehl aus.
 
 ## Setup
@@ -74,10 +92,10 @@ Web-UI:
 http://<loxberry>:8080
 ```
 
-In `data/config.json` ist `loxone.dryRun` standardmässig `true`. Dann erzeugt LoxEvo nur die URL und zeigt sie im Protokoll, sendet aber noch nichts an Loxone.
+In `data/config.json` ist `loxone.dryRun` standardmässig `true`. Dann erzeugt LoxEvo den Aufruf, sendet aber noch nichts an Loxone. Das Protokoll zeigt einen bereinigten Eintrag; vollständige konfigurierte Aufrufe stehen unter `Aufrufe & Geräte`.
 Der Modus kann auch direkt oben in der Web-UI umgeschaltet werden.
 
-TTS braucht das Paket `alexa-remote2` und eine gültige Alexa-Cookie-Datei. Empfohlen ist `alexa-remote2` ab Version `8.0.4`. Das Paket wird bewusst nicht fest im Docker-Build installiert, damit LoxEvo auch dann startet, wenn npm-Versionen wechseln. Installiere oder aktualisiere es in der Web-UI unter `Wartung`; im Docker/LoxBerry-Betrieb landet es im gemounteten `/config`-Bereich.
+TTS braucht eine gültige Alexa-Anmeldung. Das getestete Paket `alexa-remote2@8.1.1` ist bereits im Docker-Image enthalten; eine Erstinstallation über die Web-UI ist nicht nötig. Ohne Docker wird Node 24 mit `npm ci` und dem mitgelieferten Lockfile verwendet. Andere AlexaRemote-Versionen werden nicht automatisch aktiviert.
 Als Cookie-Datei kann eine reine Cookie-Zeile oder eine JSON-Datei mit `localCookie` verwendet werden. Für stabilen Dauerbetrieb ist die vollständige JSON-CookieData aus dem Amazon-Login-Proxy besser. Bei JSON-Dateien übergibt LoxEvo die gespeicherte CookieData-Struktur vollständig an `alexa-remote2`, nutzt Felder wie `csrf`, `macDms`, `refreshToken` und `deviceSerial`, falls vorhanden, und speichert echte Cookie-Updates wieder in die Datei. TTS nutzt standardmässig keine Alexa-PushConnection und führt stattdessen einen eigenen geplanten Auth-Refresh aus. Bei einem Alexa-Auth-Fehler versucht LoxEvo zuerst einen Refresh der bestehenden Verbindung, aktualisiert dabei auch die internen AlexaRemote-Cookie- und Header-Daten und wiederholt den TTS-Befehl. Wenn danach weiterhin `401 Unauthorized` kommt, erneuert LoxEvo die gespeicherten Cookie-Daten nochmals, baut ausdrücklich eine neue `AlexaRemote`-Instanz auf und ersetzt die alte Verbindung erst nach erfolgreicher Initialisierung. Danach wird der TTS-Befehl ein letztes Mal wiederholt.
 Wenn Amazon trotzdem eine neue Anmeldung verlangt, nutzt `alexa-remote2` einen lokalen Login-Proxy. LoxEvo setzt dafür automatisch die LAN-IP des LoxBerry; bei Bedarf kann `tts.proxyOwnIp` und `tts.proxyPort` in der Web-UI angepasst werden. Nach erfolgreichem Amazon-Login verbindet sich LoxEvo automatisch neu; dabei kann die laufende Proxy-Session auch dann abgeschlossen werden, wenn `alexa-remote2` keinen finalen Callback liefert, aber neue CookieData auf derselben Proxy-Verbindung bereitstellt. Falls das nicht sofort klappt, kann in der TTS-Konfiguration der Button `Alexa TTS neu verbinden` genutzt werden.
 Normale TTS-Ausgaben verwenden zuerst `defaultDevices`, danach `allDevices` und zuletzt `alarmDevices`. Dadurch funktionieren normale Meldungen auch dann weiter, wenn keine Standardgeräte gepflegt sind, aber andere Alexa-Gerätelisten vorhanden sind.
@@ -87,8 +105,8 @@ Die Web-UI startet mit einer kompakten `Statuskontrolle`. Dort sieht man auf ein
 Offene Punkte wie Fehler, Prüfbedarf oder optionale Empfehlungen werden zuerst angezeigt. Ein Klick auf eine Statuszeile öffnet direkt den passenden Konfigurations- oder Wartungsbereich; der Info-Button erklärt den jeweiligen Status.
 Auf der Statuskontrolle steht ausserdem ein überspringbarer Einrichtungsassistent bereit. Er führt Schritt für Schritt durch Loxone-Zugang, erste Befehle, Dry-Run/Live-Modus, virtuelle Alexa-Geräte, optionale Gerätesuche, TTS und Backup. Der Assistent ändert nichts automatisch; Aktionen wie `Gerätesuche aktivieren` müssen bewusst geklickt werden.
 Unter `Wartung` gibt es zusätzlich eine lokale Systemprüfung für Konfiguration, Loxone-Zugang, TTS, virtuelle Alexa-Geräte, Gerätesuche und Backup. Diese Prüfung läuft beim Öffnen des Registers oder per Button und erzeugt keine dauernde Hintergrundlast. Bereiche mit Fehlern oder Hinweisen werden aufgeklappt, reine OK-/Info-Bereiche bleiben kompakt.
-Im gleichen Register zeigt LoxEvo die installierte `alexa-remote2`-Version und verfügbare npm-Versionen und kann Installation oder Update im laufenden Container anstossen. Nach einem Paketupdate ist ein Neustart von LoxEvo erforderlich.
-Im gleichen Register können die Einstellungen als Backup exportiert und später wieder importiert werden. Der Export enthält standardmässig die LoxEvo-Konfiguration; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden. LoxEvo merkt sich serverseitig den letzten Backup-Stand und empfiehlt ein neues Backup, wenn backup-relevante Einstellungen geändert wurden.
+Im gleichen Register zeigt LoxEvo die verwendete `alexa-remote2`-Version. Die Paketauswahl ist auf die getestete Version `8.1.1` beschränkt. Eine Wartungsinstallation im Datenordner ersetzt das gebündelte Paket nicht; sie ist nur ein kompatibler Fallback. Versionswechsel des gebündelten Pakets erfolgen mit einem geprüften LoxEvo-Update und neuem Image-Build.
+Im gleichen Register können die Einstellungen als Backup exportiert und später wieder importiert werden. Der Export enthält standardmässig die LoxEvo-Konfiguration und die reservierten Alexa-Geräte-IDs; die Alexa-Cookie-Datei kann bei Bedarf bewusst mit exportiert werden. LoxEvo merkt sich serverseitig den letzten Backup-Stand und empfiehlt ein neues Backup, wenn backup-relevante Einstellungen geändert wurden.
 Zusätzlich kann dort ein Diagnosepaket exportiert werden. Es enthält Health-Status, Systemprüfung, Versionsinformationen, eine zusammengefasste Konfiguration und die letzten Ereignisse. Zugangsdaten, Admin-Passwort, Token und Hostnamen werden dabei nicht im Klartext ausgegeben.
 Backup-Dateien können sensible Daten wie Loxone-Zugangsdaten, UUIDs und optional Amazon-Cookies enthalten und sollten deshalb privat bleiben.
 
@@ -96,6 +114,8 @@ Private Daten gehören in `data/`:
 
 - `data/config.json`
 - `data/Node.txt`
+- `data/alexa-device-ids.json`
+- `data/admin-token.json`, wenn der Admin-Schutz über die Web-UI aktiviert wurde
 
 Dieser Ordner ist absichtlich von Git ausgenommen, damit keine Loxone-Zugangsdaten, UUIDs oder Alexa-Geräte-IDs veröffentlicht werden.
 Alle privaten Werte werden nach der Installation über die Web-UI oder direkt in `data/config.json` gepflegt.
@@ -117,7 +137,7 @@ Optional kann in der Web-UI unter `Wartung` ein Admin-Passwort für sensible Ber
 
 Wenn das Admin-Passwort gesetzt ist, verlangt LoxEvo für Konfiguration, Backup/Restore, Neustart, `alexa-remote2`-Update, TTS-Neuverbindung, Dry-Run-Umschaltung und Alexa-Gerätesuche-Start/Stopp technisch den Header `X-LoxEvo-Admin-Token`. Die Web-UI fragt das Admin-Passwort bei Bedarf ab und merkt es nur für die aktuelle Browser-Sitzung. Alexa-/Hue-Bridge, Loxone-Befehle, normale TTS-Endpunkte, Health, Protokoll, Einrichtung und Systemprüfung bleiben offen, damit bestehende Alexa- und Loxone-Aufrufe nicht brechen.
 
-Das über die Web-UI gesetzte Admin-Passwort wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab. Der normale Backup-Export enthält diesen Hash nicht. Alternativ kann der Schutz weiterhin per Docker-Umgebung `LOXEVO_ADMIN_TOKEN` gesetzt werden; dieser Wert hat Vorrang und wird ausserhalb der Web-UI verwaltet.
+Das über die Web-UI gesetzte Admin-Passwort wird nicht im Klartext gespeichert. LoxEvo legt nur einen Hash im Datenordner ab. Der normale Backup-Export enthält diesen Hash nicht. Eine beschädigte oder unlesbare Schutzdatei schaltet den Schutz nicht ab: Geschützte Aktionen bleiben gesperrt, bis die Datei lokal wiederhergestellt oder `LOXEVO_ADMIN_TOKEN` gesetzt wird. Dieser Umgebungswert hat Vorrang und wird ausserhalb der Web-UI verwaltet.
 
 Die Web-UI ist der empfohlene Konfigurationsweg. Aktuell können dort gepflegt werden:
 
@@ -144,18 +164,18 @@ Empfohlener Ablauf für neue Installationen:
 1. LoxEvo starten und die Web-UI öffnen.
 2. Loxone-Zugang eintragen und `Dry-Run aktiv` eingeschaltet lassen.
 3. Erste Befehle in `Konfiguration -> Befehle und Sprachnamen` anlegen.
-4. Unter `Testen` prüfen, ob die erzeugten Loxone-URLs stimmen.
+4. Unter `Aufrufe & Geräte` die Loxone-Aufrufe prüfen und unter `Testen` im Dry-Run ausführen.
 5. Erst danach den Live-Modus aktivieren.
 6. Optional TTS und virtuelle Alexa-Geräte einrichten. Wenn neue Alexa-Geräte gesucht werden sollen und SSDP/UDP 1900 belegt ist, kann der Assistent zur temporären Gerätesuche führen: Gerätesuche aktivieren, in der Alexa-App suchen, danach die Gerätesuche wieder beenden.
 
 ## Backup und Deinstallation
 
-Backups werden in der Web-UI unter `Wartung` erstellt. Der normale Export enthält `config.json` mit Loxone-, Alexa-Bridge-, Befehls- und TTS-Einstellungen. Die Alexa-Cookie-Datei `Node.txt` wird nur exportiert, wenn der entsprechende Haken gesetzt ist, weil diese Datei Zugriffsdaten für das Amazon-Konto enthalten kann. Der Admin-Passwort-Hash wird nicht im normalen Backup exportiert. Backup-Dateien enthalten private Installationsdaten und sollten nicht veröffentlicht werden.
+Backups werden in der Web-UI unter `Wartung` erstellt. Der normale Export enthält `config.json` mit Loxone-, Alexa-Bridge-, Befehls- und TTS-Einstellungen sowie `alexaDeviceIds` mit den reservierten Gerätezuordnungen. Alte Backups ohne diesen Block bleiben importierbar; kollidierende IDs werden nicht über bestehende Zuordnungen geschrieben. Die Alexa-Cookie-Datei `Node.txt` wird nur exportiert, wenn der entsprechende Haken gesetzt ist, weil diese Datei Zugriffsdaten für das Amazon-Konto enthalten kann. Der Admin-Passwort-Hash wird nicht im normalen Backup exportiert. Backup-Dateien enthalten private Installationsdaten und sollten nicht veröffentlicht werden.
 
 Nach einem Export schreibt LoxEvo im Datenordner zusätzlich einen kleinen Backup-Status. Darin wird kein Klartext-Passwort gespeichert, sondern ein Hash der backup-relevanten Einstellungen. Als backup-relevant gelten Loxone-Zugang, Befehle, Räume, Alexa-Bridge, Gerätesuche, TTS-Einstellungen, Geräteauswahl, Lautstärken und Server-Einstellungen. Reine Betriebszustände wie Dry-Run/Live-Modus werden bewusst ignoriert. Die Statuskontrolle zeigt dadurch an, ob seit dem letzten Export ein neues Backup empfohlen ist und welche Bereiche betroffen sind.
 
 Beim Import legt LoxEvo zuerst eine Sicherung der aktuellen Konfiguration im lokalen Datenordner an und schreibt danach die importierte Konfiguration. Wenn im Backup ein Cookie enthalten ist, wird es ebenfalls in den konfigurierten Cookie-Pfad geschrieben.
-Installierte npm-Pakete wie `alexa-remote2` werden nicht in die Backup-Datei aufgenommen. Wenn der komplette Ordner `data/` erhalten bleibt, bleiben sie lokal vorhanden; nach einer frischen Wiederherstellung können sie im Register `Wartung` erneut installiert werden.
+Installierte npm-Pakete werden nicht in die Backup-Datei aufgenommen. Das getestete AlexaRemote-Paket kommt aus dem Docker-Image beziehungsweise aus `npm ci`; nach einer frischen Wiederherstellung ist dafür keine Wartungsinstallation nötig. Vorhandene Zusatzinstallationen im Ordner `data/` bleiben unverändert.
 
 Eine normale Deinstallation entfernt den Container:
 
@@ -163,7 +183,7 @@ Eine normale Deinstallation entfernt den Container:
 docker compose down
 ```
 
-Damit bleiben `data/config.json`, `data/Node.txt` und lokal installierte Wartungspakete bewusst erhalten. Für eine vollständige Entfernung danach den Projektordner `/mnt/docker/loxevo` löschen und bei Bedarf das lokale Image `loxevo:local` sowie ungenutzten Docker-Build-Cache entfernen.
+Damit bleiben der vollständige Ordner `data/`, die Geräte-ID-Zuordnungen, die Admin-Datei und lokal installierte Wartungspakete bewusst erhalten. Für eine vollständige Entfernung danach den Projektordner `/mnt/docker/loxevo` nur nach privater Sicherung löschen und bei Bedarf das lokale Image `loxevo:local` sowie ungenutzten Docker-Build-Cache entfernen.
 
 Wenn der optionale Discovery-Helper installiert wurde, kann er so entfernt werden:
 

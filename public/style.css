@@ -1495,10 +1495,10 @@ input[type='range'] {
 
 .form-row.command-alexa-grid {
   grid-template-columns:
-    minmax(180px, 1fr)
-    minmax(240px, 1.3fr)
-    minmax(180px, 0.9fr)
-    minmax(240px, 1.2fr);
+    minmax(0, 1fr)
+    minmax(0, 1.3fr)
+    minmax(0, 0.9fr)
+    minmax(0, 1.2fr);
   align-items: start;
 }
 
@@ -2283,6 +2283,10 @@ pre {
 }
 
 @media (max-width: 1100px) {
+  .command-tools { position: static; }
+  .form-row.command-alexa-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .command-tools {
     grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px);
   }
@@ -2301,6 +2305,16 @@ pre {
 }
 
 @media (max-width: 760px) {
+  .room-card-head { grid-template-columns: auto minmax(0, 1fr); gap: 6px; padding: 8px; }
+  .room-card-head > button { grid-column: 2; justify-self: end; }
+  .command-summary-titleline { flex-wrap: wrap; gap: 3px; }
+  .command-summary-titleline strong, .command-summary-key { white-space: normal; overflow-wrap: anywhere; }
+  .command-tools { position: static; }
+  .section-head, .actions { flex-wrap: wrap; }
+  .form-row > *, .view, .panel, .card, label { min-width: 0; }
+  input, select, textarea, button { max-width: 100%; }
+  button, .dashboard-status-title, .dashboard-status-detail { overflow-wrap: anywhere; }
+  .bridge-id-row, .event-debug-row { grid-template-columns: minmax(0, 1fr); }
   header {
     align-items: flex-start;
     flex-direction: column;

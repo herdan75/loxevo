@@ -1,13 +1,14 @@
-import { readFile, stat, writeFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { enforcePrivateFileMode, PRIVATE_FILE_MODE } from './file-security.js';
+import { writePrivateFile } from './file-security.js';
+import { redactDiagnosticText } from './diagnostics.js';
+import { stopRemote, refreshRemoteInventory, verifyRemoteAuthentication, TESTED_ALEXA_REMOTE_VERSION } from './alexa-remote-adapter.js';
 
 const appRequire = createRequire(import.meta.url);
 const COMMAND_TIMEOUT_MS = 5000;
 const NATIVE_SEQUENCE_TIMEOUT_MS = 8000;
-const NATIVE_FIRE_AND_FORGET_MS = 100;
 const MEDIA_VOLUME_TIMEOUT_MS = 1200;
 const DEFAULT_AUTH_REFRESH_HOURS = 24;
 const DEFAULT_LOGIN_RECONNECT_INTERVAL_SECONDS = 10;
@@ -24,7 +25,7 @@ const AUTH_STATE = Object.freeze({
 
 export class TtsService {
   constructor(config, handlers = {}) {
-    this.rootConfig = config || {};
+    this.rootConfig = structuredClone(config || {});
     this.config = this.rootConfig.tts || {};
     this.handlers = handlers || {};
     this.AlexaRemote = null;
@@ -51,9 +52,56 @@ export class TtsService {
     this.initSequence = 0;
     this.authRefreshTimer = null;
     this.authRefreshPromise = null;
+    this.disposed = false;
+    this.cookieListeners = new Map();
+    this.retiredRemotes = new WeakSet();
+    this.cookieWriteQueue = Promise.resolve();
+    this.cookieState = null;
+    this.initCancellations = new Set();
+    this.existingRefreshPromise = null;
+    this.inventoryRefreshPromise = null;
+    this.inventoryReady = null;
+    this.lastDeviceError = null;
+    this.lastDelivery = null;
+    this.activeForceCandidate = false;
+    this.remoteGenerations = new WeakMap();
+    this.cookieOwnerGeneration = 0;
+    if (this.config.cookieFile && !/^(?:[a-z]:[\\/]|\/)/i.test(this.config.cookieFile)) {
+      this.config = { ...this.config, cookieFile: resolve(dirname(process.env.CONFIG_PATH || './config.json'), this.config.cookieFile) };
+    }
+  }
+
+  async dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.ready = false;
+    this.initSequence++;
+    this.stopAuthRefreshTimer();
+    this.stopLoginProxyReconnectTimer();
+    for (const cancel of this.initCancellations) cancel();
+    const remotes = new Set([...this.cookieListeners.keys(), this.remote, this.loginProxyRemote, this.loginProxySession?.remote]);
+    for (const remote of remotes) if (remote) await this.disposeRemote(remote);
+    await this.cookieWriteQueue.catch(() => {});
+    this.loginProxySession = null;
+    this.loginProxyActive = false;
+  }
+
+  requiresRestart(nextConfig) {
+    const authSettings = (root) => {
+      const settings = { ...root.tts };
+      for (const key of ['defaultDevices', 'allDevices', 'alarmDevices', 'defaultVolume', 'alarmVolume', 'ignoreZeroText']) delete settings[key];
+      return JSON.stringify({ settings, ownIp: root.alexaBridge?.advertiseIp });
+    };
+    return authSettings(this.rootConfig) !== authSettings(nextConfig);
+  }
+
+  configure(nextConfig) {
+    this.rootConfig = structuredClone(nextConfig);
+    this.config = { ...nextConfig.tts, cookieFile: this.config.cookieFile };
   }
 
   async init() {
+    if (this.disposed) return;
     if (!this.config.enabled) {
       this.authState = AUTH_STATE.DISABLED;
       console.log('TTS ist deaktiviert. Setze tts.enabled=true, wenn Alexa sprechen soll.');
@@ -82,11 +130,16 @@ export class TtsService {
     }
 
     auth = await this.refreshStoredAuthBeforeInitialInit(auth);
+    if (this.disposed) return;
     await this.initAlexaRemoteAtStartup(AlexaRemote, auth);
   }
 
   async readAlexaCookieAuth() {
-    return parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
+    try { return parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8')); }
+    catch (error) {
+      if (error.code === 'ENOENT') return { cookie: '', isJson: false, originalData: null, cookieData: null };
+      throw error;
+    }
   }
 
   shouldAttemptStartupCookieRefresh(auth) {
@@ -234,6 +287,8 @@ export class TtsService {
   }
 
   async initializeRemoteCandidate(remote, auth, options = {}) {
+    if (this.disposed) return { ok: false, error: new Error('TTS wurde beendet.') };
+    this.remoteGenerations.set(remote, options.sequence || this.initSequence);
     return await new Promise((resolve) => {
       let initialResolved = false;
       let proxyPromptSeen = false;
@@ -241,6 +296,8 @@ export class TtsService {
       const finishInitial = (result) => {
         if (initialResolved) return;
         initialResolved = true;
+        clearTimeout(timer);
+        this.initCancellations.delete(cancel);
         resolve(result);
       };
       const finishFinal = (result) => {
@@ -255,7 +312,15 @@ export class TtsService {
         finishInitial(result);
       };
 
-      remote.init(this.buildInitOptions(auth), (error) => {
+      const cancel = () => { finalHandled = true; finishInitial({ ok: false, error: new Error('TTS-Initialisierung abgebrochen.') }); };
+      const timer = setTimeout(() => {
+        finalHandled = true;
+        finishInitial({ ok: false, error: new Error('Alexa-Initialisierung dauert zu lange.') });
+        this.disposeRemote(remote).catch(() => {});
+      }, this.handlers.initTimeoutMs || 20000);
+      this.initCancellations.add(cancel);
+      const callback = (error) => {
+        if (this.disposed || this.retiredRemotes.has(remote) || finalHandled) return;
         if (error) {
           if (isProxyLoginPrompt(error)) {
             proxyPromptSeen = true;
@@ -278,17 +343,27 @@ export class TtsService {
         }
 
         finishFinal({ ok: true });
-      });
+      };
+      try { remote.init(this.buildInitOptions(auth), callback); }
+      catch (error) { finishFinal({ ok: false, error }); }
     });
   }
 
   async commitRemoteCandidate(remote, auth) {
+    if (this.disposed || this.retiredRemotes.has(remote)) return false;
+    const generation = this.remoteGenerations.get(remote);
+    if (generation !== undefined && generation !== this.initSequence) {
+      await this.disposeRemote(remote);
+      return false;
+    }
     const previousRemote = this.remote;
     const previousLoginProxyRemote = this.loginProxyRemote;
     const shouldDisposePrevious = previousRemote && previousRemote !== remote;
 
     this.remote = remote;
     this.auth = auth;
+    this.inventoryReady = remote.serialNumbers ? Object.keys(remote.serialNumbers).length > 0 : null;
+    this.lastDeviceError = this.inventoryReady === false ? 'Alexa-Geräteinventar ist noch nicht bereit.' : null;
     this.ready = true;
     this.authState = AUTH_STATE.READY;
     this.lastError = null;
@@ -306,22 +381,20 @@ export class TtsService {
     const sequenceMode = this.hasNativeSequenceSupport() ? 'native Sequenzen' : 'sendSequenceCommand-Fallback';
     console.log(`TTS ist mit alexa-remote2 verbunden (${sequenceMode}).`);
     this.emitAuthEvent('ready', 'Alexa TTS ist bereit.');
-    this.persistCookie(undefined, undefined, undefined, remote, auth).catch((persistError) => {
+    await this.persistCookie(undefined, undefined, undefined, remote, auth).catch((persistError) => {
       console.warn(`Alexa-Cookie konnte nicht gespeichert werden: ${persistError.message}`);
     });
+    return true;
   }
 
   buildInitOptions(auth) {
     const storedCookieData = auth?.cookieData || auth?.remoteCookie;
-    // LoxEvo nutzt bewusst einen eigenen Auth-Refresh-Timer statt eine
-    // alexa-remote2-spezifische Refresh-Option zu erzwingen. So bleibt das
-    // Verhalten über verschiedene alexa-remote2-Versionen nachvollziehbar.
-    // Eine PushConnection ist für reine TTS-Ausgabe nicht nötig und bleibt
-    // deshalb standardmässig aus.
+    // LoxEvo owns refresh scheduling; verified against AlexaRemote 8.1.1.
     const options = {
       cookie: storedCookieData || auth?.cookie,
       csrf: auth?.csrf,
       cookieJustCreated: !storedCookieData,
+      cookieRefreshInterval: 0,
       amazonPage: this.config.amazonPage || auth?.amazonPage || storedCookieData?.amazonPage || 'amazon.de',
       alexaServiceHost: this.config.alexaServiceHost || 'layla.amazon.de',
       acceptLanguage: this.config.acceptLanguage || defaultAcceptLanguage(this.config.amazonPage || auth?.amazonPage || storedCookieData?.amazonPage),
@@ -351,20 +424,30 @@ export class TtsService {
     if (remote === this.remote) {
       this.auth = auth;
     }
-    if (!remote || typeof remote.on !== 'function') return;
+    if (this.disposed || !remote || typeof remote.on !== 'function' || this.cookieListeners.has(remote)) return;
 
-    remote.on('cookie', (cookie, csrf, macDms) => {
+    const listener = (cookie, csrf, macDms) => {
       this.persistCookie(cookie, csrf, macDms, remote, auth).catch((error) => {
         console.warn(`Alexa-Cookie konnte nicht gespeichert werden: ${error.message}`);
       });
-    });
+    };
+    this.cookieListeners.set(remote, listener);
+    remote.on('cookie', listener);
   }
 
-  async persistCookie(cookie, csrf, macDms, sourceRemote = this.remote, sourceAuth = this.auth) {
-    if (!this.config.cookieFile) return false;
+  persistCookie(cookie, csrf, macDms, sourceRemote = this.remote, sourceAuth = this.auth) {
+    const operation = this.cookieWriteQueue.catch(() => {}).then(() => this.persistCookieNow(cookie, csrf, macDms, sourceRemote, sourceAuth));
+    this.cookieWriteQueue = operation;
+    return operation;
+  }
 
-    const cookieData = isPlainObject(sourceRemote?.cookieData) ? sourceRemote.cookieData : {};
-    const sourceData = isPlainObject(sourceAuth?.originalData) ? sourceAuth.originalData : {};
+  async persistCookieNow(cookie, csrf, macDms, sourceRemote, sourceAuth) {
+    if (this.disposed || (sourceRemote && this.retiredRemotes.has(sourceRemote)) || !this.config.cookieFile) return false;
+    const generation = this.remoteGenerations.get(sourceRemote) || 0;
+    if (generation < this.cookieOwnerGeneration) return false;
+
+    const cookieData = Object.fromEntries(Object.entries(isPlainObject(sourceRemote?.cookieData) ? sourceRemote.cookieData : {}).filter(([, value]) => value !== undefined && value !== null && value !== ''));
+    const sourceData = { ...(isPlainObject(sourceAuth?.originalData) ? sourceAuth.originalData : {}), ...(this.cookieState || this.auth?.originalData || {}) };
     const hasRemoteCookieData = Object.keys(cookieData).length > 0;
     const hasCookieEventData = Boolean(
       firstNonEmptyString(cookie, csrf) ||
@@ -384,9 +467,7 @@ export class TtsService {
     if (!localCookie) return false;
 
     const nextCsrf = firstNonEmptyString(cookieData.csrf, csrf, sourceData.csrf);
-    const previousCookie = firstNonEmptyString(sourceData.localCookie, sourceData.cookie, sourceData.loginCookie);
-    const cookieChanged = Boolean(previousCookie && localCookie !== previousCookie);
-    const nextTokenDate = cookieData.tokenDate || sourceData.tokenDate || (hasCookieEventData || cookieChanged ? Date.now() : undefined);
+    const nextTokenDate = cookieData.tokenDate || sourceData.tokenDate;
     const nextData = {
       ...sourceData,
       ...cookieData,
@@ -405,11 +486,15 @@ export class TtsService {
       delete nextData.macDms;
     }
 
-    if (isSameJsonData(sourceData, nextData)) return false;
+    if (isSameJsonData(sourceData, nextData)) {
+      if (sourceRemote === this.remote) this.auth = parseAlexaCookieFile(JSON.stringify(nextData));
+      return false;
+    }
 
-    await writeFile(this.config.cookieFile, `${JSON.stringify(nextData, null, 2)}\n`, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
-    await enforcePrivateFileMode(this.config.cookieFile, 'Alexa-Cookie-Datei');
-    if (sourceRemote === this.remote || sourceAuth === this.auth) {
+    await writePrivateFile(this.config.cookieFile, `${JSON.stringify(nextData, null, 2)}\n`, 'Alexa-Cookie-Datei');
+    this.cookieState = nextData;
+    this.cookieOwnerGeneration = generation;
+    if (sourceRemote === this.remote) {
       this.auth = parseAlexaCookieFile(JSON.stringify(nextData));
     }
     this.lastCookiePersistAt = new Date().toISOString();
@@ -528,6 +613,7 @@ export class TtsService {
       fetchFn(`https://alexa.${amazonPage}/spa/index.html`, {
         method: 'GET',
         redirect: 'manual',
+        signal: AbortSignal.timeout(COOKIE_REFRESH_TIMEOUT_MS),
         headers: {
           Cookie: localCookie,
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -540,6 +626,8 @@ export class TtsService {
     );
     const status = Number(response?.status || 0);
     const allowedRedirect = [301, 302, 303, 307, 308].includes(status);
+    const location = response?.headers?.get?.('location') || '';
+    if (allowedRedirect && /(?:signin|sign-in|login|authportal)/i.test(location)) throw new Error('Amazon-Login erforderlich.');
     if (status >= 400 || (!response?.ok && !allowedRedirect)) {
       throw new Error(`Alexa-SPA-Cookie-Refresh fehlgeschlagen (${status || 'unbekannt'}).`);
     }
@@ -553,16 +641,18 @@ export class TtsService {
     return normalizeRefreshedCookieData(cookieData, {
       localCookie: mergedCookie,
       csrf,
-      tokenDate: Date.now()
+      tokenDate: cookieData.tokenDate
     });
   }
 
   async applyRefreshedCookieData(refreshedData) {
+    if (this.disposed) return false;
     const data = normalizeRefreshedCookieData(this.getStoredCookieData(), refreshedData);
-    const persisted = await this.persistCookie(data.localCookie, data.csrf, data.macDms, { cookieData: data }, this.auth);
-    if (!persisted && this.auth) {
-      this.auth = parseAlexaCookieFile(JSON.stringify(data));
-    }
+    const source = { cookieData: data };
+    this.remoteGenerations.set(source, this.remoteGenerations.get(this.remote) ?? this.initSequence);
+    await this.persistCookie(data.localCookie, data.csrf, data.macDms, source, this.auth);
+    if (this.disposed) return false;
+    this.auth = parseAlexaCookieFile(JSON.stringify(data));
     await this.applyCookieDataToRemote(data);
     this.lastAuthRefreshAt = new Date().toISOString();
     this.lastAuthError = null;
@@ -654,6 +744,9 @@ export class TtsService {
   }
 
   markUnavailable(message, error) {
+    for (const remote of new Set([this.remote, this.loginProxyRemote, this.loginProxySession?.remote])) {
+      if (remote) this.disposeRemote(remote).catch(() => {});
+    }
     this.ready = false;
     this.authState = AUTH_STATE.ERROR;
     this.remote = null;
@@ -755,6 +848,7 @@ export class TtsService {
   }
 
   startAuthRefreshTimer() {
+    if (this.disposed) return;
     this.stopAuthRefreshTimer();
     if (!this.config.enabled || !this.ready) return;
     const intervalMs = numberInRange(
@@ -781,6 +875,7 @@ export class TtsService {
   }
 
   startLoginProxyReconnectTimer() {
+    if (this.disposed) return;
     this.stopLoginProxyReconnectTimer();
     if (!this.loginProxyActive || this.config.loginProxyAutoReconnect === false || !this.config.cookieFile) return;
     const intervalMs = numberInRange(
@@ -897,14 +992,11 @@ export class TtsService {
 
       if (hasNewRemoteCookieData) {
         const persisted = await this.persistCookie(undefined, undefined, undefined, session.remote, session.auth);
-        if (persisted && this.config.cookieFile) {
+        if (this.config.cookieFile) {
           auth = parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
-          this.loginProxyLastHandledCookieMtimeMs = await this.getCookieFileMtimeMs() || Date.now();
         }
-        this.loginProxyRemoteCookieFingerprint = cookieDataFingerprint(remoteCookieData);
         canCommitSessionRemote = persisted || hasReusableAuthData(auth);
       } else if (cookieFileChanged) {
-        this.loginProxyLastHandledCookieMtimeMs = await this.getCookieFileMtimeMs() || Date.now();
         if (this.config.cookieFile) {
           auth = parseAlexaCookieFile(await readFile(this.config.cookieFile, 'utf8'));
         }
@@ -915,11 +1007,14 @@ export class TtsService {
         return false;
       }
 
-      await this.commitRemoteCandidate(session.remote, auth);
+      await verifyRemoteAuthentication(session.remote);
+      await refreshRemoteInventory(session.remote);
+      if (this.disposed || this.loginProxySession !== session) return false;
+      if (!await this.commitRemoteCandidate(session.remote, auth)) return false;
       this.lastAuthRefreshAt = new Date().toISOString();
       this.lastAuthError = null;
-      this.emitAuthEvent('wait-proxy-success', 'Amazon-Login wurde ueber Cookie-Daten abgeschlossen.');
-      this.emitAuthEvent('candidate-committed', 'Neue Alexa-TTS-Verbindung wurde uebernommen.');
+      this.emitAuthEvent('wait-proxy-success', 'Amazon-Login wurde über Cookie-Daten abgeschlossen.');
+      this.emitAuthEvent('candidate-committed', 'Neue Alexa-TTS-Verbindung wurde übernommen.');
       return true;
     } catch (error) {
       this.lastAuthError = summarizeAuthError(error);
@@ -962,8 +1057,8 @@ export class TtsService {
     const previousTokenDateMs = cookieDataTimeMs(sourceData.tokenDate);
     const loginStartedAt = Date.parse(this.loginProxyStartedAt || '');
 
-    const cookieChanged = Boolean(localCookie && previousCookie && localCookie !== previousCookie);
-    const csrfChanged = Boolean(csrf && previousCsrf && csrf !== previousCsrf);
+    const cookieChanged = Boolean(localCookie && localCookie !== previousCookie);
+    const csrfChanged = Boolean(csrf && csrf !== previousCsrf);
     const tokenDateIsFresh = Number.isFinite(tokenDateMs) &&
       Number.isFinite(loginStartedAt) &&
       tokenDateMs > loginStartedAt &&
@@ -1055,8 +1150,13 @@ export class TtsService {
   getStatus() {
     return {
       enabled: Boolean(this.config.enabled),
-      ready: this.ready,
-      error: this.lastError,
+      ready: this.ready && this.inventoryReady !== false,
+      authReady: this.ready,
+      inventoryReady: this.inventoryReady,
+      inventoryCount: Object.keys(this.remote?.serialNumbers || {}).length,
+      error: this.lastError || this.lastDeviceError,
+      lastDelivery: this.lastDelivery,
+      testedAlexaRemoteVersion: TESTED_ALEXA_REMOTE_VERSION,
       defaultDevices: configuredDeviceList(this.config.defaultDevices),
       allDevices: configuredDeviceList(this.config.allDevices),
       alarmDevices: configuredDeviceList(this.config.alarmDevices),
@@ -1200,36 +1300,29 @@ export class TtsService {
 
   async disposeRemote(remote = this.remote) {
     if (!remote) return;
-    const cleanupMethods = ['stopProxyServer', 'stopProxy', 'close', 'disconnect', 'stop'];
-    for (const method of cleanupMethods) {
-      if (typeof remote[method] !== 'function') continue;
-      try {
-        await remote[method]();
-      } catch (error) {
-        console.warn(`AlexaRemote Cleanup (${method}) ist fehlgeschlagen: ${error.message}`);
-      }
-      return;
-    }
-    // alexa-remote2 bietet je nach Version keine dokumentierte Cleanup-Methode
-    // für den Login-Proxy an. In diesem Fall wird die alte Instanz ersetzt; der
-    // interne Proxy endet normalerweise durch alexa-remote2 selbst.
+    if (this.retiredRemotes.has(remote)) return;
+    this.retiredRemotes.add(remote);
+    const listener = this.cookieListeners.get(remote);
+    if (listener) remote.removeListener?.('cookie', listener);
+    this.cookieListeners.delete(remote);
+    await stopRemote(remote);
   }
 
   async speak(text, devices = this.getDefaultSpeakDevices()) {
     this.assertReady();
     const targets = this.normalizeDevices(devices);
     this.assertDevices(targets);
-    await this.sendSequenceToTargets('speak', text, targets);
+    return await this.sendSequenceToTargets('speak', text, targets);
   }
 
   async alarm(text, devices = firstNonEmpty(this.config.alarmDevices, this.config.allDevices, this.config.defaultDevices), volume = this.config.alarmVolume) {
     this.assertReady();
-    await this.speakAtVolume(text, normalizeVolume(volume, 100), devices);
+    return await this.speakAtVolume(text, normalizeVolume(volume, 100), devices);
   }
 
   async speakAtVolume(text, volume, devices = this.getDefaultSpeakDevices()) {
     this.assertReady();
-    await this.sendSequence('speakAtVolume', text, devices, normalizeVolume(volume, 40));
+    return await this.sendSequence('speakAtVolume', text, devices, normalizeVolume(volume, this.config.defaultVolume ?? 40));
   }
 
   async setVolume(volume, devices = firstNonEmpty(this.config.allDevices, this.config.defaultDevices)) {
@@ -1241,49 +1334,52 @@ export class TtsService {
 
     const targets = this.normalizeDevices(devices);
     this.assertDevices(targets);
-    await this.sendCommandToTargets('volume', value, targets);
+    return await this.sendCommandToTargets('volume', value, targets);
   }
 
-  async getDeviceInventory() {
+  async getDeviceInventory({ refresh = true } = {}) {
+    if (!refresh) return normalizeDeviceList(serialNumberMapToDevices(this.remote?.serialNumbers));
     this.assertReady();
-    const devices = await this.readRemoteDevices();
-    return normalizeDeviceList(devices);
+    await this.refreshDeviceInventory();
+    return normalizeDeviceList(serialNumberMapToDevices(this.remote?.serialNumbers));
   }
 
-  async readRemoteDevices() {
-    if (typeof this.remote?.getDevices !== 'function') {
-      return serialNumberMapToDevices(this.remote?.serialNumbers);
-    }
-
-    return await new Promise((resolve, reject) => {
-      let settled = false;
-      const finish = (error, devices) => {
-        if (settled) return;
-        settled = true;
-        if (error) reject(error);
-        else resolve(devices || []);
-      };
-      const finishFromCallback = (error, devices) => {
-        if (devices === undefined && (Array.isArray(error) || isPlainObject(error))) {
-          finish(null, error);
-          return;
-        }
-        finish(error, devices);
-      };
-
+  async refreshDeviceInventory() {
+    if (this.inventoryRefreshPromise) return this.inventoryRefreshPromise;
+    const remote = this.remote;
+    this.inventoryRefreshPromise = (async () => {
       try {
-        const result = this.remote.getDevices((error, devices) => finishFromCallback(error, devices));
-        if (Array.isArray(result)) finish(null, result);
-        else if (isPlainObject(result)) finish(null, result);
-        else if (result && typeof result.then === 'function') {
-          result.then((devices) => finish(null, devices)).catch((error) => finish(error));
-        }
+        await refreshRemoteInventory(remote);
+        if (this.disposed || remote !== this.remote) throw new Error('Alexa-Verbindung wurde zwischenzeitlich ersetzt.');
+        this.inventoryReady = true;
+        this.lastDeviceError = null;
       } catch (error) {
-        finish(error);
-      }
+        this.inventoryReady = false;
+        this.lastDeviceError = 'Alexa-Geräteinventar konnte nicht bestätigt werden.';
+        throw error;
+      } finally { this.inventoryRefreshPromise = null; }
+    })();
+    return this.inventoryRefreshPromise;
+  }
 
-      setTimeout(() => finish(null, serialNumberMapToDevices(this.remote?.serialNumbers)), 5000);
-    });
+  async withDeviceRecovery(action) {
+    if (this.inventoryRefreshPromise) await this.inventoryRefreshPromise;
+    try { return await action(); }
+    catch (error) {
+      if (!isUnknownDeviceError(error)) throw error;
+      this.inventoryReady = false;
+      this.lastDeviceError = 'Ein konfiguriertes Alexa-Gerät ist nicht im aktuellen Inventar.';
+      this.emitAuthEvent('device-inventory-refresh', this.lastDeviceError);
+      await this.refreshDeviceInventory();
+      try { return await action(); }
+      catch (retryError) {
+        if (isUnknownDeviceError(retryError)) {
+          this.inventoryReady = false;
+          this.lastDeviceError = 'Ein konfiguriertes Alexa-Gerät fehlt auch nach Aktualisierung.';
+        }
+        throw retryError;
+      }
+    }
   }
 
   async sendSequence(type, text, devices, volume) {
@@ -1292,32 +1388,40 @@ export class TtsService {
     }
     const targets = this.normalizeDevices(devices);
     this.assertDevices(targets);
-    await this.sendSequenceToTargets(type, text, targets, volume);
+    return await this.sendSequenceToTargets(type, text, targets, volume);
   }
 
   async sendSequenceToTargets(type, text, targets, volume) {
-    return await this.withAuthRetry(`tts-${type}`, async () => this.sendSequenceToTargetsOnce(type, text, targets, volume));
+    try { return await this.sendSequenceToTargetsOnce(type, text, targets, volume); }
+    catch (error) {
+      if (!error.delivery) this.recordDelivery(targets.map((device) => ({ device, ok: false, unconfirmed: error.code === 'TTS_TIMEOUT', error: summarizeAuthError(error) })), type);
+      throw error;
+    }
   }
 
   async sendSequenceToTargetsOnce(type, text, targets, volume) {
     if (!text || typeof text !== 'string') {
       throw new Error('TTS braucht einen Text im Request-Body.');
     }
-    if (await this.tryNativeSequence(type, text, targets, volume)) {
-      return;
+    if (await this.withDeviceRecovery(() => this.withAuthRetry(`tts-${type}`, () => this.tryNativeSequence(type, text, targets, volume)))) {
+      return this.recordDelivery(targets.map((device) => ({ device, ok: true })), type);
     }
-    await this.runForTargets(targets, (device) => this.exec(device, type, text, volume), type);
+    return await this.runForTargets(targets, (device) => this.withDeviceRecovery(() => this.withAuthRetry(`tts-${type}`, () => this.exec(device, type, text, volume))), type);
   }
 
   async sendCommandToTargets(type, value, targets) {
-    return await this.withAuthRetry(`tts-${type}`, async () => this.sendCommandToTargetsOnce(type, value, targets));
+    try { return await this.sendCommandToTargetsOnce(type, value, targets); }
+    catch (error) {
+      if (!error.delivery) this.recordDelivery(targets.map((device) => ({ device, ok: false, unconfirmed: error.code === 'TTS_TIMEOUT', error: summarizeAuthError(error) })), type);
+      throw error;
+    }
   }
 
   async sendCommandToTargetsOnce(type, value, targets) {
-    if (await this.tryNativeCommand(type, value, targets)) {
-      return;
+    if (await this.withDeviceRecovery(() => this.withAuthRetry(`tts-${type}`, () => this.tryNativeCommand(type, value, targets)))) {
+      return this.recordDelivery(targets.map((device) => ({ device, ok: true })), type);
     }
-    await this.runForTargets(targets, (device) => this.exec(device, type, value), type);
+    return await this.runForTargets(targets, (device) => this.withDeviceRecovery(() => this.withAuthRetry(`tts-${type}`, () => this.exec(device, type, value))), type);
   }
 
   async withAuthRetry(reason, action) {
@@ -1341,6 +1445,13 @@ export class TtsService {
   }
 
   async refreshExistingRemoteAuth(reason = 'auth-error', error = null) {
+    if (this.disposed) return false;
+    if (this.existingRefreshPromise) return this.existingRefreshPromise;
+    this.existingRefreshPromise = this.refreshExistingRemoteAuthInternal(reason, error).finally(() => { this.existingRefreshPromise = null; });
+    return this.existingRefreshPromise;
+  }
+
+  async refreshExistingRemoteAuthInternal(reason = 'auth-error', error = null) {
     if (!this.ready || !this.remote) return false;
     const method = ['refreshAlexaCookies', 'refreshCookie'].find((name) => typeof this.remote?.[name] === 'function');
 
@@ -1384,14 +1495,23 @@ export class TtsService {
   }
 
   async refreshAuth(reason = 'auth-error', error = null, options = {}) {
-    if (this.authRefreshPromise) return await this.authRefreshPromise;
+    if (this.disposed) throw new Error('TTS wurde beendet.');
+    while (this.authRefreshPromise) {
+      const alreadyForced = this.activeForceCandidate;
+      try { await this.authRefreshPromise; }
+      catch (refreshError) { if (!options.forceCandidate || alreadyForced) throw refreshError; }
+      if (!options.forceCandidate || alreadyForced) return;
+    }
+    this.activeForceCandidate = options.forceCandidate === true;
     this.authRefreshPromise = this.refreshAuthInternal(reason, error, options).finally(() => {
       this.authRefreshPromise = null;
+      this.activeForceCandidate = false;
     });
     return await this.authRefreshPromise;
   }
 
   async refreshAuthInternal(reason, error, options = {}) {
+    if (this.disposed) throw new Error('TTS wurde beendet.');
     const previousReady = this.ready && this.remote;
     const forceCandidate = options.forceCandidate === true;
     if (reason === 'scheduled-refresh') {
@@ -1492,7 +1612,7 @@ export class TtsService {
   }
 
   emitAuthEvent(status, text) {
-    if (typeof this.handlers.addEvent !== 'function') return;
+    if (this.disposed || typeof this.handlers.addEvent !== 'function') return;
     this.handlers.addEvent({
       type: 'tts-auth',
       status,
@@ -1505,25 +1625,26 @@ export class TtsService {
       try {
         const result = await runner(device);
         if (result?.timedOut) {
-          console.warn(`TTS ${type}: keine Rueckmeldung von ${device} nach ${COMMAND_TIMEOUT_MS} ms.`);
+          throw Object.assign(new Error('Ausführung unbestätigt.'), { code: 'TTS_TIMEOUT' });
         }
         return { device, ok: true };
       } catch (error) {
-        return { device, ok: false, error };
+        return { device, ok: false, unconfirmed: error.code === 'TTS_TIMEOUT', error: summarizeAuthError(error) || 'Alexa-Ausgabe fehlgeschlagen.' };
       }
     }));
-    const failures = results
-      .filter((result) => !result.ok)
-      .map((result) => `${result.device}: ${result.error.message}`);
-    if (failures.length === targets.length) {
-      throw new Error(`Alexa-Befehl "${type}" konnte an kein Geraet gesendet werden. ${failures.join(' | ')}`);
-    }
-    if (failures.length) {
-      console.warn(`TTS ${type}: einzelne Geräte fehlgeschlagen: ${failures.join(' | ')}`);
-    }
+    return this.recordDelivery(results, type);
+  }
+
+  recordDelivery(results, type) {
+    const failed = results.filter((result) => !result.ok);
+    const status = !failed.length ? 'sent' : failed.length < results.length ? 'partial' : failed.some((result) => result.unconfirmed) ? 'unconfirmed' : 'error';
+    this.lastDelivery = { at: new Date().toISOString(), type, status, requested: results.length, confirmed: results.length - failed.length, failed: failed.length };
+    if (failed.length) throw Object.assign(new Error(`Alexa-Ausgabe ${status === 'partial' ? 'nur teilweise bestätigt' : status === 'unconfirmed' ? 'unbestätigt' : 'fehlgeschlagen'} (${results.length - failed.length}/${results.length} Geräte).`), { code: 'TTS_DELIVERY', delivery: { ...this.lastDelivery, targets: results } });
+    return { ...this.lastDelivery, targets: results };
   }
 
   async tryNativeSequence(type, text, targets, volume) {
+    if (!this.hasNativeSequenceSupport() || (!this.remote?.serialNumbers && typeof this.remote?.find !== 'function')) return false;
     try {
       const devices = this.resolveNativeDevices(targets);
       if (!devices.length) return false;
@@ -1543,13 +1664,13 @@ export class TtsService {
 
       return false;
     } catch (error) {
-      console.warn(`TTS ${type}: native Alexa-Sequenz nicht moeglich, nutze Fallback. ${error.message}`);
-      return false;
+      throw error;
     }
   }
 
   async tryNativeCommand(type, value, targets) {
     if (type !== 'volume') return false;
+    if (!this.hasNativeSequenceSupport() || (!this.remote?.serialNumbers && typeof this.remote?.find !== 'function')) return false;
 
     try {
       const devices = this.resolveNativeDevices(targets);
@@ -1561,8 +1682,7 @@ export class TtsService {
       await this.sendNativeSequence(this.parallelNode(devices.map((device) => this.volumeNode(volume, device))), sender);
       return true;
     } catch (error) {
-      console.warn(`TTS ${type}: native Alexa-Sequenz nicht moeglich, nutze Fallback. ${error.message}`);
-      return false;
+      throw error;
     }
   }
 
@@ -1608,11 +1728,9 @@ export class TtsService {
 
     const result = await withTimeout(new Promise((resolve, reject) => {
       let settled = false;
-      let fireAndForgetTimer = null;
       const finish = (error, response) => {
         if (settled) return;
         settled = true;
-        if (fireAndForgetTimer) clearTimeout(fireAndForgetTimer);
         if (error) reject(error);
         else resolve(response);
       };
@@ -1621,15 +1739,11 @@ export class TtsService {
         const response = sender(sequenceNode, finish);
         if (response && typeof response.then === 'function') {
           response.then((payload) => finish(null, payload)).catch((error) => finish(error));
-        } else if (response !== undefined) {
-          finish(null, response);
-        } else {
-          fireAndForgetTimer = setTimeout(() => finish(null, { fireAndForget: true }), NATIVE_FIRE_AND_FORGET_MS);
         }
       } catch (error) {
         finish(error);
       }
-    }), NATIVE_SEQUENCE_TIMEOUT_MS, 'Keine Antwort von der nativen Alexa-Sequenz.');
+    }), this.handlers.commandTimeoutMs || NATIVE_SEQUENCE_TIMEOUT_MS, 'Keine Antwort von der nativen Alexa-Sequenz; Ausführung unbestätigt.');
 
     if (isPlainObject(result) && typeof result.message === 'string' && result.message) {
       throw new Error(result.message);
@@ -1672,9 +1786,12 @@ export class TtsService {
     const devices = [];
     const seen = new Set();
     for (const target of targets) {
-      for (const device of this.expandNativeDevice(target)) {
+      const expanded = this.expandNativeDevice(target);
+      if (!expanded.length) throw Object.assign(new Error('Unknown Device or Serial number'), { code: 'UNKNOWN_DEVICE' });
+      for (const device of expanded) {
         const native = this.toNativeDevice(device, target);
-        if (!native || seen.has(native.serialNumber)) continue;
+        if (!native) throw Object.assign(new Error('Alexa-Gerätedaten sind unvollständig.'), { code: 'UNKNOWN_DEVICE' });
+        if (seen.has(native.serialNumber)) continue;
         seen.add(native.serialNumber);
         devices.push(native);
       }
@@ -1684,7 +1801,7 @@ export class TtsService {
 
   expandNativeDevice(target, depth = 1) {
     const device = this.findNativeDevice(target);
-    if (!device) return [];
+    if (!device) throw Object.assign(new Error('Unknown Device or Serial number'), { code: 'UNKNOWN_DEVICE' });
     const members = Array.isArray(device.clusterMembers) ? device.clusterMembers : [];
     if (members.length && depth > 0) {
       return members.flatMap((member) => this.expandNativeDevice(member, depth - 1));
@@ -1788,12 +1905,12 @@ export class TtsService {
         if (error) reject(error);
         else resolve(result);
       };
-      const timer = setTimeout(() => finish(null, { timedOut: true }), COMMAND_TIMEOUT_MS);
+      const timer = setTimeout(() => finish(Object.assign(new Error('Alexa-Rückmeldung ausgeblieben; Ausführung unbestätigt.'), { code: 'TTS_TIMEOUT' })), this.handlers.commandTimeoutMs || COMMAND_TIMEOUT_MS);
       const callback = (error) => finish(error);
 
       try {
         if (type === 'speakAtVolume') {
-          this.remote.sendSequenceCommand(device, 'speakAtVolume', value, volume, callback);
+          finish(new Error('Lautstärke-Sequenz benötigt vollständige Alexa-Gerätedaten. Bitte Geräte aktualisieren.'));
           return;
         }
 
@@ -1805,6 +1922,7 @@ export class TtsService {
   }
 
   assertReady() {
+    if (this.disposed) throw new Error('TTS wurde beendet.');
     if (!this.config.enabled) {
       throw new Error('TTS ist in config.json deaktiviert.');
     }
@@ -1830,14 +1948,15 @@ export class TtsService {
 
 function loadAlexaRemote2() {
   const requires = [
-    createRequire(join(getDependencyInstallDir(), 'package.json')),
-    appRequire
+    appRequire,
+    createRequire(join(getDependencyInstallDir(), 'package.json'))
   ];
 
   let lastError;
   for (const requireFn of requires) {
     try {
       const module = requireFn('alexa-remote2');
+      if (requireFn('alexa-remote2/package.json').version !== TESTED_ALEXA_REMOTE_VERSION) continue;
       return module.default || module;
     } catch (error) {
       lastError = error;
@@ -1848,13 +1967,15 @@ function loadAlexaRemote2() {
 
 function loadAlexaCookie2() {
   const requires = [
-    createRequire(join(getDependencyInstallDir(), 'package.json')),
-    appRequire
+    appRequire,
+    createRequire(join(getDependencyInstallDir(), 'package.json'))
   ];
 
   for (const requireFn of requires) {
     try {
-      const module = requireFn('alexa-cookie2');
+      if (requireFn('alexa-remote2/package.json').version !== TESTED_ALEXA_REMOTE_VERSION) continue;
+      const remoteRequire = createRequire(requireFn.resolve('alexa-remote2'));
+      const module = remoteRequire('alexa-cookie2');
       return module.default || module;
     } catch {
       // Optional dependency path; fall through to the next resolver.
@@ -1995,7 +2116,7 @@ function firstNonEmptyString(...values) {
 }
 
 function normalizeRefreshedCookieData(previousData = {}, refreshedData = {}) {
-  const refreshed = isPlainObject(refreshedData) ? refreshedData : {};
+  const refreshed = Object.fromEntries(Object.entries(isPlainObject(refreshedData) ? refreshedData : {}).filter(([, value]) => value !== undefined && value !== null && value !== ''));
   const data = {
     ...(isPlainObject(previousData) ? previousData : {}),
     ...refreshed
@@ -2023,7 +2144,7 @@ function normalizeRefreshedCookieData(previousData = {}, refreshedData = {}) {
     data.macDms = macDmsValue;
   }
   data.dataVersion = data.dataVersion || 2;
-  data.tokenDate = refreshed.tokenDate || Date.now();
+  if (refreshed.tokenDate || previousData.tokenDate) data.tokenDate = refreshed.tokenDate || previousData.tokenDate;
   return data;
 }
 
@@ -2110,6 +2231,7 @@ export function parseAlexaCookieFile(content) {
   }
 
   if (!raw.startsWith('{')) {
+    if (/^[<[]/.test(raw) || /[\r\n]/.test(raw)) throw new Error('Cookie-Datei enthält keine gültigen Cookie-Daten.');
     return {
       cookie: raw,
       isJson: false,
@@ -2118,9 +2240,11 @@ export function parseAlexaCookieFile(content) {
     };
   }
 
-  const parsed = JSON.parse(raw);
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch { throw new Error('Cookie-Datei enthält ungültiges JSON.'); }
   const cookie = parsed.localCookie || parsed.cookie || parsed.loginCookie;
-  if (!cookie || typeof cookie !== 'string') {
+  if (typeof cookie !== 'string' || !cookie.trim() || /[\r\n]/.test(cookie) || cookie.trim().startsWith('<')) {
     throw new Error('Cookie-Datei ist JSON, enthaelt aber keinen localCookie oder loginCookie.');
   }
 
@@ -2145,28 +2269,7 @@ export function parseAlexaCookieFile(content) {
 
 function buildFormerRegistrationData(parsed) {
   if (!isPlainObject(parsed)) return undefined;
-  const keys = [
-    'localCookie',
-    'loginCookie',
-    'frc',
-    'map-md',
-    'deviceId',
-    'deviceSerial',
-    'refreshToken',
-    'tokenDate',
-    'amazonPage',
-    'csrf',
-    'deviceAppName',
-    'dataVersion',
-    'macDms'
-  ];
-  const data = {};
-  for (const key of keys) {
-    if (parsed[key] !== undefined) {
-      data[key] = parsed[key];
-    }
-  }
-  return Object.keys(data).length ? data : undefined;
+  return structuredClone(parsed);
 }
 
 function defaultAcceptLanguage(amazonPage) {
@@ -2218,7 +2321,7 @@ function isAuthError(error) {
 function summarizeAuthError(error) {
   if (!error) return null;
   const code = error?.statusCode || error?.status || error?.code || '';
-  const message = String(error?.message || error || '').replace(/https?:\/\/\S+/g, '[login-url]');
+  const message = redactDiagnosticText(String(error?.message || error || '').replace(/https?:\/\/\S+/g, '[login-url]'));
   return [code, message].filter(Boolean).join(' ');
 }
 
@@ -2309,7 +2412,7 @@ function callMaybeCallback(target, method, ...args) {
 
 function withTimeout(promise, timeoutMs, message) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    const timer = setTimeout(() => reject(Object.assign(new Error(message), { code: 'TTS_TIMEOUT' })), timeoutMs);
     Promise.resolve(promise)
       .then((value) => {
         clearTimeout(timer);
@@ -2323,7 +2426,11 @@ function withTimeout(promise, timeoutMs, message) {
 }
 
 function isPlainObject(value) {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+  return Boolean(value && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null));
+}
+
+export function isUnknownDeviceError(error) {
+  return error?.code === 'UNKNOWN_DEVICE' || /unknown device|unknown.*serial number/i.test(String(error?.message || error || ''));
 }
 
 function firstLanAddress() {

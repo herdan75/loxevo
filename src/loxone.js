@@ -70,7 +70,7 @@ export class LoxoneClient {
     }
 
     const command = room.scenes?.[sceneName];
-    if (!command) {
+    if (command === undefined || command === null || command === '') {
       throw new Error(`Unbekannte Szene "${sceneName}" für Raum "${roomName}".`);
     }
 
@@ -96,17 +96,19 @@ export class LoxoneClient {
       return { dryRun: true, ...entry, url, response: 'dry-run' };
     }
 
-    if (this.username || this.password) {
+    if (new URL(url).origin === new URL(this.baseUrl).origin && (this.username || this.password)) {
       const token = Buffer.from(`${this.username}:${this.password}`).toString('base64');
       headers.authorization = `Basic ${token}`;
     }
 
-    const response = await fetch(url, { method: 'GET', headers });
+    const response = await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(10000), redirect: 'error' });
     const text = await response.text();
 
     if (!response.ok) {
-      throw new Error(`Loxone HTTP ${response.status}: ${text}`);
+      throw new Error(`Loxone HTTP ${response.status}.`);
     }
+
+    assertLoxoneResponse(text);
 
     return { ...entry, url, response: text };
   }
@@ -129,7 +131,7 @@ export class LoxoneClient {
       return `/jdev/sps/io/${encodeURIComponent(uuid)}/pulse`;
     }
 
-    if (!entry.command) {
+    if (String(entry.command ?? '').trim() === '') {
       throw new Error(`Loxone Befehl fehlt für "${entry.label}".`);
     }
 
@@ -153,6 +155,17 @@ export class LoxoneClient {
   }
 }
 
+export function assertLoxoneResponse(text) {
+  let code;
+  try {
+    const payload = JSON.parse(text);
+    code = payload?.LL?.Code ?? payload?.LL?.code;
+  } catch {
+    code = String(text).match(/<LL\b[^>]*\bCode\s*=\s*["'](\d+)["']/i)?.[1];
+  }
+  if (code !== undefined && Number(code) >= 400) throw new Error(`Loxone Antwortcode ${Number(code)}.`);
+}
+
 function resolveCommandType(command) {
   const rawType = command.loxone?.type || command.loxoneType || command.type;
   if (rawType) {
@@ -168,6 +181,6 @@ function applyPathTemplate(path, entry) {
   const uuid = normalizeLoxoneUuid(entry.uuid);
   return String(path)
     .replaceAll('{uuid}', encodeURIComponent(uuid || ''))
-    .replaceAll('{value}', encodeURIComponent(entry.command || ''))
-    .replaceAll('{command}', encodeURIComponent(entry.command || ''));
+    .replaceAll('{value}', encodeURIComponent(entry.command ?? ''))
+    .replaceAll('{command}', encodeURIComponent(entry.command ?? ''));
 }

@@ -2,24 +2,34 @@ import http from 'node:http';
 import { constants } from 'node:fs';
 import { access, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig, saveConfig } from './config.js';
+import { loadConfig, prepareConfig, saveConfig } from './config.js';
 import { AlexaBridgeService, isSsdpPortInUseError } from './alexa-bridge.js';
 import { isCommandType, readCommandTarget } from './command-utils.js';
 import { DiscoveryControl } from './discovery-control.js';
 import { LoxoneClient } from './loxone.js';
 import { TtsService, parseAlexaCookieFile } from './tts.js';
-import { enforcePrivateFileMode, inspectFilePermissions, PRIVATE_FILE_MODE } from './file-security.js';
+import { inspectFilePermissions, writePrivateFile, flushPrivateWrites } from './file-security.js';
+import { redactUrl, redactDiagnosticText, sanitizeDiagnosticValue } from './diagnostics.js';
+import { DeviceIdRegistry } from './device-ids.js';
+import { appendEvent, MAX_EVENTS, MAX_DIAGNOSTIC_EVENTS } from './event-buffer.js';
+import { TESTED_ALEXA_REMOTE_VERSION } from './alexa-remote-adapter.js';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const publicDir = join(rootDir, 'public');
 const require = createRequire(import.meta.url);
+const deriveAdminKey = promisify(scrypt);
+let activeAdminChecks = 0;
+const adminAttempts = new Map();
 let dependencyUpdate = null;
 
 let config = await loadConfig();
+const deviceIds = new DeviceIdRegistry(join(dirname(resolve(process.env.CONFIG_PATH || './config.json')), 'alexa-device-ids.json'));
+await deviceIds.load(config.commands).catch((error) => { console.warn(error.message); });
 let loxone = new LoxoneClient(config);
 let tts = createTtsService();
 let alexaBridge = createAlexaBridge();
@@ -27,15 +37,13 @@ let discoveryControl = new DiscoveryControl(config);
 let bridgeHttpServer = null;
 let bridgeHttpStatus = { enabled: false, ready: false, error: null, port: null };
 const events = [];
-const MAX_EVENTS = 300;
-const MAX_DIAGNOSTIC_EVENTS = 200;
-const dedupedEventTimes = new Map();
 const oncePerProcessEventKeys = new Set();
 const startedAt = new Date();
 const MAX_REQUEST_BODY_SIZE = 1024 * 1024 * 2;
-const OPTIONAL_DISCOVERY_EVENT_DEDUPE_MS = 30 * 60 * 1000;
 const ENV_ADMIN_TOKEN = String(process.env.LOXEVO_ADMIN_TOKEN || '').trim();
 let adminSecurity = await loadAdminSecurity();
+let configUpdateQueue = Promise.resolve();
+let shuttingDown = false;
 const LOXONE_TTS_RESERVED_PATHS = new Set([
   'admin',
   'api',
@@ -48,17 +56,73 @@ const LOXONE_TTS_RESERVED_PATHS = new Set([
   'tts'
 ]);
 
-await initTts();
-await initAlexaBridge();
-await restartBridgeHttpServer();
-
 const server = http.createServer((req, res) => handleRequest(req, res, { bridgeOnly: false }));
 
 server.listen(config.server.port, '0.0.0.0', () => {
   console.log(`${config.server.name} lauscht auf Port ${config.server.port}`);
 });
+const startupServices = (async () => {
+  await initAlexaBridge();
+  await restartBridgeHttpServer();
+  await initTts();
+})().catch((error) => addEvent({ type: 'system', status: 'error', text: redactDiagnosticText(error.message) }));
+process.once('SIGTERM', () => shutdown());
+process.once('SIGINT', () => shutdown());
+
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const deadline = setTimeout(() => process.exit(1), 8000);
+  deadline.unref();
+  server.close();
+  server.closeIdleConnections();
+  await tts.dispose();
+  await alexaBridge.stop();
+  await stopBridgeHttpServer();
+  await flushPrivateWrites();
+  server.closeAllConnections();
+  clearTimeout(deadline);
+  process.exit(0);
+}
+
+function updateConfiguration(operation) {
+  const next = configUpdateQueue.catch(() => {}).then(operation);
+  configUpdateQueue = next;
+  return next;
+}
+
+async function applyConfiguration(input, { reloadTts = false } = {}) {
+  const next = prepareConfig(input);
+  const client = new LoxoneClient(next);
+  const discovery = new DiscoveryControl(next);
+  await deviceIds.sync(next.commands);
+  const previous = config;
+  await startupServices;
+  await alexaBridge.drainCommands();
+  const saved = await saveConfig(next);
+  config = saved;
+  loxone = client;
+  discoveryControl = discovery;
+  if (reloadTts || tts.disposed || tts.requiresRestart(config)) {
+    await tts.dispose();
+    tts = createTtsService();
+    await initTts();
+  } else {
+    tts.configure(config);
+  }
+  if (JSON.stringify(previous.alexaBridge) !== JSON.stringify(config.alexaBridge)) {
+    await restartAlexaBridge();
+    await restartBridgeHttpServer();
+  } else {
+    alexaBridge.config = config;
+  }
+  addEvent({ type: 'config', status: 'updated', text: 'Konfiguration gespeichert.' });
+  return { ok: true, config, restartRequired: Number(config.server.port) !== Number(server.address()?.port) };
+}
 
 async function handleRequest(req, res, { bridgeOnly = false } = {}) {
+  const requestId = randomUUID();
+  const requestStartedAt = Date.now();
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const pathParts = url.pathname.split('/').filter(Boolean);
@@ -130,13 +194,17 @@ async function handleRequest(req, res, { bridgeOnly = false } = {}) {
 
     sendJson(res, { error: 'not found' }, 404);
   } catch (error) {
-    console.error(error);
-    sendJson(res, { error: error.message }, 500);
+    const text = redactDiagnosticText(error.message || 'Anfrage fehlgeschlagen.');
+    const resource = String(req.url || '').split(/[/?]/)[1];
+    const type = error.delivery || resource === 'tts' ? 'tts-request' : ['command', 'light'].includes(resource) ? 'loxone-request' : 'system';
+    addEvent({ type, status: error.delivery?.status || 'error', text, requestId, durationMs: Date.now() - requestStartedAt });
+    console.warn(`Anfrage fehlgeschlagen (${requestId}): ${text}`);
+    if (!res.headersSent) sendJson(res, { ok: false, error: text, requestId, delivery: sanitizeDiagnosticValue(error.delivery) }, 500);
   }
 }
 
 async function handleApi(req, res, pathParts, readRequestBody, url) {
-  if (requiresAdminToken(req, pathParts) && !isAdminAuthorized(req)) {
+  if (requiresAdminToken(req, pathParts) && !await isAdminAuthorized(req)) {
     return sendJson(res, {
       ok: false,
       code: 'admin_token_required',
@@ -191,7 +259,7 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
   }
 
   if (req.method === 'GET' && pathParts[1] === 'tts' && pathParts[2] === 'devices') {
-    return await handleTtsDevices(res);
+    return await handleTtsDevices(res, { refresh: url.searchParams.get('refresh') !== 'false' });
   }
 
   if (req.method === 'POST' && pathParts[1] === 'tts' && pathParts[2] === 'reconnect') {
@@ -225,7 +293,8 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
 
   if (req.method === 'POST' && pathParts[1] === 'backup' && pathParts[2] === 'restore') {
     try {
-      return await restoreBackup(res, parseJson(await readRequestBody()));
+      const payload = parseJson(await readRequestBody());
+      return await updateConfiguration(() => restoreBackup(res, payload));
     } catch (error) {
       return sendJson(res, { ok: false, error: error.message }, 400);
     }
@@ -238,29 +307,20 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
 
   if (req.method === 'POST' && pathParts[1] === 'system' && pathParts[2] === 'restart') {
     sendJson(res, { ok: true, message: 'LoxEvo startet neu.' });
-    setTimeout(() => process.exit(0), 500);
+    setTimeout(() => shutdown(), 500);
     return;
   }
 
   if (req.method === 'PUT' && pathParts[1] === 'dry-run') {
     const payload = parseJson(await readRequestBody());
-    config.loxone.dryRun = payload.enabled !== false;
-    config = await saveConfig(config);
-    loxone = new LoxoneClient(config);
+    await updateConfiguration(() => applyConfiguration({ ...config, loxone: { ...config.loxone, dryRun: payload.enabled !== false } }));
     addEvent({ type: 'config', status: 'updated', text: `dryRun=${config.loxone.dryRun}` });
     return sendJson(res, { ok: true, dryRun: config.loxone.dryRun });
   }
 
   if (req.method === 'PUT' && pathParts[1] === 'config') {
     const nextConfig = parseJson(await readRequestBody());
-    config = await saveConfig(nextConfig);
-    loxone = new LoxoneClient(config);
-    tts = createTtsService();
-    discoveryControl = new DiscoveryControl(config);
-    await initTts();
-    await restartAlexaBridge();
-    await restartBridgeHttpServer();
-    return sendJson(res, { ok: true, config });
+    return sendJson(res, await updateConfiguration(() => applyConfiguration(nextConfig)));
   }
 
   if (req.method === 'POST' && pathParts[1] === 'light') {
@@ -305,11 +365,23 @@ function requiresAdminToken(req, pathParts) {
   return false;
 }
 
-function isAdminAuthorized(req) {
+async function isAdminAuthorized(req) {
   const token = readAdminToken(req);
-  if (!token) return false;
+  if (!token || token.length > 1024) return false;
   if (ENV_ADMIN_TOKEN) return safeTokenEquals(token, ENV_ADMIN_TOKEN);
-  return verifyStoredAdminToken(token);
+  const peer = req.socket?.remoteAddress || 'local';
+  const now = Date.now();
+  for (const [key, value] of adminAttempts) if (now - value.at > 60000) adminAttempts.delete(key);
+  const attempt = adminAttempts.get(peer) || { at: now, failures: 0 };
+  if (attempt.failures >= 10 || activeAdminChecks >= 4 || adminAttempts.size >= 1000) return false;
+  attempt.failures++;
+  adminAttempts.set(peer, attempt);
+  activeAdminChecks++;
+  try {
+    const valid = await verifyStoredAdminToken(token);
+    if (valid) adminAttempts.delete(peer);
+    return valid;
+  } finally { activeAdminChecks--; }
 }
 
 function readAdminToken(req) {
@@ -341,12 +413,14 @@ function getAdminSecurityStatus() {
   return {
     enabled: isAdminProtectionEnabled(),
     source,
-    manageable: !ENV_ADMIN_TOKEN,
+    manageable: !ENV_ADMIN_TOKEN && !adminSecurity?.unavailable,
+    unavailable: Boolean(adminSecurity?.unavailable && !ENV_ADMIN_TOKEN),
     message: describeAdminSecurity(source)
   };
 }
 
 function describeAdminSecurity(source) {
+  if (adminSecurity?.unavailable && !ENV_ADMIN_TOKEN) return 'Admin-Schutzdatei ist nicht lesbar oder beschädigt. Geschützte Änderungen bleiben gesperrt; Schutzdatei lokal wiederherstellen oder LOXEVO_ADMIN_TOKEN setzen.';
   if (source === 'environment') {
     return 'Admin-Schutz ist über LOXEVO_ADMIN_TOKEN aktiv und wird ausserhalb der Web-UI verwaltet.';
   }
@@ -372,12 +446,13 @@ async function updateAdminToken(res, payload) {
   }
 
   const token = String(payload?.token || '').trim();
-  if (token.length < 8) {
-    throw new Error('Das Admin-Passwort muss mindestens 8 Zeichen lang sein.');
+  if (token.length < 8 || token.length > 1024) {
+    throw new Error('Das Admin-Passwort muss zwischen 8 und 1024 Zeichen lang sein.');
   }
 
-  adminSecurity = createAdminTokenRecord(token);
-  await writeAdminSecurity(adminSecurity);
+  const nextSecurity = await createAdminTokenRecord(token);
+  await writeAdminSecurity(nextSecurity);
+  adminSecurity = nextSecurity;
   sessionAdminEvent('updated');
   return sendJson(res, { ok: true, status: getAdminSecurityStatus() });
 }
@@ -395,12 +470,14 @@ function sessionAdminEvent(status) {
 async function loadAdminSecurity() {
   try {
     const payload = JSON.parse(await readFile(getAdminTokenPath(), 'utf8'));
-    if (payload?.version === 1 && payload?.salt && payload?.key) {
-      return { enabled: true, ...payload };
+    if (payload?.version === 1 && /^[0-9a-f]{32}$/i.test(payload?.salt || '') && /^[0-9a-f]{64}$/i.test(payload?.key || '')) {
+      return { ...payload, enabled: true };
     }
+    throw new Error('Ungültige Admin-Schutzdatei.');
   } catch (error) {
     if (error.code !== 'ENOENT') {
-      console.warn(`Admin-Schutz konnte nicht gelesen werden: ${error.message}`);
+      console.warn('Admin-Schutzdatei ist nicht lesbar oder ungültig. Schutz bleibt aktiv.');
+      return { enabled: true, unavailable: true };
     }
   }
   return { enabled: false };
@@ -409,34 +486,33 @@ async function loadAdminSecurity() {
 async function writeAdminSecurity(record) {
   const tokenPath = getAdminTokenPath();
   await mkdir(dirname(tokenPath), { recursive: true });
-  await writeFile(tokenPath, `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
-  await enforcePrivateFileMode(tokenPath, 'Admin-Token-Datei');
+  await writePrivateFile(tokenPath, `${JSON.stringify(record, null, 2)}\n`, 'Admin-Token-Datei');
 }
 
 async function removeAdminToken() {
   await rm(getAdminTokenPath(), { force: true });
 }
 
-function createAdminTokenRecord(token) {
+async function createAdminTokenRecord(token) {
   const salt = randomBytes(16).toString('hex');
   return {
     enabled: true,
     version: 1,
     algorithm: 'scrypt',
     salt,
-    key: hashAdminToken(token, salt),
+    key: await hashAdminToken(token, salt),
     updatedAt: new Date().toISOString()
   };
 }
 
-function verifyStoredAdminToken(token) {
+async function verifyStoredAdminToken(token) {
   if (!adminSecurity?.enabled || !adminSecurity.salt || !adminSecurity.key) return false;
-  const actual = hashAdminToken(token, adminSecurity.salt);
+  const actual = await hashAdminToken(token, adminSecurity.salt);
   return safeTokenEquals(actual, adminSecurity.key);
 }
 
-function hashAdminToken(token, salt) {
-  return scryptSync(String(token), String(salt), 32).toString('hex');
+async function hashAdminToken(token, salt) {
+  return (await deriveAdminKey(String(token), String(salt), 32)).toString('hex');
 }
 
 async function exportBackup(res, includeCookie) {
@@ -446,7 +522,8 @@ async function exportBackup(res, includeCookie) {
     app: config.server?.name || 'LoxEvo',
     formatVersion: 1,
     exportedAt,
-    config
+    config,
+    alexaDeviceIds: { version: 1, ids: { ...deviceIds.ids } }
   };
 
   if (includeCookie) {
@@ -473,19 +550,31 @@ async function exportBackup(res, includeCookie) {
 }
 
 async function restoreBackup(res, backupPayload) {
-  const nextConfig = readBackupConfig(backupPayload);
+  const nextConfig = prepareConfig(readBackupConfig(backupPayload));
   const cookieTargetPath = resolveBackupCookieTarget(backupPayload, nextConfig);
+  if (cookieTargetPath && !parseAlexaCookieFile(backupPayload.cookie.content).cookie) throw new Error('Backup enthält keine brauchbaren Cookie-Daten.');
+  await deviceIds.import(backupPayload.alexaDeviceIds);
   const currentBackupPath = await writeCurrentConfigBackup();
-
-  config = await saveConfig(nextConfig);
-  const cookieRestored = await restoreCookieFromBackup(backupPayload, cookieTargetPath);
-
-  loxone = new LoxoneClient(config);
-  tts = createTtsService();
-  discoveryControl = new DiscoveryControl(config);
-  await initTts();
-  await restartAlexaBridge();
-  await restartBridgeHttpServer();
+  await startupServices;
+  let previousCookie;
+  if (cookieTargetPath) {
+    await tts.dispose();
+  }
+  let cookieRestored = false;
+  try {
+    if (cookieTargetPath) previousCookie = await readFile(cookieTargetPath, 'utf8').catch((error) => { if (error.code !== 'ENOENT') throw error; return null; });
+    cookieRestored = await restoreCookieFromBackup(backupPayload, cookieTargetPath);
+    await applyConfiguration(nextConfig, { reloadTts: cookieRestored });
+  } catch (error) {
+    if (cookieTargetPath) {
+      if (previousCookie === null) await rm(cookieTargetPath, { force: true });
+      else if (previousCookie !== undefined) await writePrivateFile(cookieTargetPath, previousCookie, 'Alexa-Cookie-Datei');
+      await tts.dispose();
+      tts = createTtsService();
+      await initTts();
+    }
+    throw error;
+  }
 
   addEvent({
     type: 'backup',
@@ -504,6 +593,7 @@ async function exportDiagnostics(res) {
     formatVersion: 1,
     exportedAt,
     health: {
+      buildRevision: process.env.LOXEVO_BUILD_REVISION || 'local',
       ok: true,
       name: config.server?.name || 'LoxEvo',
       tts: summarizeTtsStatus(tts.getStatus()),
@@ -525,7 +615,7 @@ async function exportDiagnostics(res) {
   };
 
   addEvent({ type: 'diagnostics', status: 'exported', text: 'Diagnose exportiert.' });
-  return sendJsonDownload(res, diagnostics, `loxevo-diagnostics-${timestampForFile(exportedAt)}.json`);
+  return sendJsonDownload(res, sanitizeDiagnosticValue(diagnostics), `loxevo-diagnostics-${timestampForFile(exportedAt)}.json`);
 }
 
 function exportEvents(res) {
@@ -554,6 +644,11 @@ function summarizeTtsStatus(status) {
   return {
     enabled: Boolean(status?.enabled),
     ready: Boolean(status?.ready),
+    authReady: Boolean(status?.authReady),
+    inventoryReady: status?.inventoryReady ?? null,
+    inventoryCount: status?.inventoryCount || 0,
+    lastDelivery: status?.lastDelivery,
+    testedAlexaRemoteVersion: status?.testedAlexaRemoteVersion,
     error: status?.error ? redactDiagnosticText(String(status.error)) : null,
     defaultDevicesCount: configuredCount(status?.defaultDevices),
     defaultSpeakDevicesCount: configuredCount(status?.defaultSpeakDevices),
@@ -623,10 +718,13 @@ function sanitizeConfigForDiagnostics(sourceConfig) {
 }
 
 function sanitizeEventForDiagnostics(event) {
-  return {
+  return sanitizeDiagnosticValue({
     at: event.at,
     type: event.type,
     status: event.status,
+    severity: event.severity,
+    requestId: event.requestId,
+    durationMs: event.durationMs,
     key: event.key,
     label: event.label,
     category: event.category,
@@ -640,7 +738,7 @@ function sanitizeEventForDiagnostics(event) {
     volume: event.volume,
     devicesCount: Array.isArray(event.devices) ? event.devices.length : undefined,
     url: event.url ? redactUrl(event.url) : undefined
-  };
+  });
 }
 
 function redactUrlHost(value) {
@@ -667,34 +765,6 @@ function uniqueCaseInsensitive(values = []) {
   return result;
 }
 
-function redactUrl(value) {
-  if (!value) return '';
-  try {
-    const url = new URL(value);
-    url.hostname = '<host>';
-    if (url.username) url.username = '';
-    if (url.password) url.password = '';
-    return url.toString();
-  } catch {
-    return String(value).replace(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g, '<ip>');
-  }
-}
-
-function sanitizeDiagnosticValue(value) {
-  if (Array.isArray(value)) return value.map(sanitizeDiagnosticValue);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [key, sanitizeDiagnosticValue(nestedValue)]));
-  }
-  if (typeof value === 'string') return redactDiagnosticText(value);
-  return value;
-}
-
-function redactDiagnosticText(value) {
-  return value
-    .replace(/https?:\/\/[^\s"'<>]+/g, (match) => redactUrl(match))
-    .replace(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g, '<ip>');
-}
-
 function readBackupConfig(payload) {
   if (isPlainObject(payload?.config)) {
     if (!looksLikeLoxEvoConfig(payload.config)) {
@@ -715,8 +785,7 @@ function looksLikeLoxEvoConfig(value) {
 async function writeCurrentConfigBackup() {
   const configPath = getConfigPath();
   const backupPath = join(dirname(configPath), `config.backup-${timestampForFile(new Date().toISOString())}.json`);
-  await writeFile(backupPath, `${JSON.stringify(config, null, 2)}\n`, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
-  await enforcePrivateFileMode(backupPath, 'Konfigurations-Backup');
+  await writePrivateFile(backupPath, `${JSON.stringify(config, null, 2)}\n`, 'Konfigurations-Backup');
   return backupPath;
 }
 
@@ -738,8 +807,7 @@ async function restoreCookieFromBackup(payload, targetPath) {
     return false;
   }
 
-  await writeFile(targetPath, payload.cookie.content, { encoding: 'utf8', mode: PRIVATE_FILE_MODE });
-  await enforcePrivateFileMode(targetPath, 'Alexa-Cookie-Datei');
+  await writePrivateFile(targetPath, payload.cookie.content, 'Alexa-Cookie-Datei');
   return true;
 }
 
@@ -792,9 +860,10 @@ async function runConfiguredCommand(res, commandKey) {
 
 async function executeConfiguredCommand(commandKey, source, options = {}) {
   const normalizedCommandKey = normalizeKey(commandKey);
+  const client = options.client || loxone;
   const result = options.offTarget
-    ? await loxone.runCommandOff(normalizedCommandKey)
-    : await loxone.runCommand(normalizedCommandKey);
+    ? await client.runCommandOff(normalizedCommandKey)
+    : await client.runCommand(normalizedCommandKey);
   addEvent({
     type: source,
     status: result.dryRun ? 'dry-run' : 'sent',
@@ -899,8 +968,8 @@ async function executeLoxoneTtsShortPath(cmd, payload) {
   addEvent({ type: 'tts-speak', status: 'sent', key: cmd, text: payload.text, devices: targetDevices, compat: 'loxone-short-path' });
 }
 
-async function handleTtsDevices(res) {
-  const devices = await tts.getDeviceInventory();
+async function handleTtsDevices(res, options) {
+  const devices = await tts.getDeviceInventory(options);
   return sendJson(res, { devices });
 }
 
@@ -1623,13 +1692,16 @@ function configuredCount(values) {
 async function getDependencyStatus(name) {
   const installedVersion = await getInstalledPackageVersion(name);
   const registry = await getRegistryPackageInfo(name);
-  const updateAvailable = Boolean(registry.latestVersion && (!installedVersion || compareVersions(installedVersion, registry.latestVersion) < 0));
+  const supportedVersion = name === 'alexa-remote2' ? TESTED_ALEXA_REMOTE_VERSION : registry.latestVersion;
+  const updateAvailable = Boolean(supportedVersion && installedVersion !== supportedVersion);
 
   return {
     name,
     installedVersion,
-    latestVersion: registry.latestVersion,
-    availableVersions: registry.availableVersions,
+    testedVersion: name === 'alexa-remote2' ? TESTED_ALEXA_REMOTE_VERSION : null,
+    latestVersion: supportedVersion,
+    registryLatestVersion: registry.latestVersion,
+    availableVersions: name === 'alexa-remote2' ? [TESTED_ALEXA_REMOTE_VERSION] : registry.availableVersions,
     updateAvailable,
     latestCheckedAt: registry.checkedAt,
     latestError: registry.error,
@@ -1640,8 +1712,8 @@ async function getDependencyStatus(name) {
 
 async function getInstalledPackageVersion(name) {
   const requires = [
-    createRequire(join(getDependencyInstallDir(), 'package.json')),
-    require
+    require,
+    createRequire(join(getDependencyInstallDir(), 'package.json'))
   ];
 
   for (const requireFn of requires) {
@@ -1689,7 +1761,8 @@ async function updateDependency(res, name, version) {
   if (dependencyUpdate?.status === 'running') {
     return sendJson(res, { ok: false, error: 'Ein Update läuft bereits.' }, 409);
   }
-  const requestedVersion = normalizePackageVersion(version);
+  const requestedVersion = normalizePackageVersion(version === 'latest' || !version ? TESTED_ALEXA_REMOTE_VERSION : version);
+  if (name === 'alexa-remote2' && requestedVersion !== TESTED_ALEXA_REMOTE_VERSION) return sendJson(res, { ok: false, error: `Diese LoxEvo-Version unterstützt alexa-remote2 ${TESTED_ALEXA_REMOTE_VERSION}. Andere Versionen benötigen zuerst einen Adaptertest.` }, 400);
 
   dependencyUpdate = {
     name,
@@ -1742,15 +1815,19 @@ async function runNpmInstall(name, version) {
       env: process.env
     });
     let output = '';
+    const timer = setTimeout(() => { child.kill('SIGTERM'); }, 120000);
+    const forceTimer = setTimeout(() => { child.kill('SIGKILL'); }, 125000);
 
     child.stdout.on('data', (chunk) => {
-      output += chunk.toString();
+      output = (output + chunk.toString()).slice(-16000);
     });
     child.stderr.on('data', (chunk) => {
-      output += chunk.toString();
+      output = (output + chunk.toString()).slice(-16000);
     });
-    child.on('error', reject);
+    child.on('error', (error) => { clearTimeout(timer); clearTimeout(forceTimer); reject(error); });
     child.on('close', (code) => {
+      clearTimeout(timer);
+      clearTimeout(forceTimer);
       if (code === 0) {
         resolve(output);
         return;
@@ -1920,7 +1997,13 @@ async function handleAlexa2LoxCompat(req, res, url) {
 function createAlexaBridge() {
   return new AlexaBridgeService(config, {
     getCommands: () => config.commands || {},
+    getDeviceId: (key) => deviceIds.get(key),
+    getDeviceIdError: () => deviceIds.error,
     executeCommand: executeAlexaBridgeCommand,
+    captureCommand: (key, options) => {
+      const context = { ...options, client: loxone, configSnapshot: config };
+      return () => executeAlexaBridgeCommand(key, context);
+    },
     addEvent
   });
 }
@@ -1931,12 +2014,12 @@ function createTtsService() {
 
 async function executeAlexaBridgeCommand(commandKey, options = {}) {
   const result = await executeConfiguredCommand(commandKey, 'alexa-command', options);
-  triggerAlexaCommandConfirmation(result.key || commandKey);
+  triggerAlexaCommandConfirmation(result.key || commandKey, options.configSnapshot || config);
   return result;
 }
 
-function triggerAlexaCommandConfirmation(commandKey) {
-  const command = config.commands?.[normalizeKey(commandKey)];
+function triggerAlexaCommandConfirmation(commandKey, sourceConfig = config) {
+  const command = sourceConfig.commands?.[normalizeKey(commandKey)];
   const confirmation = command?.confirmation;
   if (!confirmation?.enabled) return;
 
@@ -1989,6 +2072,7 @@ async function restartAlexaBridge() {
 function getAlexaBridgeStatus() {
   return {
     ...alexaBridge.getStatus(),
+    deviceIdError: deviceIds.error,
     bridgeHttp: bridgeHttpStatus
   };
 }
@@ -2010,13 +2094,15 @@ async function startDiscoveryMode(res) {
   }
 
   const helper = await discoveryControl.start();
-  if (!helper.available) {
+  if (!helper.available || helper.ready === false || helper.errors?.length) {
+    helper.error ||= helper.errors?.join('; ') || 'Discovery-Helper konnte die Suche nicht vorbereiten.';
     addEvent({ type: 'alexa-discovery', status: 'error', text: helper.error });
     return sendJson(res, { ok: false, error: helper.error, discovery: await getDiscoveryStatus() }, 503);
   }
 
   await restartAlexaBridge();
   await restartBridgeHttpServer();
+  if (!alexaBridge.ready) return sendJson(res, { ok: false, error: alexaBridge.lastError || 'SSDP ist nicht bereit.', discovery: await getDiscoveryStatus() }, 503);
   addEvent({ type: 'alexa-discovery', status: 'started', text: 'Alexa-Gerätesuche aktiviert.' });
   return sendJson(res, { ok: true, helper, discovery: await getDiscoveryStatus() });
 }
@@ -2030,7 +2116,8 @@ async function stopDiscoveryMode(res) {
   await restartBridgeHttpServer();
 
   const helper = await discoveryControl.stop();
-  if (!helper.available) {
+  if (!helper.available || helper.ready === false || helper.errors?.length) {
+    helper.error ||= helper.errors?.join('; ') || 'SSDP-Dienste konnten nicht wiederhergestellt werden.';
     addEvent({ type: 'alexa-discovery', status: 'warning', text: helper.error });
     return sendJson(res, { ok: false, error: helper.error, discovery: await getDiscoveryStatus() }, 503);
   }
@@ -2231,11 +2318,7 @@ function defaultTtsSpeakDevices() {
 function addEvent(event) {
   const normalizedEvent = normalizeEvent(event);
   if (shouldSuppressEvent(normalizedEvent)) return;
-  events.unshift({
-    at: new Date().toISOString(),
-    ...normalizedEvent
-  });
-  events.splice(MAX_EVENTS);
+  appendEvent(events, normalizedEvent);
 }
 
 function shouldSuppressEvent(event) {
@@ -2250,11 +2333,6 @@ function shouldSuppressEvent(event) {
   if (oncePerProcessEventKeys.has(key)) return true;
   oncePerProcessEventKeys.add(key);
 
-  const now = Date.now();
-  const lastAt = dedupedEventTimes.get(key) || 0;
-  if (now - lastAt < OPTIONAL_DISCOVERY_EVENT_DEDUPE_MS) return true;
-
-  dedupedEventTimes.set(key, now);
   return false;
 }
 

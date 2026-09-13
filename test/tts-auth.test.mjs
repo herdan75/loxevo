@@ -872,7 +872,11 @@ async function writeCookie(service, data) {
 class TrackableRemote {
   constructor() {
     this.stopped = false;
+    this.serialNumbers = { TEST_ECHO: { serialNumber: 'TEST_ECHO', deviceType: 'TEST', deviceOwnerCustomerId: 'TEST_OWNER' } };
   }
+
+  checkAuthentication(callback) { callback(true); }
+  initDeviceState(callback) { callback(null); }
 
   on() {}
 

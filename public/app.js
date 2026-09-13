@@ -255,9 +255,25 @@ roomEditor?.addEventListener('input', (event) => {
 roomEditor?.addEventListener('change', (event) => {
   updateCommandCardValidation(event.target?.closest?.('.room-card'));
 });
-[commandSearch, commandCategoryFilter, commandViewFilter, commandOnlyInvalid].forEach((control) => {
-  control?.addEventListener('input', () => renderCommandEditor());
-  control?.addEventListener('change', () => renderCommandEditor());
+let commandFilterTimer;
+function refreshCommandFilter() {
+  clearTimeout(commandFilterTimer);
+  try {
+    config = collectConfigFromForms();
+    renderCommandEditor();
+  } catch (error) { showToast(error.message, 'error'); }
+}
+commandSearch?.addEventListener('input', () => {
+  clearTimeout(commandFilterTimer);
+  commandFilterTimer = setTimeout(refreshCommandFilter, 150);
+});
+[commandCategoryFilter, commandViewFilter, commandOnlyInvalid].forEach((control) => {
+  control?.addEventListener('change', refreshCommandFilter);
+});
+window.addEventListener('beforeunload', (event) => {
+  if (!configDirty) return;
+  event.preventDefault();
+  event.returnValue = '';
 });
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => showView(button.dataset.tabTarget));
@@ -284,20 +300,14 @@ async function load() {
     config = await response.json();
     populateForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
-    await loadTtsStatus();
-    await loadTtsDevices();
-    await loadAlexaBridgeStatus();
-    await loadDiscoveryStatus();
-    await loadSetupStatus();
-    await loadAdminSecurityStatus();
-    await loadPreflightStatus();
     renderCommands();
     renderCommandEditor();
     renderIntegrations();
     syncJsonFromForms();
-    await loadEvents();
     captureSavedConfigSnapshot();
     markConfigClean();
+    await Promise.all([loadTtsStatus().then(() => loadTtsDevices()), loadAlexaBridgeStatus(), loadDiscoveryStatus(), loadSetupStatus(), loadAdminSecurityStatus(), loadPreflightStatus(), loadEvents()]);
+    renderIntegrations();
     renderDashboard();
   } catch (error) {
     showToast(error.message, 'error');
@@ -360,10 +370,10 @@ async function saveConfig(button) {
     config = result.config;
     clearDraftCommands();
     populateForms();
-    syncJsonFromForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderCommands();
     renderCommandEditor();
+    syncJsonFromForms();
     await loadTtsStatus();
     await loadTtsDevices();
     await loadAlexaBridgeStatus();
@@ -397,10 +407,10 @@ async function saveJsonConfig(button) {
     config = result.config;
     clearDraftCommands();
     populateForms();
-    syncJsonFromForms();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderCommands();
     renderCommandEditor();
+    syncJsonFromForms();
     await loadTtsStatus();
     await loadTtsDevices();
     await loadAlexaBridgeStatus();
@@ -502,7 +512,7 @@ function normalizeText(value) {
 
 function markConfigDirty() {
   if (!config) return;
-  configDirty = hasConfigChangedFromSnapshot();
+  configDirty = true;
   updateConfigDirtyNotice();
   scheduleConfigDirtyRefresh();
 }
@@ -605,6 +615,8 @@ function scheduleConfigDirtyRefresh() {
   clearTimeout(configDirtyRenderTimer);
   configDirtyRenderTimer = setTimeout(() => {
     configDirtyRenderTimer = null;
+    configDirty = hasConfigChangedFromSnapshot();
+    updateConfigDirtyNotice();
     renderBackupReminder();
     renderDashboard();
   }, 250);
@@ -751,10 +763,11 @@ async function importBackup(button) {
 
     config = result.config;
     populateForms();
-    syncJsonFromForms();
+    clearDraftCommands();
     updateDryRunUi(Boolean(config.loxone?.dryRun));
     renderCommands();
     renderCommandEditor();
+    syncJsonFromForms();
     await loadTtsStatus();
     await loadTtsDevices();
     await loadAlexaBridgeStatus();
@@ -928,6 +941,7 @@ async function adminFetch(url, options = {}) {
 
 function requestAdminToken(message, verifyToken) {
   return new Promise((resolve) => {
+    const previousFocus = document.activeElement;
     const modal = document.createElement('div');
     modal.className = 'admin-token-modal';
     modal.setAttribute('role', 'dialog');
@@ -961,8 +975,13 @@ function requestAdminToken(message, verifyToken) {
     const close = (value) => {
       document.body.classList.remove('modal-open');
       modal.remove();
+      previousFocus?.focus();
       resolve(value);
     };
+    modal.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); close(null); }
+      else trapDialogFocus(event, modal);
+    });
 
     messageEl.textContent = message;
     cancelButton.addEventListener('click', () => close(null));
@@ -1181,7 +1200,7 @@ async function reconnectTts(button) {
 
 async function loadTtsDevices(button) {
   if (!ttsDeviceList) return;
-  if (!ttsStatus?.ready) {
+  if (!ttsStatus?.ready && !ttsStatus?.authReady) {
     ttsDevices = [];
     renderTtsDevices();
     return;
@@ -1193,6 +1212,7 @@ async function loadTtsDevices(button) {
     await ensureOk(response);
     const payload = await response.json();
     ttsDevices = Array.isArray(payload.devices) ? payload.devices : [];
+    await loadTtsStatus();
     renderTtsDevices();
     if (button) {
       setButtonFeedback(button, 'success', 'Gefunden');
@@ -1218,7 +1238,7 @@ function renderTtsDevices(errorText = '') {
     return;
   }
 
-  if (!ttsStatus?.ready) {
+  if (!ttsStatus?.ready && !ttsStatus?.authReady) {
     ttsDeviceList.innerHTML = '<p class="empty">TTS muss bereit sein, bevor Alexa-Geräte geladen werden können.</p>';
     return;
   }
@@ -1771,7 +1791,6 @@ function showView(viewId) {
   views.forEach((view) => {
     view.classList.toggle('active', view.id === viewId);
   });
-  closeDetailsInView(viewId);
   if (viewId === 'eventsView') {
     loadEvents();
   }
@@ -1784,13 +1803,6 @@ function showView(viewId) {
     loadAdminSecurityStatus();
     loadDependencyStatus();
   }
-}
-
-function closeDetailsInView(viewId) {
-  const view = document.getElementById(viewId);
-  view?.querySelectorAll('details[open]').forEach((details) => {
-    details.open = false;
-  });
 }
 
 async function loadPreflightStatus(button) {
@@ -2769,10 +2781,24 @@ function skipWizardPrompt(closeModalToo = false) {
   showToast('Einrichtungsassistent übersprungen', 'ok');
 }
 
+let wizardPreviousFocus = null;
+
+function trapDialogFocus(event, modal) {
+  if (event.key !== 'Tab') return;
+  const focusable = [...modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select, textarea, a[href], [tabindex="0"]')].filter((node) => node.getClientRects().length);
+  if (!focusable.length) return;
+  const first = focusable[0], last = focusable.at(-1);
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+}
+wizardModal?.addEventListener('keydown', (event) => trapDialogFocus(event, wizardModal));
+
 function openWizard(stepIndex = 0) {
   if (!wizardModal) return;
   wizardStepIndex = Math.max(0, Math.min(stepIndex, wizardSteps().length - 1));
   wizardModal.hidden = false;
+  wizardPreviousFocus = document.activeElement;
+  closeWizardBtn?.focus();
   document.body.classList.add('modal-open');
   renderWizard();
 }
@@ -2780,6 +2806,7 @@ function openWizard(stepIndex = 0) {
 function closeWizard() {
   if (!wizardModal) return;
   wizardModal.hidden = true;
+  wizardPreviousFocus?.focus();
   document.body.classList.remove('modal-open');
 }
 
@@ -2987,9 +3014,6 @@ function renderCommandEditor(openCommandKey = '') {
       .map((card) => normalizeInputKey(card.querySelector('.command-key')?.value || card.dataset.commandOriginal || ''))
       .filter(Boolean)
   );
-  if (roomEditor.querySelector('.room-card')) {
-    config = collectConfigFromForms();
-  }
   roomEditor.innerHTML = '';
   updateCommandCategoryFilter();
   const filteredCommands = filterConfiguredCommands(Object.entries(getConfiguredCommands()));
@@ -3096,6 +3120,7 @@ function matchesCommandViewFilter(commandKey, command, filter) {
 
 function createCommandCard(commandKey, command) {
   const card = document.createElement('details');
+  card._sourceCommand = structuredClone(command);
   card.className = 'room-card';
   card.dataset.commandOriginal = commandKey;
   card.open = false;
@@ -3376,6 +3401,12 @@ function commandValidationIssues(commandKey, command = {}, commandMap = getConfi
     if (!String(target.path || '').trim()) {
       addRequiredIssue('Pfad fehlt', 'Raw-Befehle benötigen einen Spezialpfad.');
     }
+    if (String(target.path || '').includes('{uuid}') && !isValidLoxoneUuid(target.uuid)) {
+      addRequiredIssue(target.uuid ? 'UUID ungültig' : 'UUID fehlt', 'Der Spezialpfad benötigt eine gültige Loxone UUID.');
+    }
+    if (/\{(?:value|command)\}/.test(target.path || '') && String(target.value ?? '').trim() === '') {
+      addRequiredIssue('Wert fehlt', 'Der Spezialpfad benötigt einen Wert/Befehl.');
+    }
   } else if (target.type === 'pulse') {
     if (!String(target.uuid || '').trim()) {
       addRequiredIssue('UUID fehlt', 'Pulse-Befehle benötigen eine Loxone UUID.');
@@ -3388,13 +3419,14 @@ function commandValidationIssues(commandKey, command = {}, commandMap = getConfi
     } else if (!isValidLoxoneUuid(target.uuid)) {
       addRequiredIssue('UUID ungültig', 'Loxone UUID muss als 8-4-4-16, als 8-4-4-4-12 oder als 32 Hex-Zeichen ohne Bindestriche eingetragen sein.');
     }
-    if (!String(target.value || '').trim()) {
+    if (!String(target.value ?? '').trim()) {
       addRequiredIssue('Wert fehlt', `${target.type}-Befehle benötigen einen Wert/Befehl.`);
     }
   }
 
   const offCommand = normalizeInputKey(command.offCommand || '');
-  if (offCommand) {
+  const inlineOff = target.type === 'raw' ? String(target.offPath || '').trim() : target.type !== 'pulse' && String(target.offValue ?? '').trim();
+  if (offCommand && command.alexaMode !== 'action' && !inlineOff) {
     const offTarget = commandMap[offCommand];
     if (!offTarget) {
       addRequiredIssue('Aus-Befehl fehlt', `Aus-Befehl "${offCommand}" wurde nicht gefunden.`);
@@ -3420,7 +3452,8 @@ function isKnownCommandType(type) {
 
 function addRoom() {
   if (roomEditor.querySelector('.room-card')) {
-    config = collectConfigFromForms();
+    try { config = collectConfigFromForms(); }
+    catch (error) { showToast(error.message, 'error'); return; }
   }
   const nextName = uniqueCommandName('neuer_befehl');
   config.commands ||= {};
@@ -3786,7 +3819,6 @@ function collectConfigFromForms() {
   nextConfig.alexaBridge.debug = alexaBridgeDebug?.checked === true;
 
   nextConfig.commands = collectCommands();
-  delete nextConfig.rooms;
 
   nextConfig.tts ||= {};
   nextConfig.tts.enabled = ttsEnabled.checked;
@@ -3815,18 +3847,33 @@ function collectCommands() {
   renderedCommandKeys.forEach((commandKey) => {
     delete commands[commandKey];
   });
+  const seen = new Set(Object.keys(commands).map(normalizeInputKey));
+  for (const card of roomEditor.querySelectorAll('.room-card')) {
+    const input = card.querySelector('.command-key');
+    const key = normalizeInputKey(input.value);
+    if (!key || seen.has(key)) {
+      markInvalid(input);
+      throw new Error(!key ? 'Befehlsschlüssel darf nicht leer sein.' : `Befehlsschlüssel "${key}" ist doppelt. Kein Befehl wurde überschrieben.`);
+    }
+    seen.add(key);
+  }
   roomEditor.querySelectorAll('.room-card').forEach((card) => {
     const commandKey = normalizeInputKey(card.querySelector('.command-key').value);
     if (!commandKey) return;
     moveDraftCommand(card.dataset.commandOriginal || '', commandKey);
-    card.dataset.commandOriginal = commandKey;
     commands[commandKey] = collectCommandFromCard(card, commandKey);
   });
   return commands;
 }
 
 function collectCommandFromCard(card, commandKey) {
+  const original = structuredClone(card._sourceCommand || config?.commands?.[card.dataset.commandOriginal] || {});
+  const originalConfirmation = original.confirmation || {};
+  for (const key of ['alexaMode', 'offCommand', 'alexaExpose', 'confirmation']) delete original[key];
+  const originalTarget = original.loxone || {};
   const loxoneType = card.querySelector('.command-type')?.value || 'changeTo';
+  delete originalTarget.offPath;
+  if (loxoneType !== 'raw') { delete originalTarget.offValue; delete originalTarget.offCommand; }
   const alexaMode = card.querySelector('.command-alexa-mode')?.value || 'switch';
   const offCommand = normalizeInputKey(card.querySelector('.command-off-command')?.value || '');
   const offTarget = card.querySelector('.command-off-target')?.value.trim() || '';
@@ -3835,6 +3882,7 @@ function collectCommandFromCard(card, commandKey) {
   const confirmationText = card.querySelector('.command-confirmation-text')?.value.trim() || 'OK';
 
   return {
+    ...original,
     label: card.querySelector('.command-label')?.value.trim() || commandKey,
     voiceName: card.querySelector('.command-voice')?.value.trim() || commandKey,
     category: normalizeCommandCategoryInput(card.querySelector('.command-category')?.value || ''),
@@ -3844,8 +3892,9 @@ function collectCommandFromCard(card, commandKey) {
     ...(alexaMode === 'action' ? { alexaMode: 'action' } : {}),
     ...(offCommand ? { offCommand } : {}),
     ...(alexaExpose ? {} : { alexaExpose: false }),
-    ...(confirmationEnabled ? { confirmation: { enabled: true, text: confirmationText } } : {}),
+    ...(confirmationEnabled ? { confirmation: { ...originalConfirmation, enabled: true, text: confirmationText } } : {}),
     loxone: {
+      ...originalTarget,
       type: loxoneType,
       uuid: normalizeLoxoneUuidInput(card.querySelector('.command-uuid')?.value || ''),
       value: card.querySelector('.command-value')?.value.trim() || '',
@@ -3973,7 +4022,7 @@ function getCommandTarget(command) {
     uuid: loxone.uuid || command.loxoneUuid || '',
     value: loxone.value ?? loxone.command ?? command.loxoneCommand ?? '',
     path: loxone.path || command.loxonePath || '',
-    offValue: loxone.offValue ?? '',
+    offValue: loxone.offValue ?? loxone.offCommand ?? '',
     offPath: loxone.offPath || ''
   };
 }
@@ -4085,8 +4134,6 @@ function normalizeCommandType(value) {
 function normalizeLoxoneUuidInput(value) {
   const raw = String(value || '').trim();
   const segment = raw.replace(/^\/?jdev\/sps\/io\//i, '').split('/')[0].trim();
-  const match = segment.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-(?:[0-9a-f]{16}|[0-9a-f]{4}-[0-9a-f]{12})|[0-9a-f]{32}/i);
-  if (match) return match[0].toLowerCase();
   return segment.toLowerCase();
 }
 
@@ -4418,7 +4465,7 @@ function filterEvents(events) {
   const search = normalizeText(eventSearch?.value || '');
   return events.filter((event) => {
     const bucket = eventBucket(event);
-    const matchesFilter = activeEventFilter === 'all' || bucket === activeEventFilter || (activeEventFilter === 'error' && event.status === 'error');
+    const matchesFilter = activeEventFilter === 'all' || bucket === activeEventFilter || (activeEventFilter === 'error' && (event.severity === 'error' || /error|failed|not-ready|unconfirmed|partial/.test(event.status || '')));
     const text = normalizeText(`${event.type || ''} ${event.status || ''} ${event.key || ''} ${event.label || ''} ${event.text || ''} ${event.url || ''} ${event.error || ''}`);
     return matchesFilter && (!search || text.includes(search));
   });
@@ -4426,10 +4473,9 @@ function filterEvents(events) {
 
 function eventBucket(event) {
   const type = String(event.type || '');
-  if (event.status === 'error') return 'error';
   if (type.startsWith('tts')) return 'tts';
   if (type.startsWith('alexa')) return 'alexa';
-  if (['backup', 'diagnostics', 'dependency-update', 'admin-security', 'events', 'config'].includes(type)) return 'system';
+  if (['backup', 'diagnostics', 'dependency-update', 'admin-security', 'events', 'config', 'system'].includes(type)) return 'system';
   if (['command', 'light', 'alexa-command'].includes(type)) return 'loxone';
   return 'all';
 }

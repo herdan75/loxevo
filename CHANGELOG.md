@@ -16,7 +16,7 @@ Stabilitätsstand für `develop`. Prüfstatus, Migration und noch erforderliche 
 - Die Discovery-Hilfe erhält idempotente, serialisierte Suchsessions und behält Wiederherstellungsdaten bei Fehlern. Berechtigungsfehler werden nicht mehr als erwartete Portbelegung behandelt.
 - Diagnose-Routing, Secret-/URL-Bereinigung und Fehlerfilter korrigiert. Der flüchtige RAM-Puffer bleibt auf 300 Ereignisse begrenzt und begrenzt zusätzlich die Einzelgröße. HTTP-Fehler erhalten eine Korrelationskennung.
 - Mobile Überbreiten und Dialogfokus korrigiert; geöffnete Karten bleiben beim Ansichtswechsel erhalten. Suche und Dirty-Prüfung werden verzögert; unabhängige Statusabfragen blockieren den Editor nicht mehr.
-- Node 24, Paket-Lockfile, HTTP-/Browser-/Helper-Tests sowie CI-Builds und Healthchecks für amd64 und arm64 ergänzt. Der passive Langzeittest zeichnet Zustandsänderungen auf, ohne TTS oder Reconnect auszulösen. Container-/ARM- und Amazon-Langzeitnachweise sind vor Freigabe noch erforderlich.
+- Node 24, Paket-Lockfile, HTTP-/Browser-/Helper-Tests sowie CI-Builds und Healthchecks für amd64 und arm64 ergänzt. Der [CI-Lauf des Code-Commits](https://github.com/herdan75/loxevo/actions/runs/34753456353) hat diese Prüfungen einschließlich geordnetem Herunterfahren bestanden; ARM64 wurde unter QEMU geprüft. Der passive Langzeittest zeichnet Zustandsänderungen auf, ohne TTS oder Reconnect auszulösen. Der Nachweis auf dem eigenen LoxBerry mit echten Echo-Geräten bleibt vor Produktionsfreigabe erforderlich.
 
 ## 1.0.28 - 2026-08-19
 

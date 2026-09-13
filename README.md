@@ -6,13 +6,13 @@
 
 > **Status: Version 1.0.29 / Stabilitätsstand auf develop**
 >
-> Dieser Stand enthält die Stabilitätskorrekturen aus der Programmprüfung. Lokale Backend-, HTTP-, Browser- und Python-Tests sind bestanden. Die Linux-/ARM-CI und der 48-Stunden-Test mit echten Echo-Geräten müssen vor einer Produktionsfreigabe ausgewertet werden. Neue Installationen und Befehle zuerst bewusst prüfen; Loxone-Kommandos bei Bedarf im Dry-Run testen.
+> Dieser Stand enthält die Stabilitätskorrekturen aus der Programmprüfung. Lokale Tests und die Linux-CI einschließlich Helper-Tests, amd64-/ARM64-Build, Container-Healthcheck und geordnetem Herunterfahren sind bestanden. Der 48-Stunden-Test mit echten Echo-Geräten bleibt vor einer Produktionsfreigabe erforderlich. Neue Installationen und Befehle zuerst bewusst prüfen; Loxone-Kommandos bei Bedarf im Dry-Run testen.
 
 Eigene LoxBerry-Zentrale für Alexa, Echo-TTS und Loxone.
 
 ### Stabilitätsupdate 1.0.29
 
-Die Änderungen betreffen Datenintegrität, TTS-Lebenszyklus, Geräte-IDs, Diagnose und mobile Bedienung. Umsetzung, Prüfungen und die noch offenen Container-/Langzeittests stehen in [Stabilitätsprüfung](docs/stability-validation.md). Für bestehende Installationen zuerst die [Update- und Migrationshinweise](INSTALL.md#updates) lesen. Dieser Stand wird auf `develop` bereitgestellt; `main` und `pre-develop` werden dabei nicht mitgezogen.
+Die Änderungen betreffen Datenintegrität, TTS-Lebenszyklus, Geräte-IDs, Diagnose und mobile Bedienung. Umsetzung, CI-Nachweise und die noch offenen Praxis-/Langzeittests stehen in [Stabilitätsprüfung](docs/stability-validation.md). Für bestehende Installationen zuerst die [Update- und Migrationshinweise](INSTALL.md#updates) lesen. Dieser Stand wird auf `develop` bereitgestellt; `main` und `pre-develop` werden dabei nicht mitgezogen.
 
 - Der Docker-Build nutzt Node 24 und `npm ci` mit Lockfile. `alexa-remote2` ist mit Version `8.1.1` gebündelt und hat Vorrang vor lokalen Installationen im Datenordner. Diese bleiben unverändert und dienen nur als Fallback in der unterstützten Version. Die Wartung bietet diese Version an; andere Versionen benötigen zuerst entsprechende Vertragstests. Sicherheitskorrekturen für die transitiven Pakete `cookie` und `qs` sind im Lockfile festgelegt.
 - `data/alexa-device-ids.json` gehört zur Installation und zum Backup. Nicht löschen: Die Datei reserviert auch frühere Geräte-IDs. Die erstmalige Migration erhält die Zuordnung des vorhandenen Befehlsbestands; neue Befehle danach anlegen. Befehlsschlüssel nicht zum Umbenennen eines Geräts ändern, sondern Anzeige-/Sprachnamen verwenden.

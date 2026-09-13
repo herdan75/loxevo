@@ -50,9 +50,19 @@ Lokaler Prüfstand für 1.0.29 am 13.09.2026 unter Windows mit Node 24.16.0:
 
 Diese Nachweise betreffen den lokalen Arbeitsstand, nicht den produktiven Container. Der [CI-Lauf auf develop](https://github.com/herdan75/loxevo/actions/workflows/ci.yml?query=branch%3Adevelop) muss zum ausgelieferten Commit passen; ältere erfolgreiche Läufe sind kein Nachweis für 1.0.29. Ein API-Callback ist keine Messung der tatsächlichen Schallausgabe.
 
-## Vor Freigabe noch erforderlich
+## CI-Nachweis
 
-- Erfolgreicher Linux-CI-Lauf einschließlich kompiliertem C-Helper, Docker-Healthcheck nach Start und sauberem SIGTERM-Ende, auch für `linux/arm64` unter QEMU. Die Workflow-Erweiterung allein ist kein bestandener ARM-Build. Auf diesem Windows-System sind Docker, Linux/WSL und ein C-Compiler nicht verfügbar.
+Der [GitHub-CI-Lauf 34753456353](https://github.com/herdan75/loxevo/actions/runs/34753456353) für Code-Commit `70a6ff9f4e0477910b3b837fc8305c6abc1ff254` ist am 13.09.2026 erfolgreich abgeschlossen:
+
+- Ubuntu: Syntax-, Backend-/HTTP- und Chromium-Browserprüfungen bestanden.
+- Python-Host-Helper mit simuliertem `systemctl` sowie kompilierter C-SSDP-Helper bestanden.
+- `linux/amd64` und `linux/arm64`: Image-Build, Containerstart, Healthcheck und SIGTERM-Ende mit Exitcode 0 bestanden.
+
+ARM64 läuft in dieser CI unter QEMU. Das ist ein Build-/Container-Nachweis, kein Test der echten LoxBerry-Dienste, des Heimnetzes oder physischer Echo-Geräte. GitHub meldet nicht blockierende Hinweise zu älteren Action-Major-Versionen; die Jobs wurden erfolgreich ausgeführt. Die Runtime im LoxEvo-Image ist Node 24.
+
+## Vor Produktionsfreigabe noch erforderlich
+
+- Bei weiteren Codeänderungen einen neuen erfolgreichen CI-Lauf für genau den ausgelieferten Commit prüfen. Der dokumentierte Linux-/ARM-Nachweis oben wurde auf GitHub erbracht; auf dem lokalen Windows-System sind Docker, Linux/WSL und ein C-Compiler nicht verfügbar.
 - Kontrollierter 48-Stunden-Test auf LoxBerry nach manuellem Login, falls erforderlich: normale Ansage, Alarm und Lautstärke einmal bewusst prüfen; anschließend den passiven Beobachter aus der README verwenden. Keine automatischen Alarmproben.
 - Bei Fehler zuerst Zustand, vorhandenes Inventar und bereinigten Protokollexport erfassen, erst danach Reconnect oder Neustart. Prüfen, ob die konfigurierte Gerätekennung im Inventar fehlt und ob davor Auth-Refresh oder Instanzwechsel stattfand.
 - API-Bestätigung ist keine garantierte akustische Wiedergabe. Keine Fernprüfung realer Echo-Geräte, Multicast-Reichweite, Aktorwirkung oder Amazon-Langzeiterneuerung wurde hier durchgeführt.

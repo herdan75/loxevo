@@ -29,7 +29,7 @@ while (!controller.signal.aborted && Date.now() < until) {
       const record = { at: new Date().toISOString(), status: summary };
       if (!lastSignature || !status.ready || ['error', 'partial', 'unconfirmed'].includes(status.lastDelivery?.status)) {
         const inventory = await read('/api/tts/devices?refresh=false');
-        record.inventory = (inventory.devices || []).map((device) => ({ id: deviceId(device.serialNumber), deviceType: device.deviceType, online: device.online }));
+        record.inventory = (inventory.devices || []).map((device) => ({ id: device.serial || device.serialNumber ? deviceId(device.serial || device.serialNumber) : null, deviceType: device.type || device.deviceType, online: device.online }));
         record.configured = [...new Set([...(status.defaultSpeakDevices || []), ...(status.alarmDevices || [])])].map(deviceId);
       }
       console.log(JSON.stringify(sanitizeDiagnosticValue(record)));

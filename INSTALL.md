@@ -1,6 +1,6 @@
 # Installation
 
-> **Stand: 1.0.29 auf develop.** Vor einem Update die Geräte-ID-Migration und den [Prüfstatus](docs/stability-validation.md) beachten. Der echte Alexa-Langzeittest ist noch erforderlich.
+> **Stand: 1.0.30 auf develop.** Vor einem Update die Geräte-ID-Migration und den [Prüfstatus](docs/validation-1.0.30.md) beachten. Der echte Alexa-Langzeittest ist noch erforderlich. Der neue Auswahlassistent verwendet die gespeicherten Miniserver-Zugangsdaten; bestehende Befehle und Geräte-IDs werden nicht automatisch ersetzt.
 
 Diese Anleitung beschreibt den Docker-Weg. Private Daten werden erst nach der Installation lokal im Ordner `data/` angelegt oder über die Web-UI eingetragen.
 
@@ -105,7 +105,7 @@ docker compose down
 
 ## Updates
 
-Vor dem ersten Wechsel von 1.0.28 oder älter auf 1.0.29:
+Vor dem ersten Wechsel von 1.0.28 oder älter auf 1.0.29 oder neuer:
 
 1. Den vollständigen Ordner `data/` privat sichern, einschließlich Cookie und Admin-Datei. Für eine konsistente Dateikopie den Container während der Sicherung stoppen.
 2. Den bisherigen Befehlsbestand unverändert lassen. Beim ersten Start werden die bisherigen Alexa-IDs übernommen; erst danach neue Befehle ergänzen.
@@ -222,7 +222,7 @@ docker compose logs loxevo
 
 `alexa-remote2 ist nicht installiert`:
 
-Im Docker-Image von 1.0.29 ist `alexa-remote2@8.1.1` enthalten. Tritt die Meldung auf, zuerst Branch, Commit und Image-Neubau prüfen. Ohne Docker `npm ci` ausführen. Nicht auf eine beliebige andere AlexaRemote-Version wechseln.
+Im Docker-Image von 1.0.30 ist `alexa-remote2@8.1.1` enthalten. Tritt die Meldung auf, zuerst Branch, Commit und Image-Neubau prüfen. Ohne Docker `npm ci` ausführen. Nicht auf eine beliebige andere AlexaRemote-Version wechseln.
 
 `Alexa-Cookie konnte nicht gelesen werden`:
 

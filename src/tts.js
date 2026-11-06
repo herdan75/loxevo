@@ -4,7 +4,7 @@ import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { writePrivateFile } from './file-security.js';
 import { redactDiagnosticText } from './diagnostics.js';
-import { stopRemote, refreshRemoteInventory, verifyRemoteAuthentication, TESTED_ALEXA_REMOTE_VERSION } from './alexa-remote-adapter.js';
+import { callRemote, stopRemote, refreshRemoteInventory, verifyRemoteAuthentication, TESTED_ALEXA_REMOTE_VERSION } from './alexa-remote-adapter.js';
 
 const appRequire = createRequire(import.meta.url);
 const COMMAND_TIMEOUT_MS = 5000;
@@ -55,11 +55,15 @@ export class TtsService {
     this.disposed = false;
     this.cookieListeners = new Map();
     this.retiredRemotes = new WeakSet();
+    this.pendingCandidates = new WeakSet();
+    this.pendingCookies = new WeakMap();
     this.cookieWriteQueue = Promise.resolve();
     this.cookieState = null;
     this.initCancellations = new Set();
     this.existingRefreshPromise = null;
     this.inventoryRefreshPromise = null;
+    this.inventoryRefreshRemote = null;
+    this.lastInventoryRefreshAt = null;
     this.inventoryReady = null;
     this.lastDeviceError = null;
     this.lastDelivery = null;
@@ -289,6 +293,7 @@ export class TtsService {
   async initializeRemoteCandidate(remote, auth, options = {}) {
     if (this.disposed) return { ok: false, error: new Error('TTS wurde beendet.') };
     this.remoteGenerations.set(remote, options.sequence || this.initSequence);
+    this.pendingCandidates.add(remote);
     return await new Promise((resolve) => {
       let initialResolved = false;
       let proxyPromptSeen = false;
@@ -361,8 +366,12 @@ export class TtsService {
     const shouldDisposePrevious = previousRemote && previousRemote !== remote;
 
     this.remote = remote;
+    this.pendingCandidates.delete(remote);
+    this.inventoryRefreshPromise = null;
+    this.inventoryRefreshRemote = null;
     this.auth = auth;
     this.inventoryReady = remote.serialNumbers ? Object.keys(remote.serialNumbers).length > 0 : null;
+    this.lastInventoryRefreshAt = this.inventoryReady ? new Date().toISOString() : null;
     this.lastDeviceError = this.inventoryReady === false ? 'Alexa-Geräteinventar ist noch nicht bereit.' : null;
     this.ready = true;
     this.authState = AUTH_STATE.READY;
@@ -370,6 +379,12 @@ export class TtsService {
     this.clearLoginProxyState();
     this.stopLoginProxyReconnectTimer();
     this.startAuthRefreshTimer();
+
+    const pendingCookie = this.pendingCookies.get(remote) || {};
+    this.pendingCookies.delete(remote);
+    const cookiePersist = this.persistCookie(pendingCookie.cookie, pendingCookie.csrf, pendingCookie.macDms, remote, auth).catch((persistError) => {
+      console.warn(`Alexa-Cookie konnte nicht gespeichert werden: ${persistError.message}`);
+    });
 
     if (shouldDisposePrevious) {
       await this.disposeRemote(previousRemote);
@@ -381,9 +396,7 @@ export class TtsService {
     const sequenceMode = this.hasNativeSequenceSupport() ? 'native Sequenzen' : 'sendSequenceCommand-Fallback';
     console.log(`TTS ist mit alexa-remote2 verbunden (${sequenceMode}).`);
     this.emitAuthEvent('ready', 'Alexa TTS ist bereit.');
-    await this.persistCookie(undefined, undefined, undefined, remote, auth).catch((persistError) => {
-      console.warn(`Alexa-Cookie konnte nicht gespeichert werden: ${persistError.message}`);
-    });
+    await cookiePersist;
     return true;
   }
 
@@ -443,6 +456,17 @@ export class TtsService {
 
   async persistCookieNow(cookie, csrf, macDms, sourceRemote, sourceAuth) {
     if (this.disposed || (sourceRemote && this.retiredRemotes.has(sourceRemote)) || !this.config.cookieFile) return false;
+    // A candidate may emit credentials before init fails. The ready instance stays owner
+    // until the candidate has actually been accepted.
+    if (this.ready && sourceRemote !== this.remote && this.pendingCandidates.has(sourceRemote)) {
+      const previous = this.pendingCookies.get(sourceRemote) || {};
+      this.pendingCookies.set(sourceRemote, {
+        cookie: firstNonEmptyString(cookie, previous.cookie),
+        csrf: firstNonEmptyString(csrf, previous.csrf),
+        macDms: firstNonEmptyObject(macDms, previous.macDms)
+      });
+      return false;
+    }
     const generation = this.remoteGenerations.get(sourceRemote) || 0;
     if (generation < this.cookieOwnerGeneration) return false;
 
@@ -1153,6 +1177,7 @@ export class TtsService {
       ready: this.ready && this.inventoryReady !== false,
       authReady: this.ready,
       inventoryReady: this.inventoryReady,
+      lastInventoryRefreshAt: this.lastInventoryRefreshAt,
       inventoryCount: Object.keys(this.remote?.serialNumbers || {}).length,
       error: this.lastError || this.lastDeviceError,
       lastDelivery: this.lastDelivery,
@@ -1170,6 +1195,19 @@ export class TtsService {
 
   getDefaultSpeakDevices() {
     return firstNonEmpty(this.config.defaultDevices, this.config.allDevices, this.config.alarmDevices);
+  }
+
+  previewTargets(kind = 'speak', devices) {
+    const targets = this.normalizeDevices(devices || (kind === 'alarm'
+      ? firstNonEmpty(this.config.alarmDevices, this.config.allDevices, this.config.defaultDevices)
+      : this.getDefaultSpeakDevices()));
+    const names = targets.map((serial) => ({ serial, name: this.findNativeDevice(serial)?.accountName || serial }));
+    try {
+      const effective = this.resolveNativeDevices(targets).map((device) => ({ serial: device.serialNumber, name: device.raw.accountName || device.serialNumber }));
+      return { targets: names, effective, resolved: true, checkedAt: this.lastInventoryRefreshAt, native: this.hasNativeSequenceSupport() };
+    } catch {
+      return { targets: names, effective: [], resolved: false, checkedAt: this.lastInventoryRefreshAt, native: this.hasNativeSequenceSupport() };
+    }
   }
 
   getAuthStatus() {
@@ -1302,6 +1340,8 @@ export class TtsService {
     if (!remote) return;
     if (this.retiredRemotes.has(remote)) return;
     this.retiredRemotes.add(remote);
+    this.pendingCandidates.delete(remote);
+    this.pendingCookies.delete(remote);
     const listener = this.cookieListeners.get(remote);
     if (listener) remote.removeListener?.('cookie', listener);
     this.cookieListeners.delete(remote);
@@ -1345,20 +1385,30 @@ export class TtsService {
   }
 
   async refreshDeviceInventory() {
-    if (this.inventoryRefreshPromise) return this.inventoryRefreshPromise;
     const remote = this.remote;
-    this.inventoryRefreshPromise = (async () => {
+    if (this.inventoryRefreshPromise && this.inventoryRefreshRemote === remote) return this.inventoryRefreshPromise;
+    this.inventoryRefreshRemote = remote;
+    const operation = (async () => {
       try {
         await refreshRemoteInventory(remote);
         if (this.disposed || remote !== this.remote) throw new Error('Alexa-Verbindung wurde zwischenzeitlich ersetzt.');
         this.inventoryReady = true;
+        this.lastInventoryRefreshAt = new Date().toISOString();
         this.lastDeviceError = null;
       } catch (error) {
-        this.inventoryReady = false;
-        this.lastDeviceError = 'Alexa-Geräteinventar konnte nicht bestätigt werden.';
+        if (!this.disposed && remote === this.remote) {
+          this.inventoryReady = false;
+          this.lastDeviceError = 'Alexa-Geräteinventar konnte nicht bestätigt werden.';
+        }
         throw error;
-      } finally { this.inventoryRefreshPromise = null; }
+      }
     })();
+    this.inventoryRefreshPromise = operation.finally(() => {
+      if (this.inventoryRefreshRemote === remote) {
+        this.inventoryRefreshPromise = null;
+        this.inventoryRefreshRemote = null;
+      }
+    });
     return this.inventoryRefreshPromise;
   }
 
@@ -1440,7 +1490,19 @@ export class TtsService {
         }
       }
       await this.refreshAuth(reason, error, { forceCandidate: true });
-      return await action();
+      const retryRemote = this.remote;
+      try { return await action(); }
+      catch (finalError) {
+        if (isAuthError(finalError) && !this.disposed && retryRemote === this.remote) {
+          this.ready = false;
+          this.lastAuthError = summarizeAuthError(finalError);
+          this.lastError = 'Amazon lehnt den TTS-Aufruf auch nach dem Wiederherstellungsversuch ab. TTS neu verbinden oder Login prüfen.';
+          this.authState = this.loginProxyActive ? AUTH_STATE.WAIT_PROXY : AUTH_STATE.ERROR;
+          this.stopAuthRefreshTimer();
+          this.emitAuthEvent('refresh-failed', this.lastError);
+        }
+        throw finalError;
+      }
     }
   }
 
@@ -1768,16 +1830,16 @@ export class TtsService {
   }
 
   async readCurrentVolume(device) {
-    if (typeof this.remote?.getMediaPromise !== 'function') return NaN;
-
     try {
-      const media = await withTimeout(
-        this.remote.getMediaPromise(device.raw || device),
-        MEDIA_VOLUME_TIMEOUT_MS,
-        'Media-Status Timeout'
-      );
+      const remote = this.remote;
+      const media = typeof remote?.getMedia === 'function'
+        ? await callRemote(remote, 'getMedia', [device.raw || device], MEDIA_VOLUME_TIMEOUT_MS)
+        : typeof remote?.getMediaPromise === 'function'
+          ? await withTimeout(remote.getMediaPromise(device.raw || device), MEDIA_VOLUME_TIMEOUT_MS, 'Media-Status Timeout')
+          : null;
       return normalizeVolume(media?.volume, NaN);
-    } catch {
+    } catch (error) {
+      if (isAuthError(error)) throw error;
       return NaN;
     }
   }

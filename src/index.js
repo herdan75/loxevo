@@ -9,7 +9,8 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, prepareConfig, saveConfig } from './config.js';
 import { AlexaBridgeService, isSsdpPortInUseError } from './alexa-bridge.js';
-import { isCommandType, readCommandTarget } from './command-utils.js';
+import { isCommandType, readCommandTarget, resolveCommandKey } from './command-utils.js';
+import { loadLoxoneCatalog } from './loxone-catalog.js';
 import { DiscoveryControl } from './discovery-control.js';
 import { LoxoneClient } from './loxone.js';
 import { TtsService, parseAlexaCookieFile } from './tts.js';
@@ -216,6 +217,10 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
     return sendJson(res, config);
   }
 
+  if (req.method === 'GET' && pathParts[1] === 'loxone' && pathParts[2] === 'controls' && pathParts.length === 3) {
+    return sendJson(res, await loadLoxoneCatalog(loxone));
+  }
+
   if (req.method === 'GET' && pathParts[1] === 'events' && pathParts[2] === 'export') {
     return exportEvents(res);
   }
@@ -256,6 +261,15 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
 
   if (req.method === 'GET' && pathParts[1] === 'tts' && pathParts[2] === 'status') {
     return sendJson(res, tts.getStatus());
+  }
+
+  if (req.method === 'POST' && pathParts[1] === 'tts' && pathParts[2] === 'preview') {
+    const payload = parseJson(await readRequestBody());
+    if (!isPlainObject(payload)) return sendJson(res, { error: 'Ungültige TTS-Vorschau.' }, 400);
+    if (payload.devices !== undefined && (!Array.isArray(payload.devices) || payload.devices.length > 300 || payload.devices.some((item) => typeof item !== 'string' || item.length > 200))) {
+      return sendJson(res, { error: 'Ungültige TTS-Zielliste.' }, 400);
+    }
+    return sendJson(res, tts.previewTargets(payload.kind, payload.devices));
   }
 
   if (req.method === 'GET' && pathParts[1] === 'tts' && pathParts[2] === 'devices') {
@@ -342,6 +356,7 @@ async function handleApi(req, res, pathParts, readRequestBody, url) {
 
 function requiresAdminToken(req, pathParts) {
   if (!isAdminProtectionEnabled()) return false;
+  if (pathParts[1] === 'loxone') return true;
 
   const method = String(req.method || '').toUpperCase();
   const resource = pathParts[1] || '';
@@ -859,11 +874,10 @@ async function runConfiguredCommand(res, commandKey) {
 }
 
 async function executeConfiguredCommand(commandKey, source, options = {}) {
-  const normalizedCommandKey = normalizeKey(commandKey);
   const client = options.client || loxone;
   const result = options.offTarget
-    ? await client.runCommandOff(normalizedCommandKey)
-    : await client.runCommand(normalizedCommandKey);
+    ? await client.runCommandOff(commandKey)
+    : await client.runCommand(commandKey);
   addEvent({
     type: source,
     status: result.dryRun ? 'dry-run' : 'sent',
@@ -909,15 +923,15 @@ async function handleTts(req, res, pathParts, body) {
   }
   if (cmd === 'alarm') {
     const targetDevices = payload.devices || firstNonEmpty(config.tts?.alarmDevices, config.tts?.allDevices, config.tts?.defaultDevices);
-    await tts.alarm(payload.text, targetDevices, payload.volume);
+    const delivery = await tts.alarm(payload.text, targetDevices, payload.volume);
     addEvent({ type: 'tts-alarm', status: 'sent', text: payload.text, volume: payload.volume, devices: targetDevices });
-    return sendJson(res, { ok: true, command: 'alarm', devices: targetDevices });
+    return sendJson(res, { ok: true, command: 'alarm', devices: targetDevices, delivery });
   }
 
   const targetDevices = payload.devices || defaultTtsSpeakDevices();
-  await tts.speak(payload.text, targetDevices);
+  const delivery = await tts.speak(payload.text, targetDevices);
   addEvent({ type: 'tts-speak', status: 'sent', text: payload.text, devices: targetDevices });
-  return sendJson(res, { ok: true, command: 'speak', devices: targetDevices });
+  return sendJson(res, { ok: true, command: 'speak', devices: targetDevices, delivery });
 }
 
 async function handleLoxoneTtsShortPath(res, url, commandName, body) {
@@ -2019,7 +2033,7 @@ async function executeAlexaBridgeCommand(commandKey, options = {}) {
 }
 
 function triggerAlexaCommandConfirmation(commandKey, sourceConfig = config) {
-  const command = sourceConfig.commands?.[normalizeKey(commandKey)];
+  const command = sourceConfig.commands?.[resolveCommandKey(sourceConfig.commands, commandKey)];
   const confirmation = command?.confirmation;
   if (!confirmation?.enabled) return;
 

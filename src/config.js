@@ -1,6 +1,6 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { hasCommandOffTarget, isCommandType, isValidLoxoneUuid, readCommandTarget } from './command-utils.js';
+import { hasCommandOffTarget, isCommandType, isValidLoxoneUuid, readCommandTarget, resolveCommandKey, normalizeCommandKey as normalizeConfigCommandKey } from './command-utils.js';
 import { writePrivateFile } from './file-security.js';
 
 const DEFAULT_CONFIG_PATH = './config.json';
@@ -102,7 +102,7 @@ export function validateConfig(config, options = {}) {
       if (!['switch', 'action'].includes(alexaMode)) {
         reportCommandIssue(`Unbekannter Alexa-Modus "${command.alexaMode}" für Befehl "${commandName}".`);
       }
-      const offCommand = normalizeConfigCommandKey(command.offCommand);
+      const offCommand = resolveCommandKey(config.commands, command.offCommand) || normalizeConfigCommandKey(command.offCommand);
       if (offCommand && alexaMode !== 'action' && !hasCommandOffTarget(command)) {
         if (offCommand === commandName) {
           reportCommandIssue(`Aus-Befehl "${offCommand}" für Befehl "${commandName}" darf nicht auf sich selbst zeigen.`);
@@ -218,7 +218,7 @@ export function normalizeConfig(config) {
       } else {
         delete command.alexaMode;
       }
-      const offCommand = normalizeConfigCommandKey(command.offCommand);
+      const offCommand = resolveCommandKey(config.commands, command.offCommand) || normalizeConfigCommandKey(command.offCommand);
       if (offCommand) {
         command.offCommand = offCommand;
       } else {
@@ -263,16 +263,4 @@ function numberInRange(value, fallback, min = Number.NEGATIVE_INFINITY, max = Nu
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.min(max, Math.max(min, number));
-}
-
-function normalizeConfigCommandKey(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replaceAll(' ', '_')
-    .replaceAll('ä', 'ae')
-    .replaceAll('ö', 'oe')
-    .replaceAll('ü', 'ue')
-    .replaceAll('\u00df', 'ss')
-    .replace(/[^a-z0-9_-]/g, '');
 }

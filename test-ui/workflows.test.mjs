@@ -30,15 +30,21 @@ test('UI regression workflows and responsive layouts', async (t) => {
     const path = url.pathname;
     if (path === '/' || path.startsWith('/assets/')) {
       const file = path === '/' ? 'public/index.html' : `public/${path.slice(8)}`;
-      return route.fulfill({ body: await readFile(new URL(file, root)), contentType: file.endsWith('.js') ? 'application/javascript' : file.endsWith('.css') ? 'text/css' : file.endsWith('.png') ? 'image/png' : 'text/html' });
+      return route.fulfill({ body: await readFile(new URL(file, root)), contentType: file.endsWith('.js') ? 'application/javascript' : file.endsWith('.css') ? 'text/css' : file.endsWith('.png') ? 'image/png' : file.endsWith('.svg') ? 'image/svg+xml' : 'text/html' });
     }
     let body = {};
     if (path === '/api/config') {
       if (route.request().method() === 'PUT') { persisted = route.request().postDataJSON(); body = { ok: true, config: persisted }; }
       else body = persisted;
-    } else if (path === '/api/tts/status') body = { enabled: false, ready: false, defaultDevices: [], allDevices: [], alarmDevices: [], auth: {} };
+    } else if (path === '/api/dry-run') { persisted.loxone.dryRun = route.request().postDataJSON().enabled; body = { dryRun: persisted.loxone.dryRun }; }
+    else if (path === '/api/loxone/controls') body = { controls: [
+      { uuid: 'aaaaaaaa-bbbb-cccc-dddddddddddddddd', name: 'Küchenlicht', type: 'Switch', room: 'Küche', category: 'Licht', existingKeys: [], profiles: [{ id: 'switch', label: 'Ein / Aus', type: 'direct', value: 'on', offValue: 'off', alexaMode: 'switch' }] },
+      { uuid: 'bbbbbbbb-bbbb-cccc-dddddddddddddddd', name: 'Türschloss', type: 'Switch', room: 'Eingang', category: 'Sicherheit', reason: 'Gesicherter Baustein', profiles: [], existingKeys: [] }
+    ] };
+    else if (path === '/api/tts/status') body = { enabled: false, ready: false, defaultDevices: [], allDevices: [], alarmDevices: [], auth: {} };
     else if (path === '/api/tts/devices') body = { devices: [] };
     else if (path === '/api/events') body = [];
+    else if (path === '/api/command') body = { ok: true, result: { dryRun: true } };
     else if (path === '/api/alexa-bridge/status') body = { enabled: false, ready: false, devices: [] };
     else if (path === '/api/discovery/status') body = { helper: { available: false }, alexaBridge: { enabled: false } };
     else if (path === '/api/setup-status') body = { complete: true, checks: [] };
@@ -60,6 +66,134 @@ test('UI regression workflows and responsive layouts', async (t) => {
       return { errors, count: Object.keys(config.commands).length, cards: roomEditor.querySelectorAll('.room-card').length };
     });
     assert.equal(result.errors.length, 2); assert.equal(result.count, 42); assert.equal(result.cards, 42);
+  });
+  await t.test('discard cannot undo the persisted live mode just in the browser', async () => {
+    await reset();
+    const result = await page.evaluate(async () => {
+      await setDryRun(false);
+      roomEditor.querySelector('.command-label').value = 'Unsaved'; markConfigDirty(); discardConfigChanges();
+      return { config: config.loxone.dryRun, saved: savedConfigSnapshot.loxone.dryRun, toggle: dryRunToggle.checked };
+    });
+    assert.deepEqual(result, { config: false, saved: false, toggle: false }); assert.equal(persisted.loxone.dryRun, false);
+  });
+  await t.test('edits during slow post-save refresh stay dirty and are not part of the snapshot', async () => {
+    await reset();
+    const result = await page.evaluate(async () => {
+      const original = loadTtsStatus; let release;
+      loadTtsStatus = () => new Promise((resolve) => { release = resolve; });
+      const saving = saveConfig(saveBtn);
+      while (!release) await new Promise((resolve) => setTimeout(resolve, 10));
+      const input = roomEditor.querySelector('[data-command-original="test_0"] .command-label');
+      input.value = 'AFTER SAVE'; input.dispatchEvent(new Event('input', { bubbles: true }));
+      release(); await saving; loadTtsStatus = original;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return { dirty: configDirty, baseline: savedConfigSnapshot.commands.test_0.label, value: input.value, locked: document.querySelector('#configView').inert };
+    });
+    assert.deepEqual(result, { dirty: true, baseline: 'Test 0', value: 'AFTER SAVE', locked: false });
+    assert.equal(persisted.commands.test_0.label, 'Test 0');
+  });
+  await t.test('pending write locks editing and prevents another save or mode switch', async () => {
+    await reset();
+    const result = await page.evaluate(async () => {
+      const original = putJson; let release, writes = 0;
+      putJson = async (_url, value) => { writes++; await new Promise((resolve) => { release = resolve; }); return { config: value }; };
+      const first = saveConfig(saveBtn);
+      while (!release) await new Promise((resolve) => setTimeout(resolve, 5));
+      const locked = document.querySelector('#configView').inert && dryRunToggle.disabled;
+      await saveJsonConfig(saveJsonBtn); await setDryRun(false);
+      release(); await first; putJson = original;
+      return { writes, locked, unlocked: !document.querySelector('#configView').inert, mode: config.loxone.dryRun };
+    });
+    assert.deepEqual(result, { writes: 1, locked: true, unlocked: true, mode: true });
+  });
+  await t.test('multiple inactive drafts and internal duplicate voice names can be saved', async () => {
+    await reset();
+    const result = await page.evaluate(() => {
+      addRoom(); addRoom(); const next = collectConfigFromForms();
+      const drafts = validateConfigBeforeSave(next);
+      next.commands.test_1.voiceName = next.commands.test_0.voiceName; next.commands.test_1.alexaExpose = false;
+      const internal = validateConfigBeforeSave(next);
+      next.commands.test_1.alexaExpose = true;
+      return { drafts, internal, exposed: validateConfigBeforeSave(next) };
+    });
+    assert.deepEqual(result.drafts, []); assert.deepEqual(result.internal, []); assert.ok(result.exposed.some((error) => error.includes('Doppelte')));
+  });
+  await t.test('legacy keys survive form round-trip and duplication creates a new inactive identity', async () => {
+    await reset();
+    const result = await page.evaluate(() => {
+      config.commands['Licht Küche'] = config.commands.test_0; delete config.commands.test_0; renderCommandEditor();
+      const original = collectConfigFromForms();
+      const card = [...roomEditor.querySelectorAll('.room-card')].find((item) => item.dataset.commandOriginal === 'Licht Küche');
+      card.querySelector('.command-card-actions button').click();
+      const commands = collectConfigFromForms().commands;
+      return { kept: Object.hasOwn(original.commands, 'Licht Küche'), original: commands['Licht Küche'], copy: commands.licht_kueche_kopie, draft: isDraftCommand('licht_kueche_kopie') };
+    });
+    assert.equal(result.kept, true); assert.equal(result.original.enabled, true); assert.equal(result.copy.enabled, false); assert.equal(result.draft, true);
+    assert.deepEqual(result.copy.extra, result.original.extra);
+  });
+  await t.test('Loxone picker is read-only until inactive draft import, handles restrictions and duplicates', async () => {
+    await reset(); await page.evaluate(() => openConfigArea('Befehle und Sprachnamen'));
+    await page.locator('#loxonePickerBtn').click();
+    await page.locator('.picker-control option').first().waitFor();
+    await page.locator('.picker-control').selectOption('1');
+    assert.equal(await page.locator('.picker-add').isDisabled(), true);
+    await page.locator('.picker-control').selectOption('0');
+    assert.equal(await page.locator('.picker-add').isEnabled(), true);
+    assert.equal(await page.locator('.picker-mood-label').isVisible(), false);
+    await mkdir('.tmp/stability', { recursive: true });
+    for (const width of [1366, 390, 320]) {
+      await page.setViewportSize({ width, height: 800 });
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+      await page.screenshot({ path: `.tmp/stability/picker-${width}.png` });
+    }
+    await page.setViewportSize({ width: 1366, height: 800 });
+    await page.locator('.picker-add').click();
+    assert.equal(await page.locator('dialog.loxone-picker').count(), 0);
+    const result = await page.evaluate(() => {
+      const card = roomEditor.querySelector('[data-command-original="kuechenlicht"]');
+      return { command: collectConfigFromForms().commands.kuechenlicht, open: card.open, simple: card.classList.contains('command-simple'), first: roomEditor.querySelector('.room-card').dataset.commandOriginal };
+    });
+    assert.equal(result.command.enabled, false); assert.equal(result.command.loxone.value, 'on'); assert.equal(result.command.loxone.offValue, 'off');
+    assert.equal(result.open, true); assert.equal(result.simple, true); assert.equal(result.first, 'kuechenlicht');
+    assert.equal(Object.keys(persisted.commands).length, 42);
+    await page.locator('#loxonePickerBtn').click(); await page.locator('.picker-control option').first().waitFor();
+    await page.locator('.picker-control').selectOption('0'); assert.equal(await page.locator('.picker-add').isDisabled(), true);
+    await page.keyboard.press('Escape');
+  });
+  await t.test('target fallback, explicit tests and partial results remain understandable', async () => {
+    await reset();
+    const result = await page.evaluate(() => {
+      ttsDefaultDevices.value = ''; ttsAllDevices.value = 'group'; ttsAlarmDevices.value = 'alarm';
+      const speak = ttsTestPlan('speak'), alarm = ttsTestPlan('alarm');
+      const target = document.querySelector('#ttsTestTarget'); target.add(new Option('Echo', 'single')); target.value = 'single';
+      showActionResult('ttsTestResult', deliveryDescription({ confirmed: 1, requested: 2, status: 'partial' }), true);
+      return { speak, alarm, explicit: ttsTestPlan('alarm'), text: document.querySelector('#ttsTestResult').textContent };
+    });
+    assert.deepEqual(result.speak, { devices: ['group'], source: 'Alle/Fallback' });
+    assert.deepEqual(result.alarm, { devices: ['alarm'], source: 'Alarm' }); assert.deepEqual(result.explicit.devices, ['single']);
+    assert.match(result.text, /1 von 2/); assert.match(result.text, /nicht geprüft/);
+    const safety = await page.evaluate(async () => {
+      document.querySelector('#ttsTestTarget').value = '';
+      ttsDefaultDevices.value = ''; ttsAllDevices.value = ''; ttsAlarmDevices.value = '';
+      await postTtsTest('speak', speakBtn);
+      await sendCommand('test_0', document.createElement('button'));
+      return { tts: document.querySelector('#ttsTestResult').textContent, loxone: document.querySelector('#commandTestResult').textContent };
+    });
+    assert.match(safety.tts, /nichts gesendet/); assert.match(safety.loxone, /Dry-Run, nicht gesendet/);
+  });
+  await t.test('backup conflict preview is secret-free and cancel performs no write', async () => {
+    await reset();
+    const next = fixture(); delete next.commands.test_0; next.commands.test_1.label = 'Changed'; next.commands.added = next.commands.test_2;
+    await page.locator('#importBackupFile').setInputFiles({ name: 'fixture.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ config: next, cookie: { content: 'SECRET_COOKIE' } })) });
+    const result = await page.evaluate(async () => {
+      const original = window.confirm; let message = '';
+      window.confirm = (text) => { message = text; return false; };
+      await importBackup(document.querySelector('#importBackupBtn')); window.confirm = original;
+      return { message, locked: configWritePending, label: config.commands.test_1.label };
+    });
+    assert.match(result.message, /Entfernt \(1\): test_0/); assert.match(result.message, /Neu \(1\): added/);
+    assert.match(result.message, /Cookie enthalten: ja/); assert.ok(!result.message.includes('SECRET_COOKIE'));
+    assert.equal(result.locked, false); assert.equal(result.label, 'Test 1'); assert.equal(persisted.commands.test_1.label, 'Test 1');
   });
   await t.test('discard restores command values and JSON save replaces stale editor state', async () => {
     await reset();
@@ -133,7 +267,7 @@ test('UI regression workflows and responsive layouts', async (t) => {
   await t.test('all six views fit desktop, tablet and mobile widths', async () => {
     await reset(); await mkdir('.tmp/stability', { recursive: true });
     const overflow = [];
-    for (const width of [1366, 768, 390]) {
+    for (const width of [1366, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 800 });
       for (const view of ['dashboardView', 'configView', 'controlView', 'integrationView', 'maintenanceView', 'eventsView']) {
         await page.evaluate((id) => { showView(id); document.getElementById(id).querySelectorAll('details').forEach((node) => { node.open = true; }); }, view);

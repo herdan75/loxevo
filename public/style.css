@@ -1270,6 +1270,40 @@ main {
   color: #ffffff;
 }
 
+.loxone-picker {
+  width: min(680px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: #fff;
+}
+.loxone-picker::backdrop { background: rgb(0 0 0 / 35%); }
+.loxone-picker > * + * { margin-top: 12px; }
+.loxone-picker h2 { font-size: 18px; margin: 0; }
+.loxone-picker label { display: grid; gap: 4px; min-width: 0; }
+.loxone-picker [hidden] { display: none; }
+.loxone-picker select, .loxone-picker input { width: 100%; min-width: 0; }
+.loxone-picker pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.picker-control { height: 180px; }
+.command-advanced-toggle { margin: 6px 12px 0; font-size: 12px; }
+.command-simple .advanced-field { display: none; }
+.command-simple .form-row.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.command-simple .command-detail-section:last-child { display: none; }
+.command-card-actions { flex-shrink: 0; gap: 4px; }
+.command-card-actions img { display: block; }
+.action-result { margin-top: 8px; font-size: 13px; overflow-wrap: anywhere; }
+.info-button, .info-button-small { min-width: 24px; min-height: 24px; }
+
+@media (max-width: 600px) {
+  .tab-nav { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }
+  .tab-nav .tab-button { min-width: 0; padding: 8px 3px; font-size: 12px; overflow-wrap: anywhere; }
+  .command-card-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 100px; }
+  .command-simple .form-row.three { grid-template-columns: minmax(0, 1fr); }
+}
+
 .view {
   display: none;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2306,7 +2340,7 @@ pre {
 
 @media (max-width: 760px) {
   .room-card-head { grid-template-columns: auto minmax(0, 1fr); gap: 6px; padding: 8px; }
-  .room-card-head > button { grid-column: 2; justify-self: end; }
+  .room-card-head > button, .room-card-head > .command-card-actions { grid-column: 2; justify-self: end; max-width: none; }
   .command-summary-titleline { flex-wrap: wrap; gap: 3px; }
   .command-summary-titleline strong, .command-summary-key { white-space: normal; overflow-wrap: anywhere; }
   .command-tools { position: static; }
@@ -2360,6 +2394,10 @@ pre {
   .tab-nav {
     flex-direction: column;
   }
+
+  .panel { padding: 12px; }
+  .config-section-body { padding: 10px; }
+  .category-group > .room-card { margin-left: 6px; margin-right: 6px; }
 
   .wizard-head,
   .wizard-footer {

@@ -1,6 +1,19 @@
 export const COMMAND_TYPES = ['changeTo', 'direct', 'pulse', 'raw'];
 export const LOXONE_UUID_PATTERN = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-(?:[0-9a-f]{16}|[0-9a-f]{4}-[0-9a-f]{12}))$/i;
 
+export function normalizeCommandKey(value) {
+  return String(value || '').trim().toLowerCase().replaceAll(' ', '_')
+    .replaceAll('ä', 'ae').replaceAll('ö', 'oe').replaceAll('ü', 'ue').replaceAll('ß', 'ss')
+    .replace(/[^a-z0-9_-]/g, '');
+}
+
+export function resolveCommandKey(commands, value) {
+  if (Object.hasOwn(commands || {}, value)) return value;
+  const normalized = normalizeCommandKey(value);
+  const matches = Object.keys(commands || {}).filter((key) => normalizeCommandKey(key) === normalized);
+  return matches.length === 1 ? matches[0] : null;
+}
+
 export function isCommandType(value) {
   return COMMAND_TYPES.includes(value);
 }

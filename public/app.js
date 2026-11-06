@@ -142,6 +142,8 @@ let adminSecurityInfo = null;
 let allEvents = [];
 let activeEventFilter = 'all';
 let configDirty = false;
+let configWritePending = false;
+const simpleCommandKeys = new Set();
 let savedConfigSnapshot = null;
 const ADMIN_TOKEN_STORAGE_KEY = 'loxevoAdminToken';
 const LAST_BACKUP_EXPORT_KEY = 'loxevoLastBackupExportAt';
@@ -168,6 +170,7 @@ saveJsonBtn.addEventListener('click', () => saveJsonConfig(saveJsonBtn));
 reloadJsonBtn.addEventListener('click', () => regenerateJsonFromForms(reloadJsonBtn));
 speakBtn.addEventListener('click', () => postTtsTest('speak', speakBtn));
 alarmBtn.addEventListener('click', () => postTtsTest('alarm', alarmBtn));
+document.querySelector('#ttsTestTarget').addEventListener('change', renderTtsTargetPreview);
 refreshEventsBtn.addEventListener('click', () => loadEvents(refreshEventsBtn));
 clearEventsBtn?.addEventListener('click', () => clearEvents(clearEventsBtn));
 exportEventsBtn?.addEventListener('click', () => exportEvents(exportEventsBtn));
@@ -242,11 +245,11 @@ ttsAlarmVolume?.addEventListener('input', () => {
   });
 });
 document.querySelector('#configView')?.addEventListener('input', (event) => {
-  if (event.target?.closest?.('.command-tools')) return;
+  if (event.target?.closest?.('.command-tools, .command-advanced-toggle')) return;
   markConfigDirty();
 });
 document.querySelector('#configView')?.addEventListener('change', (event) => {
-  if (event.target?.closest?.('.command-tools')) return;
+  if (event.target?.closest?.('.command-tools, .command-advanced-toggle')) return;
   markConfigDirty();
 });
 roomEditor?.addEventListener('input', (event) => {
@@ -345,17 +348,35 @@ function renderCommands() {
 async function sendCommand(commandKey, button) {
   setButtonFeedback(button, 'pending', 'Wird ausgeführt');
   try {
-    await postJson('/api/command', { command: commandKey });
+    const result = await postJson('/api/command', { command: commandKey });
+    const simulated = result.result?.dryRun === true;
+    showActionResult('commandTestResult', `${commandKey}: ${simulated ? 'Dry-Run, nicht gesendet' : 'Aufruf erfolgreich; physischer Zustand nicht geprüft'}.`);
     await loadEvents();
-    setButtonFeedback(button, 'success', 'Ausgeführt');
-    showToast(`Befehl ausgeführt: ${commandKey}`, 'ok');
+    setButtonFeedback(button, 'success', simulated ? 'Dry-Run' : 'Gesendet');
+    showToast(`${simulated ? 'Dry-Run' : 'Aufruf erfolgreich'}: ${commandKey}`, 'ok');
   } catch (error) {
     setButtonFeedback(button, 'error', 'Fehler');
+    showActionResult('commandTestResult', `${commandKey}: ${error.message}`, true);
     showToast(error.message, 'error');
   }
 }
 
+async function writeConfigJson(url, body) {
+  if (configWritePending) throw new Error('Konfiguration wird bereits gespeichert.');
+  configWritePending = true;
+  const view = document.querySelector('#configView');
+  view.inert = true;
+  dryRunToggle.disabled = true;
+  try { return await putJson(url, body); }
+  finally {
+    configWritePending = false;
+    view.inert = false;
+    dryRunToggle.disabled = false;
+  }
+}
+
 async function saveConfig(button) {
+  if (configWritePending) return;
   try {
     const nextConfig = collectConfigFromForms();
     const validation = validateConfigBeforeSave(nextConfig);
@@ -366,7 +387,7 @@ async function saveConfig(button) {
     }
     if (!confirmConfigSave(nextConfig)) return;
     setButtonFeedback(button, 'pending', 'Speichert');
-    const result = await putJson('/api/config', nextConfig);
+    const result = await writeConfigJson('/api/config', nextConfig);
     config = result.config;
     clearDraftCommands();
     populateForms();
@@ -374,6 +395,8 @@ async function saveConfig(button) {
     renderCommands();
     renderCommandEditor();
     syncJsonFromForms();
+    captureSavedConfigSnapshot();
+    markConfigClean();
     await loadTtsStatus();
     await loadTtsDevices();
     await loadAlexaBridgeStatus();
@@ -381,8 +404,6 @@ async function saveConfig(button) {
     await loadSetupStatus();
     await loadPreflightStatus();
     renderIntegrations();
-    captureSavedConfigSnapshot();
-    markConfigClean();
     renderDashboard();
     setButtonFeedback(button, 'success', 'Gespeichert');
     showToast(`Konfiguration gespeichert: ${configSaveSummaryInline(config)}`, 'ok');
@@ -393,6 +414,7 @@ async function saveConfig(button) {
 }
 
 async function saveJsonConfig(button) {
+  if (configWritePending) return;
   try {
     const nextConfig = JSON.parse(configEditor.value);
     const validation = validateConfigBeforeSave(nextConfig);
@@ -403,7 +425,7 @@ async function saveJsonConfig(button) {
     }
     if (!confirmConfigSave(nextConfig)) return;
     setButtonFeedback(button, 'pending', 'Speichert');
-    const result = await putJson('/api/config', nextConfig);
+    const result = await writeConfigJson('/api/config', nextConfig);
     config = result.config;
     clearDraftCommands();
     populateForms();
@@ -411,6 +433,8 @@ async function saveJsonConfig(button) {
     renderCommands();
     renderCommandEditor();
     syncJsonFromForms();
+    captureSavedConfigSnapshot();
+    markConfigClean();
     await loadTtsStatus();
     await loadTtsDevices();
     await loadAlexaBridgeStatus();
@@ -418,8 +442,6 @@ async function saveJsonConfig(button) {
     await loadSetupStatus();
     await loadPreflightStatus();
     renderIntegrations();
-    captureSavedConfigSnapshot();
-    markConfigClean();
     renderDashboard();
     setButtonFeedback(button, 'success', 'Gespeichert');
     showToast(`JSON gespeichert: ${configSaveSummaryInline(config)}`, 'ok');
@@ -447,7 +469,9 @@ function validateConfigBeforeSave(nextConfig) {
     markInvalid(loxonePassword);
   }
   const commandKeys = Object.keys(nextConfig.commands || {});
-  const duplicateLabels = duplicateValues(commandKeys.map((key) => normalizeText(nextConfig.commands?.[key]?.voiceName || nextConfig.commands?.[key]?.label || key)));
+  const duplicateLabels = duplicateValues(commandKeys
+    .filter((key) => nextConfig.commands[key].enabled !== false && nextConfig.commands[key].alexaExpose !== false)
+    .map((key) => normalizeText(nextConfig.commands[key].voiceName || nextConfig.commands[key].label || key)));
   if (duplicateLabels.length) {
     errors.push(`Doppelte Sprach-/Befehlsnamen prüfen: ${duplicateLabels.slice(0, 3).join(', ')}.`);
   }
@@ -568,6 +592,7 @@ function captureSavedConfigSnapshot() {
 }
 
 function discardConfigChanges() {
+  if (configWritePending) return;
   if (!savedConfigSnapshot) return;
   if (configDirty && !window.confirm('Ungespeicherte Änderungen verwerfen?')) return;
   clearDraftCommands();
@@ -625,9 +650,13 @@ function scheduleConfigDirtyRefresh() {
 async function postTtsTest(kind, button) {
   const isAlarm = kind === 'alarm';
   const endpoint = isAlarm ? '/tts/alarm' : '/tts/speak';
-  const devices = isAlarm
-    ? firstDeviceList(ttsAlarmDevices.value, ttsAllDevices.value, ttsDefaultDevices.value)
-    : firstDeviceList(ttsDefaultDevices.value);
+  const plan = ttsTestPlan(kind);
+  const devices = plan.devices;
+  if (!devices.length) {
+    showActionResult('ttsTestResult', 'Kein Testziel gewählt. Es wurde nichts gesendet.', true);
+    return;
+  }
+  if (isAlarm && !window.confirm(`Alarmtest mit ${ttsAlarmVolume.value}% Lautstärke an ${devices.join(', ') || 'keine Geräte'} senden?`)) return;
   const payload = {
     text: ttsText.value
   };
@@ -648,15 +677,56 @@ async function postTtsTest(kind, button) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    await ensureOk(response);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(result.error || `HTTP ${response.status}`); error.delivery = result.delivery; throw error;
+    }
+    showActionResult('ttsTestResult', deliveryDescription(result.delivery));
     await loadTtsStatus();
     await loadEvents();
     setButtonFeedback(button, 'success', 'Gesendet');
     showToast(isAlarm ? 'Alarm gesendet' : 'TTS gesendet', 'ok');
   } catch (error) {
     setButtonFeedback(button, 'error', 'Fehler');
+    showActionResult('ttsTestResult', `${error.message}${error.delivery ? ` ${deliveryDescription(error.delivery)}` : ''}`, true);
     showToast(error.message, 'error');
   }
+}
+
+function showActionResult(id, text, failed = false) {
+  const node = document.getElementById(id);
+  node.hidden = false; node.textContent = `${new Date().toLocaleTimeString('de-CH')}: ${text}`;
+  node.classList.toggle('danger-text', failed);
+}
+
+function deliveryDescription(delivery) {
+  return delivery ? `${delivery.confirmed || 0} von ${delivery.requested || 0} Zielen bestätigt (${delivery.status}). Hörbare Wiedergabe nicht geprüft.` : 'Aufruf angenommen. Hörbare Wiedergabe nicht geprüft.';
+}
+
+function ttsTestPlan(kind) {
+  const explicit = document.querySelector('#ttsTestTarget').value;
+  if (explicit) return { devices: [explicit], source: 'Testziel' };
+  const lists = kind === 'alarm'
+    ? [[ttsAlarmDevices.value, 'Alarm'], [ttsAllDevices.value, 'Alle/Fallback'], [ttsDefaultDevices.value, 'Standard']]
+    : [[ttsDefaultDevices.value, 'Standard'], [ttsAllDevices.value, 'Alle/Fallback'], [ttsAlarmDevices.value, 'Alarm-Fallback']];
+  for (const [value, source] of lists) { const devices = firstDeviceList(value); if (devices.length) return { devices, source }; }
+  return { devices: [], source: 'keine Ziele' };
+}
+
+let ttsPreviewSequence = 0;
+async function renderTtsTargetPreview() {
+  const sequence = ++ttsPreviewSequence;
+  const output = document.querySelector('#ttsTargetPreview');
+  const lines = [];
+  try {
+    for (const kind of ['speak', 'alarm']) {
+      const plan = ttsTestPlan(kind);
+      const preview = await postJson('/api/tts/preview', { kind, devices: plan.devices });
+      const targets = preview.native && preview.resolved ? preview.effective : preview.targets || [];
+      lines.push(`${kind === 'alarm' ? `Alarm (${ttsAlarmVolume.value}%)` : 'Sprechen (aktuelle Gerätelautstärke)'} · ${plan.source}: ${targets.map((device) => device.name).join(', ') || 'keine Ziele'}${preview.resolved === false ? ' · Inventar nicht bestätigt' : ''}`);
+    }
+    if (sequence === ttsPreviewSequence) output.textContent = lines.join(' | ');
+  } catch { if (sequence === ttsPreviewSequence) output.textContent = 'Zielvorschau derzeit nicht verfügbar.'; }
 }
 
 async function postJson(url, payload) {
@@ -740,21 +810,35 @@ async function exportEvents(button) {
 }
 
 async function importBackup(button) {
+  if (configWritePending) return;
+  let ownsWrite = false;
   const file = importBackupFile?.files?.[0];
   if (!file) {
     showToast('Bitte zuerst eine Backup-Datei auswählen', 'error');
     return;
   }
 
-  const ok = window.confirm('Backup importieren? Die aktuelle Konfiguration wird vorher im Datenordner gesichert.');
-  if (!ok) return;
-
-  setButtonFeedback(button, 'pending', 'Importiert');
   try {
+    if (file.size > 5 * 1024 * 1024) throw new Error('Backup ist zu groß (maximal 5 MB).');
+    const text = await file.text();
+    if (configWritePending) return;
+    let payload;
+    try { payload = JSON.parse(text); } catch { throw new Error('Backup enthält ungültiges JSON.'); }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Keine LoxEvo-Konfiguration im Backup.');
+    const imported = payload.config || payload;
+    if (!imported.loxone || (!imported.commands && !imported.rooms)) throw new Error('Keine LoxEvo-Konfiguration im Backup.');
+    const current = savedConfigSnapshot?.commands || {}, next = imported.commands || {};
+    const added = Object.keys(next).filter((key) => !Object.hasOwn(current, key));
+    const removed = Object.keys(current).filter((key) => !Object.hasOwn(next, key));
+    const changed = Object.keys(next).filter((key) => Object.hasOwn(current, key) && JSON.stringify(current[key]) !== JSON.stringify(next[key]));
+    const list = (keys) => keys.slice(0, 20).join(', ') + (keys.length > 20 ? ` … (${keys.length} insgesamt)` : '');
+    if (!window.confirm(`Backup ersetzen?\n\nNeu (${added.length}): ${list(added) || 'keine'}\nGeändert / überschrieben (${changed.length}): ${list(changed) || 'keine'}\nEntfernt (${removed.length}): ${list(removed) || 'keine'}\nCookie enthalten: ${payload.cookie?.content ? 'ja' : 'nein'}\n\nDie gesamte Konfiguration wird ersetzt, nicht zusammengeführt. Ungespeicherte Änderungen gehen verloren. Bestehende ID-Konflikte werden serverseitig geprüft. Vorher wird die aktuelle Konfiguration gesichert.`)) return;
+    ownsWrite = true; configWritePending = true; document.querySelector('#configView').inert = true;
+    setButtonFeedback(button, 'pending', 'Importiert');
     const response = await adminFetch('/api/backup/restore', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: await file.text()
+      body: text
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -768,6 +852,9 @@ async function importBackup(button) {
     renderCommands();
     renderCommandEditor();
     syncJsonFromForms();
+    captureSavedConfigSnapshot();
+    markConfigClean();
+    ownsWrite = false; configWritePending = false; document.querySelector('#configView').inert = false;
     await loadTtsStatus();
     await loadTtsDevices();
     await loadAlexaBridgeStatus();
@@ -777,8 +864,6 @@ async function importBackup(button) {
     renderIntegrations();
     await loadEvents();
     if (importBackupFile) importBackupFile.value = '';
-    captureSavedConfigSnapshot();
-    markConfigClean();
     renderDashboard();
 
     setButtonFeedback(button, 'success', 'Importiert');
@@ -786,6 +871,8 @@ async function importBackup(button) {
   } catch (error) {
     setButtonFeedback(button, 'error', 'Fehler');
     showToast(error.message, 'error');
+  } finally {
+    if (ownsWrite) { configWritePending = false; document.querySelector('#configView').inert = false; }
   }
 }
 
@@ -1119,6 +1206,7 @@ function renderTtsStatus() {
     target.className = className;
   });
   renderTtsAuthDetails();
+  void renderTtsTargetPreview();
   renderSystemNotice();
 }
 
@@ -1154,6 +1242,7 @@ function renderTtsAuthDetails() {
       lines.push('Hinweis: Für stabilen Dauerbetrieb ist eine vollständige JSON-CookieData aus dem Amazon-Login-Proxy besser.');
     }
     if (auth.lastAuthRefreshAt) lines.push(`Letzter Auth-Refresh: ${formatDateTime(auth.lastAuthRefreshAt)}`);
+    lines.push(`TTS-Inventar: ${ttsStatus.inventoryReady === true ? 'bestätigt' : 'nicht bestätigt'}${ttsStatus.lastInventoryRefreshAt ? `, Stand ${formatDateTime(ttsStatus.lastInventoryRefreshAt)}` : ''}. Echo-Inventar und Amazon-Anmeldung sind unabhängig von der lokalen Alexa-Gerätesuche (SSDP).`);
     if (auth.lastCookiePersistAt) lines.push(`Cookie zuletzt gespeichert: ${formatDateTime(auth.lastCookiePersistAt)}`);
     if (auth.lastAuthError) lines.push(`Letzter Auth-Hinweis: ${escapeHtml(auth.lastAuthError)}`);
     if (auth.loginProxyActive) {
@@ -1208,10 +1297,15 @@ async function loadTtsDevices(button) {
 
   if (button) setButtonFeedback(button, 'pending', 'Sucht');
   try {
-    const response = await fetch(`/api/tts/devices?ts=${Date.now()}`, { cache: 'no-store' });
+    const response = await fetch(`/api/tts/devices?refresh=${button ? 'true' : 'false'}&ts=${Date.now()}`, { cache: 'no-store' });
     await ensureOk(response);
     const payload = await response.json();
     ttsDevices = Array.isArray(payload.devices) ? payload.devices : [];
+    const targetSelect = document.querySelector('#ttsTestTarget');
+    const selected = targetSelect.value;
+    targetSelect.replaceChildren(new Option('Konfigurierte Listen', ''), ...ttsDevices.map((device) => new Option(device.name || device.serial, device.serial)));
+    if (selected && !ttsDevices.some((device) => device.serial === selected)) targetSelect.add(new Option(`${selected} (nicht im Inventar)`, selected));
+    targetSelect.value = selected;
     await loadTtsStatus();
     renderTtsDevices();
     if (button) {
@@ -1239,7 +1333,7 @@ function renderTtsDevices(errorText = '') {
   }
 
   if (!ttsStatus?.ready && !ttsStatus?.authReady) {
-    ttsDeviceList.innerHTML = '<p class="empty">TTS muss bereit sein, bevor Alexa-Geräte geladen werden können.</p>';
+    ttsDeviceList.innerHTML = `<p class="empty">${ttsStatus?.enabled ? 'Amazon-Anmeldung ist nicht bereit. TTS-Status und Login prüfen.' : 'Alexa TTS ist deaktiviert. Gespeicherte Ziellisten bleiben erhalten.'}</p>`;
     return;
   }
 
@@ -1785,6 +1879,7 @@ function positionHelpTooltip(button, tooltip) {
 }
 
 function showView(viewId) {
+  if (viewId === 'controlView') void renderTtsTargetPreview();
   tabButtons.forEach((button) => {
     button.classList.toggle('active', button.dataset.tabTarget === viewId);
   });
@@ -2337,9 +2432,11 @@ async function restartSystem(button) {
 }
 
 async function setDryRun(enabled) {
+  if (configWritePending) { updateDryRunUi(Boolean(config.loxone?.dryRun)); return; }
   try {
-    const result = await putJson('/api/dry-run', { enabled });
+    const result = await writeConfigJson('/api/dry-run', { enabled });
     config.loxone.dryRun = result.dryRun;
+    if (savedConfigSnapshot) savedConfigSnapshot.loxone.dryRun = result.dryRun;
     syncJsonFromForms();
     updateDryRunUi(result.dryRun);
     await loadSetupStatus();
@@ -2365,7 +2462,7 @@ async function setAlexaBridgeDebug(enabled) {
     const nextConfig = structuredClone(config);
     nextConfig.alexaBridge ||= {};
     nextConfig.alexaBridge.debug = enabled === true;
-    const result = await putJson('/api/config', nextConfig);
+    const result = await writeConfigJson('/api/config', nextConfig);
     config = result.config;
     populateForms();
     syncJsonFromForms();
@@ -3009,6 +3106,12 @@ function updateTtsVolumeLabels() {
 }
 
 function renderCommandEditor(openCommandKey = '') {
+  for (const [id, field] of [['commandCategories', 'category'], ['commandRooms', 'room']]) {
+    const list = document.getElementById(id);
+    list.replaceChildren(...[...new Set(Object.values(getConfiguredCommands()).map((command) => command[field]).filter(Boolean))].sort().map((value) => {
+      const option = document.createElement('option'); option.value = value; return option;
+    }));
+  }
   const openCommandKeys = new Set(
     [...roomEditor.querySelectorAll('.room-card[open]')]
       .map((card) => normalizeInputKey(card.querySelector('.command-key')?.value || card.dataset.commandOriginal || ''))
@@ -3165,7 +3268,20 @@ function createCommandCard(commandKey, command) {
     renderCommands();
   });
 
-  head.append(titleWrap, deleteButton);
+  const duplicateButton = document.createElement('button');
+  duplicateButton.type = 'button'; duplicateButton.className = 'secondary small';
+  duplicateButton.title = 'Befehl duplizieren'; duplicateButton.setAttribute('aria-label', 'Befehl duplizieren');
+  duplicateButton.innerHTML = '<img src="/assets/copy.svg" width="16" height="16" alt="">';
+  duplicateButton.addEventListener('click', (event) => {
+    event.preventDefault(); event.stopPropagation();
+    const copy = collectCommandFromCard(card, commandKey);
+    for (const field of ['id', 'deviceId', 'alexaId', 'alexaDeviceId']) delete copy[field];
+    copy.label = `${copy.label} Kopie`; copy.voiceName = copy.label; copy.enabled = false;
+    addCommandDraft(copy, `${normalizeInputKey(commandKey)}_kopie`);
+  });
+  const cardActions = document.createElement('div'); cardActions.className = 'actions command-card-actions';
+  cardActions.append(duplicateButton, deleteButton);
+  head.append(titleWrap, cardActions);
 
   const fields = document.createElement('div');
   fields.className = 'form-row three';
@@ -3181,8 +3297,8 @@ function createCommandCard(commandKey, command) {
   const details = document.createElement('div');
   details.className = 'form-row four';
   details.innerHTML = `
-    <label>Rubrik<input class="command-category" type="text"></label>
-    <label>Raum<input class="command-room" type="text"></label>
+    <label>Rubrik<input class="command-category" type="text" list="commandCategories"></label>
+    <label>Raum<input class="command-room" type="text" list="commandRooms"></label>
     <label>Funktion<input class="command-function" type="text"></label>
     <label>Aktion/Szene<input class="command-action" type="text"></label>
   `;
@@ -3281,8 +3397,25 @@ function createCommandCard(commandKey, command) {
   `;
   raw.querySelector('.command-path').value = target.path;
 
+  const advanced = document.createElement('label'); advanced.className = 'checkbox-row command-advanced-toggle';
+  advanced.innerHTML = '<input type="checkbox"><span>Erweiterte Felder</span>';
+  const advancedToggle = advanced.querySelector('input');
+  advancedToggle.checked = !simpleCommandKeys.has(commandKey) || target.type === 'raw';
+  for (const input of [fields.querySelector('.command-key'), details.querySelector('.command-function'), details.querySelector('.command-action'), alexa.querySelector('.command-off-command')]) input.closest('label').classList.add('advanced-field');
+  raw.classList.add('advanced-field');
+  const updateAdvanced = () => {
+    card.classList.toggle('command-simple', !advancedToggle.checked);
+    if (advancedToggle.checked) simpleCommandKeys.delete(commandKey); else simpleCommandKeys.add(commandKey);
+  };
+  advancedToggle.addEventListener('change', updateAdvanced);
+  loxone.querySelector('.command-type').addEventListener('change', () => {
+    if (loxone.querySelector('.command-type').value === 'raw') { advancedToggle.checked = true; updateAdvanced(); }
+  });
+  updateAdvanced();
+
   card.append(
     head,
+    advanced,
     createCommandSection('Basisdaten', fields),
     createCommandSection('Zuordnung', details),
     createCommandSection('Loxone', loxone),
@@ -3315,7 +3448,8 @@ function initInlineHelpButtons(scope) {
 
 function updateCommandCardValidation(card) {
   if (!card) return;
-  const commandKey = normalizeInputKey(card.querySelector('.command-key')?.value || card.dataset.commandOriginal || '');
+  const enteredKey = card.querySelector('.command-key')?.value || card.dataset.commandOriginal || '';
+  const commandKey = enteredKey === card.dataset.commandOriginal ? enteredKey : normalizeInputKey(enteredKey);
   const command = collectCommandFromCard(card, commandKey);
   const issues = commandValidationIssues(commandKey, command);
   const title = card.querySelector('.command-summary-title');
@@ -3424,7 +3558,8 @@ function commandValidationIssues(commandKey, command = {}, commandMap = getConfi
     }
   }
 
-  const offCommand = normalizeInputKey(command.offCommand || '');
+  const offName = command.offCommand || '';
+  const offCommand = Object.hasOwn(commandMap, offName) ? offName : Object.keys(commandMap).find((key) => normalizeInputKey(key) === normalizeInputKey(offName)) || normalizeInputKey(offName);
   const inlineOff = target.type === 'raw' ? String(target.offPath || '').trim() : target.type !== 'pulse' && String(target.offValue ?? '').trim();
   if (offCommand && command.alexaMode !== 'action' && !inlineOff) {
     const offTarget = commandMap[offCommand];
@@ -3473,6 +3608,7 @@ function addRoom() {
     enabled: false
   };
   markDraftCommand(nextName);
+  commandSearch.value = ''; commandViewFilter.value = ''; commandOnlyInvalid.checked = false;
   if (commandCategoryFilter && commandCategoryFilter.value && commandCategoryFilter.value !== NEW_COMMAND_CATEGORY) {
     commandCategoryFilter.value = '';
   }
@@ -3481,6 +3617,21 @@ function addRoom() {
   renderIntegrations();
   syncJsonFromForms();
   markConfigDirty();
+}
+
+function addCommandDraft(command, baseName, simple = false) {
+  try { config = collectConfigFromForms(); }
+  catch (error) { showToast(error.message, 'error'); return false; }
+  const key = uniqueCommandName(baseName || 'neuer_befehl');
+  config.commands[key] = structuredClone(command);
+  config.commands[key].enabled = false;
+  markDraftCommand(key);
+  if (simple) simpleCommandKeys.add(key);
+  commandSearch.value = ''; commandCategoryFilter.value = ''; commandViewFilter.value = ''; commandOnlyInvalid.checked = false;
+  renderCommandEditor(key); renderCommands(); syncJsonFromForms(); markConfigDirty();
+  const card = [...roomEditor.querySelectorAll('.room-card')].find((entry) => entry.dataset.commandOriginal === key);
+  card?.querySelector('.command-label')?.focus();
+  return true;
 }
 
 function renderIntegrations() {
@@ -3858,7 +4009,8 @@ function collectCommands() {
     seen.add(key);
   }
   roomEditor.querySelectorAll('.room-card').forEach((card) => {
-    const commandKey = normalizeInputKey(card.querySelector('.command-key').value);
+    const enteredKey = card.querySelector('.command-key').value;
+    const commandKey = enteredKey === card.dataset.commandOriginal ? enteredKey : normalizeInputKey(enteredKey);
     if (!commandKey) return;
     moveDraftCommand(card.dataset.commandOriginal || '', commandKey);
     commands[commandKey] = collectCommandFromCard(card, commandKey);
@@ -3908,7 +4060,9 @@ function collectCommandFromCard(card, commandKey) {
 
 function confirmConfigSave(nextConfig) {
   const summary = configSaveSummary(nextConfig);
-  return window.confirm(`Konfiguration speichern?\n\n${summary}`);
+  const removed = Object.keys(savedConfigSnapshot?.commands || {}).filter((key) => !Object.hasOwn(nextConfig.commands || {}, key));
+  const identityWarning = removed.length ? `\n\nEntfernte oder geänderte Schlüssel: ${removed.join(', ')}. Alexa-Zuordnungen hängen am Schlüssel; ein neuer Schlüssel ist ein neues Gerät. Für reine Umbenennungen nur Anzeigename/Sprachname ändern.` : '';
+  return window.confirm(`Konfiguration speichern?\n\n${summary}${identityWarning}`);
 }
 
 function configSaveSummary(nextConfig) {
@@ -3973,7 +4127,8 @@ function regenerateJsonFromForms(button) {
 function uniqueCommandName(baseName) {
   let name = baseName;
   let index = 2;
-  while (getConfiguredCommands()[name]) {
+  const existing = new Set(Object.keys(getConfiguredCommands()).map(normalizeInputKey));
+  while (existing.has(normalizeInputKey(name))) {
     name = `${baseName}_${index}`;
     index += 1;
   }

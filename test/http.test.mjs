@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
+import { createServer as httpServer } from 'node:http';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { scryptSync } from 'node:crypto';
+import { scryptSync, createHash } from 'node:crypto';
 
 async function start(t, { brokenAdmin = false, adminRecord, delayTts = false } = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'loxevo-http-'));
@@ -53,6 +54,7 @@ test('unreadable admin state remains protected instead of silently disabling pro
   const response = await fetch(`${url}/api/config`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(config) });
   assert.equal(response.status, 401);
   assert.equal((await fetch(`${url}/api/backup`)).status, 401);
+  assert.equal((await fetch(`${url}/api/loxone/controls`)).status, 401);
 });
 
 test('HTTP health is available while optional TTS init is still pending', async (t) => {
@@ -83,4 +85,43 @@ test('passive soak observer reads cached inventory without sending or reconnecti
   assert.equal(code, 0, errors);
   const record = JSON.parse(output.trim()); assert.equal(record.status.ready, false); assert.deepEqual(record.inventory, []);
   const events = await (await fetch(`${url}/api/events`)).json(); assert.ok(!events.some((event) => event.type === 'tts-speak'));
+});
+
+test('nonempty soak inventory hashes actual serials and retains type', async (t) => {
+  const routes = [];
+  const server = httpServer((req, res) => {
+    routes.push(req.url);
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify(req.url.startsWith('/api/tts/devices') ? { devices: [{ serial: 'A', type: 'echo-a' }, { serial: 'B', type: 'echo-b' }] } : { ready: false, defaultSpeakDevices: ['A', 'B'] }));
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve)); t.after(() => server.close());
+  const child = spawn(process.execPath, ['tools/tts-soak.mjs', `http://127.0.0.1:${server.address().port}`, '0.00001'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  let output = ''; child.stdout.on('data', (data) => { output += data; });
+  assert.equal(await new Promise((resolve) => child.once('exit', resolve)), 0);
+  const record = JSON.parse(output.trim());
+  assert.notEqual(record.inventory[0].id, record.inventory[1].id);
+  assert.equal(record.inventory[0].id, createHash('sha256').update('A').digest('hex').slice(0, 12));
+  assert.deepEqual(record.inventory.map((device) => device.id), record.configured);
+  assert.equal(record.inventory[1].deviceType, 'echo-b');
+  assert.deepEqual(routes, ['/api/tts/status', '/api/tts/devices?refresh=false']);
+});
+
+test('catalog and TTS preview are real internal HTTP routes with Hue enabled', async (t) => {
+  let requests = 0;
+  const server = httpServer((req, res) => { requests++; assert.equal(req.url, '/data/LoxAPP3.json'); res.end(JSON.stringify({ controls: {} })); });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve)); t.after(() => server.close());
+  const { url, config } = await start(t);
+  config.loxone.baseUrl = `http://127.0.0.1:${server.address().port}`;
+  config.commands['Licht Küche'] = { label: 'Licht Küche', enabled: true, loxone: { type: 'direct', uuid: 'aaaaaaaa-bbbb-cccc-dddddddddddddddd', value: 'on', offValue: 'off' } };
+  await fetch(`${url}/api/config`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(config) });
+  const response = await fetch(`${url}/api/loxone/controls`);
+  assert.equal(response.status, 200); assert.deepEqual((await response.json()).controls, []); assert.equal(requests, 1);
+  for (const command of ['Licht Küche', 'licht_kueche']) {
+    const sent = await fetch(`${url}/api/command`, { method: 'POST', body: JSON.stringify({ command }) });
+    assert.equal(sent.status, 200); assert.equal((await sent.json()).result.key, 'Licht Küche');
+  }
+  assert.equal(requests, 1);
+  const preview = await fetch(`${url}/api/tts/preview`, { method: 'POST', body: JSON.stringify({ devices: ['A'] }) });
+  assert.equal(preview.status, 200); assert.equal((await preview.json()).resolved, false);
+  assert.equal((await fetch(`${url}/api/tts/preview`, { method: 'POST', body: JSON.stringify({ devices: {} }) })).status, 400);
 });

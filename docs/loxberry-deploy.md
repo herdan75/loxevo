@@ -1,6 +1,6 @@
 # LoxBerry Docker Deployment
 
-> **Stand: 1.0.29 auf develop.** Vor dem ersten Update [Migration und Prüfstatus](stability-validation.md) beachten. Ein erfolgreicher Build ersetzt keinen Test auf dem eigenen LoxBerry.
+> **Stand: 1.0.30 auf develop.** Vor dem ersten Update [Migration und Prüfstatus](validation-1.0.30.md) beachten. Ein erfolgreicher Build ersetzt keinen Test auf dem eigenen LoxBerry.
 
 Diese Anleitung beschreibt den kontrollierten Test von LoxEvo auf dem LoxBerry. Neue Installation und Branch-Wechsel sind in [INSTALL.md](../INSTALL.md) beschrieben. `main` wird mit diesem Update nicht verändert.
 
@@ -114,7 +114,7 @@ So wird der LoxBerry-SSDP-Dienst nur für die eigentliche Suche pausiert.
 
 ## Update und Kontrolle
 
-Für den Wechsel auf 1.0.29 den vollständigen Datenordner bei gestopptem Container privat sichern und zunächst mit unverändertem Befehlsbestand starten. Befehle erst nach erfolgreicher ID-Migration ergänzen. Die genauen Git-/Docker-Befehle stehen unter [Updates](../INSTALL.md#updates).
+Für den Wechsel von 1.0.28 oder älter auf 1.0.30 den vollständigen Datenordner bei gestopptem Container privat sichern und zunächst mit unverändertem Befehlsbestand starten. Befehle erst nach erfolgreicher ID-Migration ergänzen. Bei 1.0.29 bleibt die vorhandene ID-Datei erhalten. Die genauen Git-/Docker-Befehle stehen unter [Updates](../INSTALL.md#updates).
 
 Nach dem Neubau `docker compose ps`, `docker compose logs --tail=80 loxevo` und den Health-Endpunkt prüfen. Danach TTS-Status und Geräteinventar kontrollieren. Die API unterscheidet Authentifizierung, Inventarbereitschaft und Zustellergebnis; `healthy` allein bestätigt keine TTS-Wiedergabe. Normale TTS und Alarm-TTS einmal bewusst testen, anschließend den [passiven 48-Stunden-Beobachter](../README.md#stabilitätsupdate-1029) starten. Bei Fehlern zuerst Protokoll und Inventar sichern, nicht sofort neu starten.
 
@@ -151,7 +151,7 @@ docker compose down
 
 `alexa-remote2 ist nicht installiert`
 
-Version 1.0.29 enthält das Paket bereits. Branch, Commit und Image-Neubau prüfen; keine beliebige andere AlexaRemote-Version installieren. Ohne Docker die Pakete mit `npm ci` aus dem Lockfile installieren.
+Version 1.0.30 enthält das Paket bereits. Branch, Commit und Image-Neubau prüfen; keine beliebige andere AlexaRemote-Version installieren. Ohne Docker die Pakete mit `npm ci` aus dem Lockfile installieren.
 
 `Alexa-Cookie konnte nicht gelesen werden`
 

@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
+## 1.0.30 - 2026-11-06
+
+- Neun Auditbefunde korrigiert: Dry-Run-Speicherstand, Cookie-Zuständigkeit fehlgeschlagener TTS-Kandidaten, native Lautstärkeabfrage, veraltete Inventarantworten, Bereitschaft nach endgültigem 401/403, Speichern während Hintergrundabfragen, doppelte Namen in inaktiven/internen Entwürfen, ältere Befehlsschlüssel und Gerätekennungen im passiven Langzeittest.
+- Loxone-Auswahlassistent mit begrenztem, rein lesendem Strukturabruf, Raum-/Namenssuche und technischer Vorschau. Geprüfte Profile für Switch, Pushbutton, LightControllerV2 und Jalousie; gesicherte, eingeschränkte, unbekannte und untergeordnete Controls werden nicht automatisch übernommen. Neue Befehle bleiben inaktiv, bestehende Zuordnungen unverändert.
+- Befehle als neue inaktive Entwürfe duplizieren, Rubrik-/Raumvorschläge, einfache/erweiterte Felder, kompakte mobile Navigation und Hinweis vor identitätsändernden Schlüsseländerungen.
+- Backup-Import zeigt neue, geänderte und entfernte Befehle sowie Cookie-Präsenz vor dem vollständigen Ersetzen. Speichern sperrt den Editor nur während des Schreibens; spätere Eingaben bleiben ungespeichert erkennbar.
+- TTS-Zielvorschau nutzt die vorhandene native Gruppenauflösung ohne Amazon-Aufruf. Explizite Testziele, Alarmbestätigung, bleibende Aktionsergebnisse und Inventarzeitpunkt; keine Gleichsetzung von API-Bestätigung und physischem Gerätezustand.
+- Nur explizites Aktualisieren lädt das Echo-Inventar neu. RAM-Protokoll, manuelle/Raw-Befehle, bestehende Alexa-IDs und AlexaRemote-Version 8.1.1 bleiben erhalten. Prüfungen und verbleibende Praxisgrenzen: [Prüfbericht](docs/validation-1.0.30.md).
+
 ## 1.0.29 - 2026-09-13
 
 Stabilitätsstand für `develop`. Prüfstatus, Migration und noch erforderliche Praxisnachweise sind in [Stabilitätsprüfung](docs/stability-validation.md) dokumentiert.

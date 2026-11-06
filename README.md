@@ -4,15 +4,19 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: Source available](https://img.shields.io/badge/License-source--available-orange.svg)](LICENSE)
 
-> **Status: Version 1.0.29 / Stabilitätsstand auf develop**
+> **Status: Version 1.0.30 / Stabilität und Loxone-Auswahlassistent auf develop**
 >
-> Dieser Stand enthält die Stabilitätskorrekturen aus der Programmprüfung. Lokale Tests und die Linux-CI einschließlich Helper-Tests, amd64-/ARM64-Build, Container-Healthcheck und geordnetem Herunterfahren sind bestanden. Der 48-Stunden-Test mit echten Echo-Geräten bleibt vor einer Produktionsfreigabe erforderlich. Neue Installationen und Befehle zuerst bewusst prüfen; Loxone-Kommandos bei Bedarf im Dry-Run testen.
+> Dieser Stand behebt neun weitere Befunde der Programmprüfung und ergänzt die Bausteinauswahl sowie gezielte Bedienungsverbesserungen. Prüfnachweise und Grenzen stehen im [Prüfbericht 1.0.30](docs/validation-1.0.30.md). Ein kontrollierter Langzeittest mit echten Echo-Geräten und dem eigenen Miniserver bleibt erforderlich. Neue Befehle zunächst im Dry-Run prüfen; Dry-Run verhindert keine TTS-Ausgabe.
 
 Eigene LoxBerry-Zentrale für Alexa, Echo-TTS und Loxone.
 
-### Stabilitätsupdate 1.0.29
+### Update 1.0.30
 
-Die Änderungen betreffen Datenintegrität, TTS-Lebenszyklus, Geräte-IDs, Diagnose und mobile Bedienung. Umsetzung, CI-Nachweise und die noch offenen Praxis-/Langzeittests stehen in [Stabilitätsprüfung](docs/stability-validation.md). Für bestehende Installationen zuerst die [Update- und Migrationshinweise](INSTALL.md#updates) lesen. Dieser Stand wird auf `develop` bereitgestellt; `main` und `pre-develop` werden dabei nicht mitgezogen.
+Bei einer bestehenden bereiten TTS-Verbindung übernehmen Kandidaten die Cookie-Persistenz erst nach erfolgreichem Verbindungswechsel. Veraltete Inventarabfragen verändern keine neue Verbindung; ein endgültiger Auth-Fehler beendet die Bereitschaftsanzeige. Lautstärken werden über die tatsächliche AlexaRemote-Callback-API gelesen. Speichern, Verwerfen, mehrere Entwürfe und ältere Befehlsschlüssel sind mit Regressionstests abgesichert. Für bestehende Installationen zuerst die [Update- und Migrationshinweise](INSTALL.md#updates) lesen. Nur `develop` wird aktualisiert; `main` und `pre-develop` bleiben unverändert.
+
+Unter **Konfiguration → Befehle und Sprachnamen → Aus Loxone hinzufügen** lassen sich unterstützte Bausteine nach Raum und Name auswählen. Der Abruf liest nur die Struktur des gespeicherten Miniservers. Die Vorschau zeigt die erzeugten Befehle; übernommen wird ein inaktiver, ungespeicherter Entwurf. Details zu Profilen und Grenzen: [Loxone-Auswahlassistent](docs/loxone-picker.md).
+
+Weitere Bedienungsverbesserungen: Befehle duplizieren, Rubrik-/Raumvorschläge, erweiterte Felder bei Bedarf, kompakte mobile Tabs, Importvorschau und bleibende Testergebnisse. TTS-Tests zeigen Ziele und Gruppenauflösung aus dem vorhandenen Inventar; ein einzelnes Testziel überschreibt keine gespeicherte Liste. Ein Alarmtest verlangt eine Bestätigung mit Empfängern und Lautstärke. Die Inventarliste wird nur über den Suchbutton aktiv erneuert, nicht bei jeder Hintergrundanzeige.
 
 - Der Docker-Build nutzt Node 24 und `npm ci` mit Lockfile. `alexa-remote2` ist mit Version `8.1.1` gebündelt und hat Vorrang vor lokalen Installationen im Datenordner. Diese bleiben unverändert und dienen nur als Fallback in der unterstützten Version. Die Wartung bietet diese Version an; andere Versionen benötigen zuerst entsprechende Vertragstests. Sicherheitskorrekturen für die transitiven Pakete `cookie` und `qs` sind im Lockfile festgelegt.
 - `data/alexa-device-ids.json` gehört zur Installation und zum Backup. Nicht löschen: Die Datei reserviert auch frühere Geräte-IDs. Die erstmalige Migration erhält die Zuordnung des vorhandenen Befehlsbestands; neue Befehle danach anlegen. Befehlsschlüssel nicht zum Umbenennen eines Geräts ändern, sondern Anzeige-/Sprachnamen verwenden.

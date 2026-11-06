@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
-import { hasCommandOffTarget } from './command-utils.js';
+import { hasCommandOffTarget, resolveCommandKey } from './command-utils.js';
 import { allocateLegacyDeviceId } from './device-ids.js';
 import { INTERNAL_API_RESOURCES } from './http-routes.js';
 
@@ -292,10 +292,10 @@ export class AlexaBridgeService {
     const source = commands[commandKey];
     if (!source || isOffAction(source.action)) return null;
 
-    const explicitOffCommand = normalizeCommandKey(source.offCommand);
+    const explicitOffCommand = resolveCommandKey(commands, source.offCommand);
     if (explicitOffCommand) {
       const target = commands[explicitOffCommand];
-      if (target?.enabled !== false) return explicitOffCommand;
+      if (target && target.enabled !== false) return explicitOffCommand;
     }
 
     const sourceRoom = normalizeCommandPart(source.room);
@@ -714,10 +714,6 @@ function displayPart(value) {
 
 function normalizeCommandPart(value) {
   return String(value || '').trim().toLowerCase();
-}
-
-function normalizeCommandKey(value) {
-  return String(value || '').trim();
 }
 
 function isOffAction(value) {

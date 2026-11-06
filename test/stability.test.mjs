@@ -10,6 +10,7 @@ import { refreshRemoteInventory, TESTED_ALEXA_REMOTE_VERSION } from '../src/alex
 import { DeviceIdRegistry, allocateLegacyDeviceId } from '../src/device-ids.js';
 import { AlexaBridgeService, isSsdpPortInUseError } from '../src/alexa-bridge.js';
 import { appendEvent, MAX_EVENTS, MAX_EVENT_BYTES } from '../src/event-buffer.js';
+import { LoxoneClient } from '../src/loxone.js';
 
 async function fixture(t) {
   const dir = await mkdtemp(join(tmpdir(), 'loxevo-stability-'));
@@ -18,6 +19,116 @@ async function fixture(t) {
   t.after(async () => { await service.dispose(); await rm(dir, { recursive: true, force: true }); });
   return { service, dir, root };
 }
+
+test('failed candidate credentials never replace the ready owner; later refresh still persists', async (t) => {
+  const { service } = await fixture(t);
+  const active = new EventEmitter();
+  active.cookieData = { localCookie: 'session=active', refreshToken: 'old', tokenDate: 1000 };
+  service.remote = active; service.ready = true; service.initSequence = 1;
+  service.remoteGenerations.set(active, 1);
+  await service.persistCookie();
+  const candidate = new EventEmitter();
+  service.attachCookiePersistence(candidate, service.auth);
+  candidate.init = (_options, callback) => {
+    candidate.cookieData = { localCookie: 'session=failed-candidate', refreshToken: 'bad' };
+    candidate.emit('cookie', candidate.cookieData.localCookie, 'candidate-csrf');
+    callback(new Error('init failed'));
+  };
+  service.initSequence = 2;
+  assert.equal((await service.initializeRemoteCandidate(candidate, service.auth, { sequence: 2 })).ok, false);
+  await service.cookieWriteQueue;
+  assert.equal(JSON.parse(await readFile(service.config.cookieFile, 'utf8')).localCookie, 'session=active');
+  await service.disposeRemote(candidate);
+  await service.applyRefreshedCookieData({ localCookie: 'session=fresh', refreshToken: 'fresh', tokenDate: 2000 });
+  assert.equal(JSON.parse(await readFile(service.config.cookieFile, 'utf8')).refreshToken, 'fresh');
+});
+
+test('accepted candidate persists staged cookie event fields', async (t) => {
+  const { service } = await fixture(t);
+  service.remote = {}; service.ready = true; service.initSequence = 1;
+  const remote = new EventEmitter(); service.attachCookiePersistence(remote, {});
+  remote.init = (_options, callback) => { remote.emit('cookie', 'session=accepted', 'accepted-csrf'); callback(); };
+  await service.initializeRemoteCandidate(remote, {}, { sequence: 1 });
+  await service.cookieWriteQueue;
+  await service.commitRemoteCandidate(remote, {});
+  const saved = JSON.parse(await readFile(service.config.cookieFile, 'utf8'));
+  assert.equal(saved.localCookie, 'session=accepted'); assert.equal(saved.csrf, 'accepted-csrf');
+});
+
+test('new cookie event during old remote disposal wins over staged candidate data', async (t) => {
+  const { service } = await fixture(t);
+  const remote = new EventEmitter(); service.attachCookiePersistence(remote, {});
+  service.remote = { stop: async () => { remote.emit('cookie', 'session=latest', 'latest'); await service.cookieWriteQueue; } };
+  service.ready = true; service.initSequence = 1;
+  remote.init = (_options, callback) => { remote.emit('cookie', 'session=staged', 'staged'); callback(); };
+  await service.initializeRemoteCandidate(remote, {}, { sequence: 1 }); await service.cookieWriteQueue;
+  await service.commitRemoteCandidate(remote, {}); await service.cookieWriteQueue;
+  assert.equal(JSON.parse(await readFile(service.config.cookieFile, 'utf8')).localCookie, 'session=latest');
+});
+
+test('native media callback restores volume including zero and propagates auth errors', async (t) => {
+  const { service } = await fixture(t);
+  const require = createRequire(import.meta.url);
+  const remote = new (require('alexa-remote2'))(); service.remote = remote;
+  remote.find = () => ({ serialNumber: 'A', deviceType: 'test' });
+  remote.httpsGet = (_path, callback) => callback(null, { volume: 0 });
+  assert.equal(await service.readCurrentVolume({ serialNumber: 'A' }), 0);
+  remote.httpsGet = (_path, callback) => callback(new Error('401 Unauthorized'));
+  await assert.rejects(service.readCurrentVolume({ serialNumber: 'A' }), /401/);
+});
+
+test('retired inventory completion cannot damage or clear a newer pending refresh', async (t) => {
+  const { service } = await fixture(t);
+  let finishOld, finishNew;
+  const old = { getDevices: (callback) => { finishOld = callback; } };
+  const next = { getDevices: (callback) => { finishNew = callback; } };
+  service.remote = old;
+  const before = service.refreshDeviceInventory(); const rejected = assert.rejects(before, /ersetzt/);
+  service.remote = next; service.inventoryReady = true;
+  const after = service.refreshDeviceInventory();
+  finishOld(null, { devices: [{ serialNumber: 'OLD', deviceType: 'test' }] }); await rejected;
+  assert.equal(service.inventoryReady, true); assert.equal(service.inventoryRefreshRemote, next);
+  assert.ok(service.inventoryRefreshPromise);
+  finishNew(null, { devices: [{ serialNumber: 'NEW', deviceType: 'test' }] }); await after;
+  assert.equal(service.inventoryReady, true); assert.ok(service.lastInventoryRefreshAt);
+});
+
+test('final unauthorized result is bounded and no longer READY; non-auth errors preserve auth', async (t) => {
+  const { service } = await fixture(t);
+  service.remote = {}; service.ready = true; service.authState = 'READY';
+  service.refreshExistingRemoteAuth = async () => true;
+  service.refreshAuth = async () => {};
+  let attempts = 0;
+  await assert.rejects(service.withAuthRetry('test', async () => { attempts++; throw new Error('401 Unauthorized'); }), /401/);
+  assert.equal(attempts, 3); assert.equal(service.ready, false); assert.equal(service.authState, 'ERROR');
+  service.ready = true;
+  await assert.rejects(service.withAuthRetry('test', async () => { throw new Error('network timeout'); }), /network/);
+  assert.equal(service.ready, true);
+});
+
+test('legacy command keys execute by exact name or canonical alias without migration', async () => {
+  const commands = { 'Licht Küche': { enabled: true, loxone: { type: 'direct', uuid: '16aad661-0377-5ccb-ffffba27bfcae6ca', value: 'on', offValue: 'off' } } };
+  const client = new LoxoneClient({ loxone: { baseUrl: 'http://miniserver.invalid', dryRun: true }, commands });
+  assert.equal((await client.runCommand('Licht Küche')).key, 'Licht Küche');
+  assert.equal((await client.runCommand('licht_kueche')).key, 'Licht Küche');
+  assert.equal((await client.runCommandOff('licht_kueche')).command, 'off');
+  assert.deepEqual(Object.keys(commands), ['Licht Küche']);
+  await assert.rejects(client.runCommand('unknown'), /Unbekannter/);
+});
+
+test('TTS target preview shares native group deduplication without invoking Amazon', async (t) => {
+  const { service } = await fixture(t);
+  service.remote = { serialNumbers: {
+    group: { serialNumber: 'group', accountName: 'Gruppe', clusterMembers: ['A', 'B'] },
+    A: { serialNumber: 'A', deviceType: 'echo', deviceOwnerCustomerId: 'test', accountName: 'Küche' },
+    B: { serialNumber: 'B', deviceType: 'echo', deviceOwnerCustomerId: 'test', accountName: 'Bad' }
+  } };
+  const before = JSON.stringify(service.remote.serialNumbers);
+  const preview = service.previewTargets('speak', ['group', 'A']);
+  assert.equal(preview.resolved, true); assert.deepEqual(preview.effective.map((device) => device.serial), ['A', 'B']);
+  assert.equal(service.previewTargets('speak', ['missing']).resolved, false);
+  assert.equal(JSON.stringify(service.remote.serialNumbers), before); assert.equal(service.lastDelivery, null);
+});
 
 test('cookie updates use canonical state, serialize and ignore retired generations', async (t) => {
   const { service } = await fixture(t);

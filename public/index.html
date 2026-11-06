@@ -113,6 +113,7 @@
           </div>
         </div>
         <div id="rooms" class="rooms"></div>
+        <p id="commandTestResult" class="action-result" role="status" hidden></p>
       </section>
 
       <section class="panel">
@@ -122,11 +123,14 @@
             <p>Sendet einen Testtext aus dieser Web-UI an die konfigurierten Echo-Geräte.</p>
           </div>
         </div>
-        <textarea id="ttsText" rows="3">Geschirrspüler ist fertig.</textarea>
+        <label>Testziel<select id="ttsTestTarget"><option value="">Konfigurierte Listen</option></select></label>
+        <p id="ttsTargetPreview" class="field-note" aria-live="polite"></p>
+        <textarea id="ttsText" rows="3" aria-label="TTS-Testtext">Geschirrspüler ist fertig.</textarea>
         <div class="actions">
           <button id="speakBtn">Sprechen</button>
           <button id="alarmBtn" class="danger">Alarm</button>
         </div>
+        <p id="ttsTestResult" class="action-result" role="status" hidden></p>
       </section>
       </section>
 
@@ -364,10 +368,12 @@ sudo sh tools/install-discovery-helper.sh</code></pre>
             </label>
             <div class="command-tools-actions">
               <button id="addRoomBtn" type="button" class="secondary">Neuen Befehl hinzufügen</button>
-              <span class="field-note">Neue Einträge erscheinen unter „Neue Befehle”.</span>
+              <button id="loxonePickerBtn" type="button" class="secondary">Aus Loxone hinzufügen</button>
             </div>
           </div>
           <div id="roomEditor" class="room-editor"></div>
+          <datalist id="commandCategories"></datalist>
+          <datalist id="commandRooms"></datalist>
           </div>
         </details>
 
@@ -631,6 +637,7 @@ Content-Type: application/json
     </div>
 
     <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+    <script src="/assets/loxone-picker.js"></script>
     <script src="/assets/app.js"></script>
   </body>
 </html>

@@ -22,6 +22,7 @@ RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
 COPY src ./src
 COPY public ./public
+COPY THIRD_PARTY_NOTICES.md ./THIRD_PARTY_NOTICES.md
 COPY tools/tts-soak.mjs ./tools/tts-soak.mjs
 COPY config.example.json ./config.example.json
 COPY --from=ssdp-helper-build /out/loxevo-ssdp-helper /app/bin/loxevo-ssdp-helper

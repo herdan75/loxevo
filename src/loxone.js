@@ -1,4 +1,4 @@
-import { hasCommandOffTarget, normalizeCommandType, normalizeLoxoneUuid, readCommandOffTarget, readCommandTarget } from './command-utils.js';
+import { hasCommandOffTarget, normalizeCommandType, normalizeLoxoneUuid, readCommandOffTarget, readCommandTarget, resolveCommandKey } from './command-utils.js';
 
 export class LoxoneClient {
   constructor(config) {
@@ -11,6 +11,7 @@ export class LoxoneClient {
   }
 
   async runCommand(commandKey) {
+    commandKey = resolveCommandKey(this.commands, commandKey) || commandKey;
     const command = this.commands[commandKey];
     if (!command) {
       throw new Error(`Unbekannter Befehl: ${commandKey}`);
@@ -36,6 +37,7 @@ export class LoxoneClient {
   }
 
   async runCommandOff(commandKey) {
+    commandKey = resolveCommandKey(this.commands, commandKey) || commandKey;
     const command = this.commands[commandKey];
     if (!command) {
       throw new Error(`Unbekannter Befehl: ${commandKey}`);

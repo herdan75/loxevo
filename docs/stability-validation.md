@@ -1,5 +1,7 @@
 # Stabilitätsprüfung nach dem Audit vom 13.09.2026
 
+Historischer Prüfstand 1.0.29. Aktuelle Ergänzungen: [Prüfbericht 1.0.30](validation-1.0.30.md).
+
 Zielstand: **1.0.29 auf `develop`**. Ausgangsbasis: `37919e8`, Version 1.0.28. Die Änderungen werden ausschließlich auf `develop` bereitgestellt; `main` und `pre-develop` bleiben unverändert. Private Importdateien bleiben unangetastet. Dieser Versionsschritt ist noch keine abgeschlossene Produktionsfreigabe.
 
 Die ursprünglichen Befunde stehen in der [historischen Programmprüfung](review-2026-09-13.md). Sie beziehen sich auf 1.0.28; die nachfolgende Matrix dokumentiert die Umsetzung für 1.0.29.

@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an LoxEvo werden in dieser Datei gesammelt.
 
+## 1.0.31 - 2026-11-09
+
+- Loxone-Auswahlassistent: Dimmer sowie direkte Switch-/Dimmer-Unterelemente einer LightControllerV2 können als Ein/Aus-Entwurf übernommen werden. Dimmer schalten auf ihre letzte Helligkeit ein. Zusammengesetzte Steuerungsadressen einschließlich Groß-/Kleinschreibung des Eingangszusatzes bleiben als vollständige Raw-Ein-/Aus-Pfade erhalten; bestehende UUID-Verarbeitung und gespeicherte Befehle bleiben unverändert.
+- Geschützte oder eingeschränkte übergeordnete Bausteine sperren auch ihre Unterelemente. Fremde, mehrdeutige und nicht geprüfte Steuerungsadressen werden nicht automatisch übernommen. Farb- und Zentralsteuerungen erhalten keine pauschalen Schaltprofile.
+- Bausteine sind nach Raum und übergeordnetem Baustein gruppiert. Die Auswahl zeigt den vollständigen Kontext; nicht unterstützte Einträge haben eine begründete Sperre, ein deaktiviertes Aktionsfeld und einen erkennbar deaktivierten Hinzufügen-Button. Leere technische Vorschauen und veraltete Eingabewerte nach Filterwechsel entfallen.
+- Dublettenprüfung vergleicht den tatsächlichen Aufruf, auch zwischen Raw- und Direct-/changeTo-Befehlen. Einzelne Lichtkreise werden nicht mehr als Zuordnung der gesamten Lichtsteuerung gezählt.
+- Tests für Adressen, Rechtevererbung, Entwürfe, Speicherung, Ein/Aus-Aufrufe, Filter und mobile Darstellung ergänzt. Prüfstatus und verbleibende Hardwaregrenzen: [Prüfbericht 1.0.31](docs/validation-1.0.31.md).
+
 ## 1.0.30 - 2026-11-06
 
 - Neun Auditbefunde korrigiert: Dry-Run-Speicherstand, Cookie-Zuständigkeit fehlgeschlagener TTS-Kandidaten, native Lautstärkeabfrage, veraltete Inventarantworten, Bereitschaft nach endgültigem 401/403, Speichern während Hintergrundabfragen, doppelte Namen in inaktiven/internen Entwürfen, ältere Befehlsschlüssel und Gerätekennungen im passiven Langzeittest.

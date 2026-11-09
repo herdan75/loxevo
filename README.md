@@ -4,11 +4,15 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: Source available](https://img.shields.io/badge/License-source--available-orange.svg)](LICENSE)
 
-> **Status: Version 1.0.30 / Stabilität und Loxone-Auswahlassistent auf develop**
+> **Status: Version 1.0.31 / Korrigierter Loxone-Auswahlassistent auf develop**
 >
-> Dieser Stand behebt neun weitere Befunde der Programmprüfung und ergänzt die Bausteinauswahl sowie gezielte Bedienungsverbesserungen. Prüfnachweise und Grenzen stehen im [Prüfbericht 1.0.30](docs/validation-1.0.30.md). Ein kontrollierter Langzeittest mit echten Echo-Geräten und dem eigenen Miniserver bleibt erforderlich. Neue Befehle zunächst im Dry-Run prüfen; Dry-Run verhindert keine TTS-Ausgabe.
+> Dieser Stand ergänzt die Stabilitätskorrekturen aus 1.0.30 um eine korrigierte Bausteinauswahl mit Unterstützung für einzelne Lichtkreise. Prüfnachweise und Grenzen stehen im [Prüfbericht 1.0.31](docs/validation-1.0.31.md). Ein kontrollierter Langzeittest mit echten Echo-Geräten und dem eigenen Miniserver bleibt erforderlich. Neue Befehle zunächst im Dry-Run prüfen; Dry-Run verhindert keine TTS-Ausgabe.
 
 Eigene LoxBerry-Zentrale für Alexa, Echo-TTS und Loxone.
+
+### Update 1.0.31
+
+Der Loxone-Auswahlassistent unterstützt jetzt Dimmer und einzelne Schalt-/Dimmkreise einer LightControllerV2. Ein-/Aus-Pfade wie `UUID/AI1/on` und `UUID/AI1/off` bleiben vollständig erhalten. Die Liste zeigt die Zuordnung zum übergeordneten Baustein; fehlende Unterstützung wird ausdrücklich erklärt. Gesicherte, eingeschränkte und nicht geprüfte Ziele bleiben gesperrt. Farb- und Zentralsteuerungen werden nicht pauschal freigegeben. Bestehende Befehle, Alexa-IDs, TTS und gespeicherte Einstellungen werden nicht verändert. Nur `develop` wird aktualisiert.
 
 ### Update 1.0.30
 

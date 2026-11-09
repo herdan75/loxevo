@@ -8,6 +8,7 @@ const label = (value) => typeof value === 'string' ? value.slice(0, 200) : '';
 // Explicit profiles from Loxone Structure File V17. Unknown controls stay manual.
 const profiles = {
   Switch: [{ id: 'switch', label: 'Ein / Aus', type: 'direct', value: 'on', offValue: 'off', alexaMode: 'switch' }],
+  Dimmer: [{ id: 'switch', label: 'Ein / Aus (letzte Helligkeit)', type: 'direct', value: 'on', offValue: 'off', alexaMode: 'switch' }],
   Pushbutton: [{ id: 'pulse', label: 'Impuls', type: 'pulse', value: '', alexaMode: 'action' }],
   LightControllerV2: [{ id: 'mood', label: 'Lichtstimmung', type: 'changeTo', value: '', offValue: '0', needsValue: true, alexaMode: 'switch' }],
   Jalousie: [
@@ -17,32 +18,79 @@ const profiles = {
   ]
 };
 
+function actionAddress(value) {
+  if (typeof value !== 'string' || value.length > 200) return '';
+  const [uuid, ...parts] = value.trim().split('/');
+  return [uuid.toLowerCase(), ...parts].join('/');
+}
+
+function protectionReason(control) {
+  if (control.isSecured) return 'Gesicherter Baustein: manuell konfigurieren.';
+  const value = control.restrictions ?? 0;
+  const numeric = typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value));
+  const restrictions = Number(value);
+  if (!numeric || !Number.isSafeInteger(restrictions) || restrictions !== 0) return 'Eingeschränkter Baustein: keine automatische Übernahme.';
+  return '';
+}
+
+function supportsAddress(address, parent) {
+  if (isValidLoxoneUuid(address)) return true;
+  if (!parent || parent.type !== 'LightControllerV2') return false;
+  const [uuid, input, extra] = address.split('/');
+  if (!isValidLoxoneUuid(uuid) || uuid !== parent.uuid || extra !== undefined) return false;
+  // Keep only documented light inputs or the explicitly referenced master brightness.
+  return /^AI[1-9]\d*$/.test(input || '') || (address === parent.masterValue && /^[A-Za-z][A-Za-z0-9_-]*$/.test(input || ''));
+}
+
+function profilesForAddress(type, address) {
+  return structuredClone(profiles[type]).map((profile) => {
+    if (!address.includes('/')) return profile;
+    const { offValue, ...rest } = profile;
+    return { ...rest, type: 'raw', value: '', path: `/jdev/sps/io/${address}/${profile.value}`, offPath: `/jdev/sps/io/${address}/${offValue}` };
+  });
+}
+
+function referencedAddress(target) {
+  if (target.type !== 'raw') return target.uuid;
+  const path = String(target.path || '').replaceAll('{uuid}', target.uuid);
+  const match = path.match(/^\/?jdev\/sps\/io\/([^/]+)\/(.+)$/);
+  if (!match || !isValidLoxoneUuid(match[1])) return '';
+  const parts = match[2].split('/');
+  return actionAddress(`${match[1]}${parts.length > 1 && parts[0] !== 'changeTo' ? `/${parts[0]}` : ''}`);
+}
+
 export function parseLoxoneCatalog(data, commands = {}) {
   if (!object(data) || !object(data.controls)) throw new Error('Loxone-Struktur enthält keine gültige Bausteinliste.');
   const controls = [];
-  const existing = Object.entries(commands).map(([key, command]) => [key, readCommandTarget(command)]);
+  const existing = Object.entries(commands).map(([key, command]) => [key, referencedAddress(readCommandTarget(command))]);
   function visit(entries, parent = null, depth = 0) {
     if (depth > 8) throw new Error('Loxone-Struktur ist zu stark verschachtelt.');
     for (const control of Object.values(entries)) {
       if (!object(control)) continue;
       if (controls.length >= MAX_CONTROLS) throw new Error('Loxone-Struktur enthält zu viele Bausteine.');
-      const uuid = label(control.uuidAction).trim().toLowerCase();
+      const uuid = actionAddress(control.uuidAction);
       const type = label(control.type);
-      const restrictions = Number(control.restrictions ?? 0);
-      const reason = parent ? 'Unterelement: manuell prüfen'
-        : control.isSecured ? 'Gesicherter Baustein'
-          : !Number.isSafeInteger(restrictions) || restrictions !== 0 ? 'Eingeschränkter Baustein'
-            : !isValidLoxoneUuid(uuid) ? 'Keine unterstützte Steuerungs-UUID'
-              : !Object.hasOwn(profiles, type) ? 'Kein geprüftes Profil' : '';
+      const protection = parent?.protection || protectionReason(control);
+      const lightChild = parent?.type === 'LightControllerV2' && parent.depth === 0 && isValidLoxoneUuid(parent.uuid) && ['Switch', 'Dimmer'].includes(type);
+      const reason = protection
+        || (parent && !lightChild ? (type === 'ColorPickerV2' ? 'Farbsteuerung wird noch nicht automatisch übernommen. Lichtstimmung am übergeordneten Baustein wählen oder manuell konfigurieren.' : 'Dieses Unterelement wird noch nicht automatisch unterstützt.') : '')
+        || (!supportsAddress(uuid, parent) ? 'Keine unterstützte Steuerungsadresse: manuell konfigurieren.' : '')
+        || (!Object.hasOwn(profiles, type) ? 'Für diesen Bausteintyp gibt es noch kein geprüftes Aktionsprofil.' : '');
       const room = control.room || parent?.room;
       const cat = control.cat || parent?.cat;
+      const id = String(controls.length);
+      const name = label(control.name) || type || 'Unbenannter Baustein';
       controls.push({
-        uuid, name: label(control.name) || type || 'Unbenannter Baustein', type,
+        id, parentId: parent?.id ?? null, rootId: parent?.rootId ?? id,
+        parentName: parent?.name || '', uuid, name, type,
         room: label(data.rooms?.[room]?.name), category: label(data.cats?.[cat]?.name),
-        reason, profiles: reason ? [] : structuredClone(profiles[type]),
-        existingKeys: existing.filter(([, target]) => target.uuid === uuid || target.path.startsWith(`/jdev/sps/io/${uuid}/`)).map(([key]) => key)
+        reason, profiles: reason ? [] : profilesForAddress(type, uuid),
+        existingKeys: existing.filter(([, address]) => uuid && address === uuid).map(([key]) => key)
       });
-      if (object(control.subControls)) visit(control.subControls, control, depth + 1);
+      if (object(control.subControls)) visit(control.subControls, {
+        id, rootId: parent?.rootId ?? id, name, type, uuid, room, cat, protection, depth,
+        masterValue: actionAddress(control.details?.masterValue)
+      }, depth + 1);
     }
   }
   visit(data.controls);

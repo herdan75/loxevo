@@ -2,8 +2,21 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile, mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { parseLoxoneCatalog } from '../src/loxone-catalog.js';
 
 const root = new URL('../', import.meta.url);
+const lightUuid = 'cccccccc-bbbb-cccc-dddddddddddddddd';
+const pickerFixture = { rooms: { kitchen: { name: 'Küche' }, terrace: { name: 'Terrasse' } }, cats: { light: { name: 'Licht' } }, controls: {
+  switch: { uuidAction: 'aaaaaaaa-bbbb-cccc-dddddddddddddddd', name: 'Küchenlicht', type: 'Switch', room: 'kitchen', cat: 'light' },
+  secured: { uuidAction: 'bbbbbbbb-bbbb-cccc-dddddddddddddddd', name: 'Türschloss', type: 'Switch', isSecured: true },
+  light: { uuidAction: lightUuid, name: 'Lichtsteuerung Terrasse', type: 'LightControllerV2', room: 'terrace', cat: 'light', subControls: {
+    dimmer: { uuidAction: `${lightUuid}/AI1`, name: 'Deckenlicht', type: 'Dimmer' },
+    switch: { uuidAction: `${lightUuid}/AI2`, name: 'Steckdose', type: 'Switch' },
+    color: { uuidAction: `${lightUuid}/AI3`, name: 'Farblicht', type: 'ColorPickerV2' }
+  } },
+  central: { uuidAction: 'dddddddd-bbbb-cccc-dddddddddddddddd', name: 'Licht Zentral', type: 'CentralLightController' },
+  blind: { uuidAction: 'eeeeeeee-bbbb-cccc-dddddddddddddddd', name: 'Rollladen Terrasse', type: 'Jalousie', room: 'terrace' }
+} };
 const fixture = () => ({
   server: { name: 'LoxEvo', port: 8080 },
   loxone: { baseUrl: 'http://miniserver.invalid', username: 'fixture', password: 'fixture', dryRun: true },
@@ -37,10 +50,7 @@ test('UI regression workflows and responsive layouts', async (t) => {
       if (route.request().method() === 'PUT') { persisted = route.request().postDataJSON(); body = { ok: true, config: persisted }; }
       else body = persisted;
     } else if (path === '/api/dry-run') { persisted.loxone.dryRun = route.request().postDataJSON().enabled; body = { dryRun: persisted.loxone.dryRun }; }
-    else if (path === '/api/loxone/controls') body = { controls: [
-      { uuid: 'aaaaaaaa-bbbb-cccc-dddddddddddddddd', name: 'Küchenlicht', type: 'Switch', room: 'Küche', category: 'Licht', existingKeys: [], profiles: [{ id: 'switch', label: 'Ein / Aus', type: 'direct', value: 'on', offValue: 'off', alexaMode: 'switch' }] },
-      { uuid: 'bbbbbbbb-bbbb-cccc-dddddddddddddddd', name: 'Türschloss', type: 'Switch', room: 'Eingang', category: 'Sicherheit', reason: 'Gesicherter Baustein', profiles: [], existingKeys: [] }
-    ] };
+    else if (path === '/api/loxone/controls') body = parseLoxoneCatalog(pickerFixture, persisted.commands);
     else if (path === '/api/tts/status') body = { enabled: false, ready: false, defaultDevices: [], allDevices: [], alarmDevices: [], auth: {} };
     else if (path === '/api/tts/devices') body = { devices: [] };
     else if (path === '/api/events') body = [];
@@ -137,6 +147,10 @@ test('UI regression workflows and responsive layouts', async (t) => {
     await page.locator('.picker-control option').first().waitFor();
     await page.locator('.picker-control').selectOption('1');
     assert.equal(await page.locator('.picker-add').isDisabled(), true);
+    assert.equal(await page.locator('.picker-action').isDisabled(), true);
+    assert.equal(await page.locator('.picker-action option').textContent(), 'Nicht unterstützt');
+    assert.equal(await page.locator('.picker-name').isDisabled(), true);
+    assert.equal(await page.locator('.picker-technical').isVisible(), false);
     await page.locator('.picker-control').selectOption('0');
     assert.equal(await page.locator('.picker-add').isEnabled(), true);
     assert.equal(await page.locator('.picker-mood-label').isVisible(), false);
@@ -144,6 +158,7 @@ test('UI regression workflows and responsive layouts', async (t) => {
     for (const width of [1366, 390, 320]) {
       await page.setViewportSize({ width, height: 800 });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+      assert.ok(await page.locator('.loxone-picker').evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth + 1));
       await page.screenshot({ path: `.tmp/stability/picker-${width}.png` });
     }
     await page.setViewportSize({ width: 1366, height: 800 });
@@ -158,6 +173,96 @@ test('UI regression workflows and responsive layouts', async (t) => {
     assert.equal(Object.keys(persisted.commands).length, 42);
     await page.locator('#loxonePickerBtn').click(); await page.locator('.picker-control option').first().waitFor();
     await page.locator('.picker-control').selectOption('0'); assert.equal(await page.locator('.picker-add').isDisabled(), true);
+    await page.keyboard.press('Escape');
+  });
+  await t.test('light subcontrol drafts preserve raw on/off paths, grouping and distinct circuit identities', async () => {
+    await reset(); await page.evaluate(() => openConfigArea('Befehle und Sprachnamen'));
+    const originalCommand = await page.evaluate(() => collectConfigFromForms().commands.test_0);
+    await page.locator('#loxonePickerBtn').click(); await page.locator('.picker-control option').first().waitFor();
+    await page.locator('.picker-control').selectOption('3');
+    assert.equal(await page.locator('.picker-control option:checked').evaluate((option) => option.parentElement.label), 'Terrasse · Lichtsteuerung Terrasse');
+    assert.match(await page.locator('.picker-selection').textContent(), /Terrasse › Lichtsteuerung Terrasse › Deckenlicht/);
+    assert.match(await page.locator('.picker-preview').textContent(), new RegExp(`${lightUuid}/AI1/on`));
+    assert.match(await page.locator('.picker-preview').textContent(), new RegExp(`${lightUuid}/AI1/off`));
+    assert.equal(await page.locator('.picker-add').isEnabled(), true);
+    await page.locator('.picker-technical summary').click();
+    for (const [width, height] of [[1366, 800], [390, 780], [320, 568]]) {
+      await page.setViewportSize({ width, height });
+      const bounds = await page.locator('.loxone-picker').evaluate((dialog) => {
+        const rect = dialog.getBoundingClientRect();
+        return { fits: dialog.scrollWidth <= dialog.clientWidth + 1, top: rect.top, bottom: rect.bottom };
+      });
+      assert.equal(bounds.fits, true); assert.ok(bounds.top >= 0 && bounds.bottom <= height + 1);
+      await page.locator('.picker-add').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `.tmp/stability/picker-circuit-${width}.png` });
+    }
+    await page.setViewportSize({ width: 1366, height: 800 });
+    await page.locator('.picker-add').click();
+    const result = await page.evaluate(() => {
+      const card = roomEditor.querySelector('[data-command-original="deckenlicht"]');
+      return { command: collectConfigFromForms().commands.deckenlicht, open: card.open, first: roomEditor.querySelector('.room-card').dataset.commandOriginal };
+    });
+    assert.equal(result.command.enabled, false); assert.equal(result.command.loxone.type, 'raw');
+    assert.equal(result.command.loxone.path, `/jdev/sps/io/${lightUuid}/AI1/on`);
+    assert.equal(result.command.loxone.offPath, `/jdev/sps/io/${lightUuid}/AI1/off`);
+    assert.equal(result.command.room, 'terrasse'); assert.equal(result.command.category, 'Licht');
+    assert.equal(result.open, true); assert.equal(result.first, 'deckenlicht');
+    assert.equal(Object.keys(persisted.commands).length, 42);
+    await page.locator('#loxonePickerBtn').click(); await page.locator('.picker-control option').first().waitFor();
+    await page.locator('.picker-control').selectOption('3');
+    assert.equal(await page.locator('.picker-add').isDisabled(), true);
+    assert.match(await page.locator('.picker-note').textContent(), /Bereits vorhanden: deckenlicht/);
+    await page.locator('.picker-control').selectOption('4');
+    assert.equal(await page.locator('.picker-add').isEnabled(), true);
+    await page.locator('.picker-add').click();
+    const commands = await page.evaluate(() => collectConfigFromForms().commands);
+    assert.equal(commands.steckdose.loxone.path, `/jdev/sps/io/${lightUuid}/AI2/on`);
+    assert.deepEqual(commands.test_0, originalCommand);
+    await page.evaluate(() => saveConfig(saveBtn));
+    assert.equal(persisted.commands.deckenlicht.loxone.offPath, `/jdev/sps/io/${lightUuid}/AI1/off`);
+    assert.equal(persisted.commands.steckdose.enabled, false);
+  });
+  await t.test('picker empty states, filters, scene validation and existing raw aliases stay consistent', async () => {
+    await reset(); await page.evaluate(() => openConfigArea('Befehle und Sprachnamen'));
+    await page.locator('#loxonePickerBtn').click(); await page.locator('.picker-control option').first().waitFor();
+    await page.locator('.picker-control').selectOption('5');
+    assert.equal(await page.locator('.picker-action').isDisabled(), true);
+    assert.match(await page.locator('.picker-note').textContent(), /Farbsteuerung/);
+    await page.screenshot({ path: '.tmp/stability/picker-unsupported.png' });
+    await page.locator('.picker-control').selectOption('6');
+    assert.match(await page.locator('.picker-note').textContent(), /kein geprüftes/);
+    await page.locator('.picker-control').selectOption('2');
+    assert.equal(await page.locator('.picker-mood-label').isVisible(), true);
+    for (const value of ['', '-1', '0.5', '9007199254740992']) {
+      await page.locator('.picker-mood').fill(value);
+      assert.equal(await page.locator('.picker-add').isDisabled(), true);
+    }
+    await page.locator('.picker-mood').fill('0');
+    assert.equal(await page.locator('.picker-add').isEnabled(), true);
+    assert.match(await page.locator('.picker-preview').textContent(), /changeTo\/0/);
+    await page.locator('.picker-search').fill('kein solcher Baustein');
+    assert.equal(await page.locator('.picker-control option').count(), 0);
+    assert.match(await page.locator('.picker-status').textContent(), /Keine Bausteine/);
+    assert.equal(await page.locator('.picker-name').inputValue(), '');
+    assert.equal(await page.locator('.picker-action').isDisabled(), true);
+    assert.equal(await page.locator('.picker-technical').isVisible(), false);
+    await page.locator('.picker-search').fill('Lichtsteuerung Terrasse');
+    assert.equal(await page.locator('.picker-control option').count(), 4);
+    await page.locator('.picker-control').selectOption('3');
+    await page.locator('.picker-room').selectOption('Küche');
+    assert.equal(await page.locator('.picker-add').isDisabled(), true);
+    assert.equal(await page.locator('.picker-name').inputValue(), '');
+    await page.locator('.loxone-picker [aria-label="Schließen"]').focus();
+    await page.keyboard.press('Escape');
+    await page.locator('dialog.loxone-picker').waitFor({ state: 'detached' });
+    await page.evaluate(() => {
+      config.commands.raw_alias = { label: 'Legacy', enabled: false, loxone: { type: 'raw', path: '/jdev/sps/io/aaaaaaaa-bbbb-cccc-dddddddddddddddd/on' } };
+      renderCommandEditor();
+    });
+    await page.locator('#loxonePickerBtn').click(); await page.locator('.picker-control option').first().waitFor();
+    await page.locator('.picker-control').selectOption('0');
+    assert.equal(await page.locator('.picker-add').isDisabled(), true);
+    assert.match(await page.locator('.picker-note').textContent(), /raw_alias/);
     await page.keyboard.press('Escape');
   });
   await t.test('target fallback, explicit tests and partial results remain understandable', async () => {

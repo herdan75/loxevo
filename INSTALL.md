@@ -1,6 +1,6 @@
 # Installation
 
-> **Stand: 1.0.30 auf develop.** Vor einem Update die Geräte-ID-Migration und den [Prüfstatus](docs/validation-1.0.30.md) beachten. Der echte Alexa-Langzeittest ist noch erforderlich. Der neue Auswahlassistent verwendet die gespeicherten Miniserver-Zugangsdaten; bestehende Befehle und Geräte-IDs werden nicht automatisch ersetzt.
+> **Stand: 1.0.31 auf develop.** Vor einem Update die Geräte-ID-Migration und den [Prüfstatus](docs/validation-1.0.31.md) beachten. Der echte Alexa-Langzeittest ist noch erforderlich. Der Auswahlassistent verwendet die gespeicherten Miniserver-Zugangsdaten; bestehende Befehle und Geräte-IDs werden nicht automatisch ersetzt. 1.0.31 ergänzt Lichtkreise, ohne vorhandene Einstellungen zu migrieren.
 
 Diese Anleitung beschreibt den Docker-Weg. Private Daten werden erst nach der Installation lokal im Ordner `data/` angelegt oder über die Web-UI eingetragen.
 
@@ -222,7 +222,7 @@ docker compose logs loxevo
 
 `alexa-remote2 ist nicht installiert`:
 
-Im Docker-Image von 1.0.30 ist `alexa-remote2@8.1.1` enthalten. Tritt die Meldung auf, zuerst Branch, Commit und Image-Neubau prüfen. Ohne Docker `npm ci` ausführen. Nicht auf eine beliebige andere AlexaRemote-Version wechseln.
+Im Docker-Image von 1.0.31 ist `alexa-remote2@8.1.1` enthalten. Tritt die Meldung auf, zuerst Branch, Commit und Image-Neubau prüfen. Ohne Docker `npm ci` ausführen. Nicht auf eine beliebige andere AlexaRemote-Version wechseln.
 
 `Alexa-Cookie konnte nicht gelesen werden`:
 

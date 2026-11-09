@@ -1,6 +1,6 @@
 # LoxBerry Docker Deployment
 
-> **Stand: 1.0.30 auf develop.** Vor dem ersten Update [Migration und Prüfstatus](validation-1.0.30.md) beachten. Ein erfolgreicher Build ersetzt keinen Test auf dem eigenen LoxBerry.
+> **Stand: 1.0.31 auf develop.** Vor dem ersten Update die bestehenden Migrationshinweise und den [Prüfstatus](validation-1.0.31.md) beachten. Ein erfolgreicher Build ersetzt keinen Test auf dem eigenen LoxBerry. Das Update von 1.0.30 benötigt keine Konfigurationsmigration.
 
 Diese Anleitung beschreibt den kontrollierten Test von LoxEvo auf dem LoxBerry. Neue Installation und Branch-Wechsel sind in [INSTALL.md](../INSTALL.md) beschrieben. `main` wird mit diesem Update nicht verändert.
 
@@ -151,7 +151,7 @@ docker compose down
 
 `alexa-remote2 ist nicht installiert`
 
-Version 1.0.30 enthält das Paket bereits. Branch, Commit und Image-Neubau prüfen; keine beliebige andere AlexaRemote-Version installieren. Ohne Docker die Pakete mit `npm ci` aus dem Lockfile installieren.
+Version 1.0.31 enthält das Paket bereits. Branch, Commit und Image-Neubau prüfen; keine beliebige andere AlexaRemote-Version installieren. Ohne Docker die Pakete mit `npm ci` aus dem Lockfile installieren.
 
 `Alexa-Cookie konnte nicht gelesen werden`
 

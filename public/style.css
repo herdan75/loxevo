@@ -1287,7 +1287,10 @@ main {
 .loxone-picker [hidden] { display: none; }
 .loxone-picker select, .loxone-picker input { width: 100%; min-width: 0; }
 .loxone-picker pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
-.picker-control { height: 180px; }
+.loxone-picker .picker-control { height: 220px; }
+.loxone-picker .picker-selection, .loxone-picker .picker-note { overflow-wrap: anywhere; }
+.loxone-picker .picker-selection { margin-top: 6px; }
+.loxone-picker .picker-add:disabled { background: #e4e7eb; border-color: #c8cfd6; color: #52606d; opacity: 1; cursor: not-allowed; }
 .command-advanced-toggle { margin: 6px 12px 0; font-size: 12px; }
 .command-simple .advanced-field { display: none; }
 .command-simple .form-row.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
